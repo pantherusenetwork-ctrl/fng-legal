@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — FNG Publisher</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    background: #000; color: #f5f0e8;
+    line-height: 1.7; padding: 40px 20px;
+    max-width: 800px; margin: 0 auto;
+  }
+  h1 { font-size: 2em; margin-bottom: 0.5em; }
+  h2 { font-size: 1.3em; margin: 1.8em 0 0.5em; color: #d4af37; }
+  p, li { color: #ccc; margin-bottom: 0.8em; }
+  ul { margin-left: 20px; margin-bottom: 1em; }
+  a { color: #d4af37; }
+  .back { display: inline-block; margin-bottom: 2em; }
+  .meta { color: #666; font-size: 0.9em; margin-bottom: 2em; }
+  .highlight { background: #1a1a1a; padding: 15px; border-left: 3px solid #d4af37; margin: 1em 0; }
+</style>
+</head>
+<body>
+
+<a href="index.html" class="back">&larr; Back to FNG Publisher</a>
+
+<h1>Privacy Policy</h1>
+<p class="meta">Last updated: June 17, 2026</p>
+
+<div class="highlight">
+  <strong>Summary:</strong> FNG Publisher is a private internal automation tool. It does not
+  collect, store, or process data from any user other than the single authorized channel
+  owner. It does not interact with any third-party TikTok user data.
+</div>
+
+<h2>1. Who we are</h2>
+<p>
+  For New Generation ("FNG", "we") is the operator of the @fornewgenerationtv TikTok channel
+  and the FNG Publisher automation app. Contact: <a href="mailto:kaizenxhunter@gmail.com">kaizenxhunter@gmail.com</a>
+</p>
+
+<h2>2. What data we process</h2>
+<p>FNG Publisher processes only the following data, strictly for the purpose of publishing
+videos to our own authorized TikTok account:</p>
+<ul>
+  <li>OAuth access tokens issued by TikTok to the channel owner;</li>
+  <li>Video files produced internally by the channel;</li>
+  <li>Video metadata (caption, hashtags, privacy setting) entered by the channel owner.</li>
+</ul>
+<p>
+  We do <strong>not</strong> collect any data from other TikTok users, viewers, followers,
+  commenters, or third parties.
+</p>
+
+<h2>3. How we store data</h2>
+<p>
+  OAuth tokens are stored encrypted in our internal n8n credential vault on a self-hosted
+  server (UGREEN NAS, Tailscale private network). Video files are stored locally on the
+  same server and are deleted after successful upload.
+</p>
+
+<h2>4. Data sharing</h2>
+<p>
+  We do not share, sell, rent, or transfer any data to third parties. The only external
+  party that receives data is TikTok itself (via the Content Posting API), which is
+  necessary to fulfill the publishing function.
+</p>
+
+<h2>5. Data retention</h2>
+<ul>
+  <li>OAuth tokens: kept until the channel owner revokes them or they expire.</li>
+  <li>Video metadata logs: kept for 90 days for debugging, then deleted.</li>
+  <li>Video files: deleted after successful upload to TikTok.</li>
+</ul>
+
+<h2>6. Your rights (GDPR / RGPD)</h2>
+<p>
+  Since the App only processes the channel owner's own data, GDPR data-subject requests
+  are handled internally. The channel owner can revoke OAuth access at any time via
+  TikTok account settings.
+</p>
+
+<h2>7. Cookies and tracking</h2>
+<p>
+  This website does not use cookies, analytics, or any third-party tracking.
+</p>
+
+<h2>8. Security</h2>
+<p>
+  All credentials are encrypted at rest. The server hosting the App is only reachable
+  via a private Tailscale VPN. We follow standard security best practices (rotation
+  of secrets, HTTPS for all OAuth callbacks, no plain-text credential storage).
+</p>
+
+<h2>9. Changes to this policy</h2>
+<p>
+  We may update this Privacy Policy. The updated version is effective upon publication
+  on this page.
+</p>
+
+<h2>10. Contact</h2>
+<p>
+  Questions or data requests: <a href="mailto:kaizenxhunter@gmail.com">kaizenxhunter@gmail.com</a>
+</p>
+
+</body>
+</html>
