@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "id": "prj-demo",
+  "name": "Salle serveur — Démo",
+  "created": "2026-08-28T10:00:00Z",
+  "racks": [
+    {
+      "id": "rack-a",
+      "name": "Baie A",
+      "u_height": 42,
+      "width_inches": 19,
+      "location": "Local technique RDC",
+      "desc_units": false,
+      "notes": "",
+      "items": [
+        {
+          "id": "eq-01",
+          "type_id": "fortinet-fortigate-100f",
+          "position_u": 42,
+          "face": "front",
+          "meta": {
+            "hostname": "FW-SIEGE-01",
+            "role": "firewall",
+            "vlan": "MGMT 99",
+            "wall_outlet": "",
+            "port_usage": [
+              { "port": "port1", "outlet": "PM-R12", "vlan": "99", "usage": "Management" },
+              { "port": "port3", "outlet": "", "vlan": "trunk", "usage": "Uplink core" }
+            ],
+            "serial": "FG100F0000000000",
+            "notes": ""
+          }
+        },
+        {
+          "id": "eq-02",
+          "type_id": "cisco-catalyst-9300-48p",
+          "position_u": 40,
+          "face": "front",
+          "meta": {
+            "hostname": "SW-CORE-01",
+            "role": "switch",
+            "vlan": "trunk",
+            "wall_outlet": "",
+            "port_usage": [
+              { "port": "Gi1/0/1", "outlet": "PM-A01", "vlan": "20", "usage": "Poste accueil" },
+              { "port": "Gi1/0/48", "outlet": "", "vlan": "trunk", "usage": "Uplink firewall" }
+            ],
+            "serial": "",
+            "notes": ""
+          }
+        },
+        {
+          "id": "eq-03",
+          "type_id": "generic-patch-panel-24",
+          "position_u": 41,
+          "face": "front",
+          "meta": {
+            "hostname": "",
+            "role": "patch-panel",
+            "vlan": "",
+            "wall_outlet": "",
+            "port_usage": [],
+            "serial": "",
+            "notes": "Brassage étage RDC"
+          }
+        },
+        {
+          "id": "eq-04",
+          "type_id": "hpe-proliant-dl380-g11",
+          "position_u": 20,
+          "face": "front",
+          "meta": {
+            "hostname": "HYPERV-01",
+            "role": "server",
+            "vlan": "SRV 30",
+            "wall_outlet": "",
+            "port_usage": [],
+            "serial": "",
+            "notes": ""
+          }
+        },
+        {
+          "id": "eq-05",
+          "type_id": "apc-smart-ups-3000-2u",
+          "position_u": 1,
+          "face": "front",
+          "meta": {
+            "hostname": "",
+            "role": "ups",
+            "vlan": "",
+            "wall_outlet": "",
+            "port_usage": [],
+            "serial": "",
+            "notes": "Onduleur bas de baie"
+          }
+        }
+      ]
+    }
+  ],
+  "equipment_types": [],
+  "logical": {
+    "vlans": [
+      { "vid": 20, "name": "USERS", "color": "#22d3ee" },
+      { "vid": 30, "name": "SERVEURS", "color": "#a78bfa" },
+      { "vid": 99, "name": "MGMT", "color": "#f97316" }
+    ],
+    "links": [
+      {
+        "id": "lnk-01",
+        "from": { "equipment_id": "eq-01", "port": "port3" },
+        "to": { "equipment_id": "eq-02", "port": "Gi1/0/48" },
+        "kind": "trunk",
+        "vlans": [20, 30, 99],
+        "label": "Uplink FW → Core",
+        "media": "cuivre-cat6a"
+      }
+    ]
+  }
+}

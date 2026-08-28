@@ -1,0 +1,151 @@
+/* RackForgePrime — DA sombre, futuriste, sobre.
+   Règles : lisible à 1 m, zéro gadget, glow réservé à la sélection. */
+
+:root {
+  --bg: #0b0e14;
+  --panel: #11151f;
+  --panel-2: #161b28;
+  --frame: #1b2230;
+  --line: #2c3547;
+  --text: #cbd5e1;
+  --text-dim: #64748b;
+  --accent: #22d3ee;
+  --danger: #f87171;
+  --mono: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  --sans: system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  display: flex; flex-direction: column;
+  background: var(--bg); color: var(--text);
+  font-family: var(--sans); font-size: 14px;
+}
+
+/* ---- Barre supérieure ---- */
+#topbar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 8px 14px; background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+#brand { font-size: 17px; font-weight: 700; letter-spacing: .5px; white-space: nowrap; }
+.brand-mark { color: var(--accent); }
+.brand-accent { color: var(--accent); }
+#project-name {
+  flex: 0 1 340px; background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px;
+  font-family: var(--mono); font-size: 13px;
+}
+#project-name:focus { outline: 1px solid var(--accent); }
+#topbar-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.sep { width: 1px; height: 22px; background: var(--line); }
+
+button, label.export {
+  background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--line); border-radius: 6px;
+  padding: 6px 12px; cursor: pointer; font-size: 13px; font-family: var(--sans);
+}
+button:hover, label.export:hover { border-color: var(--accent); color: var(--accent); }
+button.export, label.export { font-family: var(--mono); }
+button.danger { border-color: #7f1d1d; color: var(--danger); }
+button.danger:hover { border-color: var(--danger); }
+
+/* ---- Layout 3 colonnes ---- */
+#layout { flex: 1; display: flex; min-height: 0; }
+
+/* Palette gauche */
+#palette {
+  width: 250px; flex-shrink: 0; overflow-y: auto;
+  background: var(--panel); border-right: 1px solid var(--line);
+  padding: 12px;
+}
+#palette h2, #inspector h2 {
+  margin: 0 0 10px; font-size: 12px; text-transform: uppercase;
+  letter-spacing: 1.5px; color: var(--text-dim);
+}
+#palette-filter {
+  width: 100%; margin-bottom: 12px; background: var(--panel-2);
+  border: 1px solid var(--line); border-radius: 6px; color: var(--text);
+  padding: 6px 10px;
+}
+.palette-group-title {
+  margin: 14px 0 6px; font-size: 11px; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--text-dim);
+  display: flex; align-items: center; gap: 6px;
+}
+.role-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.palette-item {
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-left: 3px solid var(--line); border-radius: 6px;
+  padding: 7px 9px; margin-bottom: 6px; cursor: grab; user-select: none;
+}
+.palette-item:active { cursor: grabbing; }
+.palette-item:hover { border-color: var(--accent); }
+.palette-item .vendor { font-size: 11px; color: var(--text-dim); }
+.palette-item .model { font-size: 13px; }
+.palette-item .uh { float: right; font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+.palette-hint { font-size: 11px; color: var(--text-dim); line-height: 1.5; margin-top: 16px; }
+
+/* Canvas */
+#canvas-wrap { flex: 1; overflow: auto; padding: 20px; }
+#canvas { display: flex; gap: 40px; align-items: flex-start; min-width: min-content; }
+#canvas svg { display: block; }
+
+/* États de drag rendus dans le SVG */
+.ghost-ok rect { stroke: var(--accent); }
+.item-selected { filter: drop-shadow(0 0 6px rgba(34, 211, 238, .6)); }
+g.rack-item { cursor: grab; }
+
+/* Panneau métadonnées */
+#inspector {
+  width: 290px; flex-shrink: 0; overflow-y: auto;
+  background: var(--panel); border-left: 1px solid var(--line); padding: 14px;
+}
+#inspector.hidden { display: none; }
+.inspector-type {
+  font-family: var(--mono); font-size: 12px; color: var(--accent);
+  margin-bottom: 12px; padding: 8px; background: var(--panel-2);
+  border-radius: 6px; border: 1px solid var(--line);
+}
+#inspector-form label { display: block; margin-bottom: 9px; font-size: 12px; color: var(--text-dim); }
+#inspector-form input, #inspector-form textarea, #port-usage-rows input {
+  width: 100%; margin-top: 3px; background: var(--panel-2);
+  border: 1px solid var(--line); border-radius: 5px; color: var(--text);
+  padding: 5px 8px; font-family: var(--mono); font-size: 12px;
+}
+#inspector-form input:focus, #inspector-form textarea:focus { outline: 1px solid var(--accent); }
+#port-usage-fs { border: 1px solid var(--line); border-radius: 6px; margin: 10px 0; }
+#port-usage-fs legend { font-size: 11px; color: var(--text-dim); padding: 0 5px; }
+.pu-row { display: grid; grid-template-columns: 1fr 1fr 52px 1fr 20px; gap: 4px; margin-bottom: 4px; }
+.pu-row button { padding: 0; border: none; background: none; color: var(--danger); font-size: 14px; }
+#btn-add-port { font-size: 11px; padding: 3px 8px; margin: 4px; }
+.inspector-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+
+/* Barre d'état */
+#statusbar {
+  padding: 6px 14px; background: var(--panel);
+  border-top: 1px solid var(--line);
+  font-family: var(--mono); font-size: 12px; color: var(--text-dim);
+}
+#statusbar .stat-accent { color: var(--accent); }
+#statusbar .stat-err { color: var(--danger); }
+
+/* Modale brassage */
+#patch-dialog {
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--line); border-radius: 10px;
+  max-width: 80vw; max-height: 80vh; padding: 18px;
+}
+#patch-dialog::backdrop { background: rgba(0, 0, 0, .6); }
+#patch-dialog h2 { margin-top: 0; }
+.dialog-hint { font-size: 12px; color: var(--text-dim); }
+#patch-table-wrap { overflow: auto; max-height: 55vh; margin-bottom: 12px; }
+#patch-table-wrap table { border-collapse: collapse; font-family: var(--mono); font-size: 12px; width: 100%; }
+#patch-table-wrap th, #patch-table-wrap td {
+  border: 1px solid var(--line); padding: 5px 10px; text-align: left; white-space: nowrap;
+}
+#patch-table-wrap th {
+  background: var(--panel-2); color: var(--accent);
+  position: sticky; top: 0; font-weight: 600;
+}

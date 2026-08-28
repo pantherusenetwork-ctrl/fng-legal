@@ -1,0 +1,10 @@
+# RackForgePrime — dépendances (100 % locales, aucune API cloud payante)
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.6
+reportlab>=4.1
+svglib>=1.5
+
+# Développement / tests
+pytest>=8.0
+httpx>=0.27

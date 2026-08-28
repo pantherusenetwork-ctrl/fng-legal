@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RackForgePrime</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+  <!-- Barre supérieure : identité + actions globales -->
+  <header id="topbar">
+    <div id="brand">
+      <span class="brand-mark">▣</span> RackForge<span class="brand-accent">Prime</span>
+    </div>
+    <input id="project-name" type="text" value="Nouveau projet" title="Nom du projet"
+           aria-label="Nom du projet">
+    <div id="topbar-actions">
+      <button id="btn-add-rack" title="Ajouter une baie 42U">+ Baie</button>
+      <button id="btn-patch-table" title="Tableau de brassage généré depuis les métadonnées">Brassage</button>
+      <span class="sep"></span>
+      <button id="btn-export-svg" class="export">SVG</button>
+      <button id="btn-export-pdf" class="export">PDF</button>
+      <button id="btn-export-json" class="export">JSON</button>
+      <label id="btn-import-json" class="export" title="Charger un projet JSON">
+        Ouvrir<input type="file" accept=".json" hidden>
+      </label>
+    </div>
+  </header>
+
+  <main id="layout">
+    <!-- Palette gauche : équipements par rôle / constructeur -->
+    <aside id="palette">
+      <h2>Équipements</h2>
+      <input id="palette-filter" type="search" placeholder="Filtrer (modèle, marque…)"
+             aria-label="Filtrer la palette">
+      <div id="palette-groups"><!-- rempli par app.js depuis /api/catalog --></div>
+      <p class="palette-hint">Glissez un équipement vers une baie.<br>
+        Il s'aligne seul sur les U libres ; une collision refuse le dépôt.</p>
+    </aside>
+
+    <!-- Canvas : les baies, rendues en SVG à l'échelle U exacte -->
+    <section id="canvas-wrap">
+      <div id="canvas"><!-- SVG des baies, généré par app.js --></div>
+    </section>
+
+    <!-- Panneau métadonnées : s'ouvre au clic sur un équipement -->
+    <aside id="inspector" class="hidden">
+      <h2>Métadonnées</h2>
+      <div id="inspector-type" class="inspector-type"></div>
+      <form id="inspector-form">
+        <label>Hostname <input name="hostname" autocomplete="off"></label>
+        <label>Rôle <input name="role" autocomplete="off"></label>
+        <label>VLAN <input name="vlan" autocomplete="off"></label>
+        <label>Prise murale <input name="wall_outlet" autocomplete="off"></label>
+        <label>N° de série <input name="serial" autocomplete="off"></label>
+        <label>Notes <textarea name="notes" rows="2"></textarea></label>
+        <fieldset id="port-usage-fs">
+          <legend>Brassage (port / prise / VLAN / usage)</legend>
+          <div id="port-usage-rows"></div>
+          <button type="button" id="btn-add-port">+ Ligne</button>
+        </fieldset>
+      </form>
+      <div class="inspector-actions">
+        <button id="btn-delete-item" class="danger">Supprimer l'équipement</button>
+        <button id="btn-close-inspector">Fermer</button>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Barre d'état : stats live par baie (esprit TSS) -->
+  <footer id="statusbar"><span id="status-text">Chargement du catalogue…</span></footer>
+
+  <!-- Modale tableau de brassage -->
+  <dialog id="patch-dialog">
+    <h2>Tableau de brassage</h2>
+    <p class="dialog-hint">Généré automatiquement depuis les métadonnées — aucun dessin ne remplace ce tableau.</p>
+    <div id="patch-table-wrap"></div>
+    <button id="btn-close-patch">Fermer</button>
+  </dialog>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
