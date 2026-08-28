@@ -148,9 +148,35 @@ function svgEl(tag, attrs, text) {
   return el;
 }
 
+/* Types disponibles = catalogue intégré + types du projet (imports).
+ * Un type projet portant le même id qu'un type intégré le REMPLACE :
+ * c'est le mécanisme « Remplacer par image officielle ». */
+function refreshTypes() {
+  typesById = {};
+  for (const t of catalog.types) typesById[t.id] = t;
+  for (const t of (project?.equipment_types || [])) typesById[t.id] = t;
+}
+function allTypes() {
+  return Object.values(typesById);
+}
+
 /* Faceplate placeholder — même dessin que _faceplate_placeholder() côté Python. */
 function drawFaceplate(g, t, x, y, label, selected) {
   const h = t.u_height * U_PX;
+  if (t.faceplate_image) {
+    /* Image officielle : étirée sur le slot U exact (convention TSS/NetBox),
+       cadre de sélection par-dessus. */
+    g.appendChild(svgEl("rect", { x, y: y + 1, width: RACK_W, height: h - 2, fill: C.face }));
+    const img = svgEl("image", {
+      x, y: y + 1, width: RACK_W, height: h - 2,
+      preserveAspectRatio: "none", href: t.faceplate_image,
+    });
+    g.appendChild(img);
+    if (selected)
+      g.appendChild(svgEl("rect", { x, y: y + 1, width: RACK_W, height: h - 2,
+        fill: "none", stroke: C.accent, "stroke-width": 1.6 }));
+    return;
+  }
   g.appendChild(svgEl("rect", {
     x, y: y + 1, width: RACK_W, height: h - 2, rx: 2, fill: C.face,
     stroke: selected ? C.accent : "#2c3547", "stroke-width": selected ? 1.6 : 1,
@@ -259,7 +285,7 @@ function renderPalette(filter) {
   wrap.innerHTML = "";
   const f = (filter || "").toLowerCase();
   for (const [cat, label] of Object.entries(CATEGORY_LABELS)) {
-    const types = catalog.types.filter((t) =>
+    const types = allTypes().filter((t) =>
       t.category === cat &&
       (!f || `${t.vendor} ${t.model}`.toLowerCase().includes(f)));
     if (!types.length) continue;
@@ -506,6 +532,9 @@ $("#btn-import-json input").addEventListener("change", async (e) => {
   try {
     const data = JSON.parse(await file.text());
     project = data;
+    if (!project.equipment_types) project.equipment_types = [];
+    refreshTypes();
+    renderPalette($("#palette-filter").value);
     $("#project-name").value = project.name || "Sans nom";
     closeInspector();
     renderAll();
@@ -513,6 +542,125 @@ $("#btn-import-json input").addEventListener("change", async (e) => {
     renderStatus('<span class="stat-err">JSON illisible</span>');
   }
   e.target.value = "";
+});
+
+/* =====================================================================
+ * Imports de modèles — YAML NetBox, PDF datasheet, image/SVG custom.
+ * Tout passe par la modale de validation : rien n'entre en silence.
+ * =================================================================== */
+
+let pendingProposal = null; // { type: {...}, source: "yaml"|"pdf"|"image" }
+
+function openProposal(type, source, confidence) {
+  pendingProposal = { type, source };
+  const dlg = $("#proposal-dialog");
+  const f = $("#proposal-form");
+  f.elements.vendor.value = type.vendor || "";
+  f.elements.model.value = type.model || "";
+  f.elements.category.value = type.category || "other";
+  f.elements.u_height.value = type.u_height || 1;
+  f.elements.power_w.value = type.power_w || 0;
+  f.elements.ports_count.value = (type.ports || []).length;
+  const hints = {
+    yaml: "Importé depuis un devicetype NetBox — vérifiez puis validez.",
+    pdf: "Extrait de la datasheet PDF. Les champs ambrés sont devinés : vérifiez-les.",
+    image: "Faceplate custom — complétez les caractéristiques réelles.",
+  };
+  $("#proposal-hint").textContent = hints[source];
+  /* Champs devinés (heuristique PDF) marqués visuellement. */
+  for (const name of ["vendor", "model", "u_height", "power_w", "ports_count"]) {
+    const key = name === "ports_count" ? "ports" : name;
+    f.elements[name].classList.toggle(
+      "guessed", source === "pdf" && confidence && !confidence[key]);
+  }
+  dlg.showModal();
+}
+
+$("#proposal-form").addEventListener("submit", (e) => {
+  if (e.submitter && e.submitter.value === "cancel") { pendingProposal = null; return; }
+  const f = e.target;
+  const n = parseInt(f.elements.ports_count.value || "0", 10);
+  const t = pendingProposal.type;
+  /* Id unique dans la palette courante. */
+  let id = t.id || "type-importe";
+  while (typesById[id]) id += "-2";
+  project.equipment_types.push({
+    id, vendor: f.elements.vendor.value.trim(),
+    model: f.elements.model.value.trim(),
+    category: f.elements.category.value,
+    u_height: Math.max(1, parseInt(f.elements.u_height.value, 10) || 1),
+    power_w: parseFloat(f.elements.power_w.value) || 0,
+    ports: Array.from({ length: n }, (_, i) => ({ name: "port" + (i + 1), type: "other" })),
+    color: catalog.role_colors[f.elements.category.value] || "#94a3b8",
+    faceplate_svg: null,
+    faceplate_image: t.faceplate_image || null,
+  });
+  pendingProposal = null;
+  refreshTypes();
+  renderPalette($("#palette-filter").value);
+  renderStatus("Modèle ajouté à la palette");
+  saveLocal();
+});
+
+/* Lecture d'un fichier image/SVG en data URI (stocké dans le JSON projet :
+ * le projet reste auto-suffisant, régénérable sans fichiers externes). */
+function fileToDataURI(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+document.querySelectorAll("[data-import]").forEach((input) =>
+  input.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    const kind = e.target.dataset.import;
+    try {
+      if (kind === "image") {
+        openProposal({
+          id: file.name.replace(/\.[^.]+$/, "").toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+          vendor: "", model: file.name.replace(/\.[^.]+$/, ""),
+          category: "other", u_height: 1,
+          faceplate_image: await fileToDataURI(file),
+        }, "image");
+        return;
+      }
+      const url = kind === "yaml" ? "/api/import/devicetype-yaml"
+                                  : "/api/import/datasheet";
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(url, { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) {
+        renderStatus(`<span class="stat-err">Import refusé : ${data.detail}</span>`);
+        return;
+      }
+      if (kind === "yaml") openProposal(data.type, "yaml");
+      else openProposal(data.proposal, "pdf", data.confidence);
+    } catch (err) {
+      renderStatus(`<span class="stat-err">Import impossible : ${err}</span>`);
+    }
+  }));
+
+/* « Remplacer par image officielle » : clone le type de l'item sélectionné
+ * dans les types du projet (même id => il remplace le type intégré). */
+$("#replace-image-input").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  const found = findItem(selectedItemId);
+  if (!file || !found) return;
+  const dataUri = await fileToDataURI(file);
+  const t = typesById[found.item.type_id];
+  const existing = project.equipment_types.find((x) => x.id === t.id);
+  if (existing) existing.faceplate_image = dataUri;
+  else project.equipment_types.push({ ...t, faceplate_image: dataUri });
+  refreshTypes();
+  renderAll();
+  renderStatus("Image officielle appliquée au modèle");
 });
 
 /* ---- Baies ---- */
@@ -544,6 +692,8 @@ $("#btn-patch-table").addEventListener("click", async () => {
   $("#patch-dialog").showModal();
 });
 $("#btn-close-patch").addEventListener("click", () => $("#patch-dialog").close());
+$("#btn-export-csv").addEventListener("click", () =>
+  postForBlob("/api/patch-table.csv", currentProject().id + "-brassage.csv"));
 
 /* ---- Sauvegarde de secours (localStorage) ---- */
 function saveLocal() {
@@ -564,12 +714,12 @@ function loadLocal() {
 (async function init() {
   const res = await fetch("/api/catalog");
   catalog = await res.json();
-  typesById = Object.fromEntries(catalog.types.map((t) => [t.id, t]));
+  project = loadLocal() || newProject();
+  if (!project.equipment_types) project.equipment_types = [];
+  refreshTypes();
   renderPalette("");
   $("#palette-filter").addEventListener("input",
     (e) => renderPalette(e.target.value));
-
-  project = loadLocal() || newProject();
   $("#project-name").value = project.name;
   renderAll();
   renderStatus("Prêt");

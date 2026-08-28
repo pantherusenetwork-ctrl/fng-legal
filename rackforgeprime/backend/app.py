@@ -10,14 +10,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from rackforge import storage
 from rackforge.catalog import BUILTIN_TYPES, ROLE_COLORS
-from rackforge.models import Project, patch_table, rack_stats, type_index
+from rackforge.importers import import_netbox_yaml, parse_datasheet_pdf
+from rackforge.models import (Project, patch_table, patch_table_csv,
+                              rack_stats, type_index)
 from rackforge.pdf_export import render_project_pdf
 from rackforge.svg_export import render_project_svg
 
@@ -63,6 +65,40 @@ def validate(payload: dict) -> dict:
 def get_patch_table(payload: dict) -> dict:
     project = _parse_project(payload)
     return {"rows": patch_table(project, type_index(project))}
+
+
+@app.post("/api/patch-table.csv")
+def get_patch_table_csv(payload: dict) -> Response:
+    project = _parse_project(payload)
+    csv_text = patch_table_csv(project, type_index(project))
+    return Response(
+        # BOM UTF-8 : Excel FR ouvre le fichier avec les accents corrects.
+        content="\ufeff" + csv_text, media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition":
+                 f'attachment; filename="{project.id}-brassage.csv"'},
+    )
+
+
+# --- Imports de types (YAML NetBox, PDF datasheet) --------------------------
+
+@app.post("/api/import/devicetype-yaml")
+async def import_devicetype_yaml(file: UploadFile = File(...)) -> dict:
+    """YAML NetBox devicetype-library -> type prêt à ajouter à la palette."""
+    try:
+        text = (await file.read()).decode("utf-8", errors="replace")
+        eq_type = import_netbox_yaml(text)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"type": eq_type.model_dump()}
+
+
+@app.post("/api/import/datasheet")
+async def import_datasheet(file: UploadFile = File(...)) -> dict:
+    """PDF datasheet -> proposition de type (l'utilisateur valide dans l'UI)."""
+    try:
+        return parse_datasheet_pdf(await file.read(), file.filename or "")
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 # --- Exports (le JSON reste la source de vérité) ----------------------------

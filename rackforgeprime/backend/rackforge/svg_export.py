@@ -152,9 +152,19 @@ def render_rack(rack: Rack, types: dict[str, EquipmentType],
         label = item.meta.hostname or f"{t.vendor} {t.model}"
         s.append(f'<g id="item-{escape(item.id)}">')
         if t.faceplate_svg:
-            # Image officielle : injectée telle quelle, cadrée à l'échelle U.
+            # SVG officiel : injecté tel quel, cadré à l'échelle U.
             s.append(f'<g transform="translate({inner_x},{y})">'
                      f'{t.faceplate_svg}</g>')
+        elif t.faceplate_image:
+            # Image officielle (PNG/JPEG en data URI) étirée sur le slot U
+            # exact — c'est la convention des outils rack (TSS, NetBox).
+            ih = t.u_height * U_PX
+            s.append(f'<rect x="{inner_x}" y="{y + 1}" width="{RACK_W}" '
+                     f'height="{ih - 2}" fill="{C_FACE}"/>')
+            s.append(f'<image x="{inner_x}" y="{y + 1}" width="{RACK_W}" '
+                     f'height="{ih - 2}" preserveAspectRatio="none" '
+                     f'href="{t.faceplate_image}" '
+                     f'xlink:href="{t.faceplate_image}"/>')
         else:
             s.extend(_faceplate_placeholder(t, inner_x, y, RACK_W, label))
         s.append('</g>')
@@ -178,7 +188,8 @@ def render_project_svg(project: Project) -> str:
     total_w = sum(w for w, _ in sizes) + GAP_X * max(len(racks) - 1, 0) + 40
     total_h = (max((h for _, h in sizes), default=200)) + 60
     parts: list[str] = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{total_w}" '
+        f'<svg xmlns="http://www.w3.org/2000/svg" '
+        f'xmlns:xlink="http://www.w3.org/1999/xlink" width="{total_w}" '
         f'height="{total_h}" viewBox="0 0 {total_w} {total_h}" '
         f'font-family="{FONT}">',
         f'<rect x="0" y="0" width="{total_w}" height="{total_h}" fill="{C_BG}"/>',

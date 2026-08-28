@@ -34,6 +34,18 @@
       <input id="palette-filter" type="search" placeholder="Filtrer (modèle, marque…)"
              aria-label="Filtrer la palette">
       <div id="palette-groups"><!-- rempli par app.js depuis /api/catalog --></div>
+      <h2 class="palette-import-title">Importer un modèle</h2>
+      <div class="palette-imports">
+        <label class="import-btn" title="Fichier YAML de netbox-community/devicetype-library">
+          YAML NetBox<input type="file" accept=".yaml,.yml" hidden data-import="yaml">
+        </label>
+        <label class="import-btn" title="Datasheet PDF constructeur : modèle, U, conso et ports extraits puis proposés">
+          PDF datasheet<input type="file" accept=".pdf" hidden data-import="pdf">
+        </label>
+        <label class="import-btn" title="Image ou SVG d'une faceplate custom">
+          Image / SVG<input type="file" accept=".svg,.png,.jpg,.jpeg" hidden data-import="image">
+        </label>
+      </div>
       <p class="palette-hint">Glissez un équipement vers une baie.<br>
         Il s'aligne seul sur les U libres ; une collision refuse le dépôt.</p>
     </aside>
@@ -61,6 +73,10 @@
         </fieldset>
       </form>
       <div class="inspector-actions">
+        <label class="import-btn" title="Photo ou SVG officiel du constructeur, appliqué à ce modèle">
+          Remplacer par image officielle
+          <input type="file" accept=".svg,.png,.jpg,.jpeg" hidden id="replace-image-input">
+        </label>
         <button id="btn-delete-item" class="danger">Supprimer l'équipement</button>
         <button id="btn-close-inspector">Fermer</button>
       </div>
@@ -75,7 +91,39 @@
     <h2>Tableau de brassage</h2>
     <p class="dialog-hint">Généré automatiquement depuis les métadonnées — aucun dessin ne remplace ce tableau.</p>
     <div id="patch-table-wrap"></div>
+    <button id="btn-export-csv" class="export">Exporter CSV</button>
     <button id="btn-close-patch">Fermer</button>
+  </dialog>
+
+  <!-- Modale de validation d'un type importé (YAML / PDF / image) :
+       rien n'entre dans la palette sans passage humain. -->
+  <dialog id="proposal-dialog">
+    <h2>Nouveau modèle d'équipement</h2>
+    <p class="dialog-hint" id="proposal-hint"></p>
+    <form id="proposal-form" method="dialog">
+      <label>Constructeur <input name="vendor" required></label>
+      <label>Modèle <input name="model" required></label>
+      <label>Catégorie
+        <select name="category">
+          <option value="switch">Switch</option>
+          <option value="firewall">Firewall</option>
+          <option value="router">Routeur</option>
+          <option value="patch-panel">Panneau de brassage</option>
+          <option value="server">Serveur</option>
+          <option value="ups">Onduleur</option>
+          <option value="blank">Obturateur</option>
+          <option value="cable-mgmt">Passe-câbles</option>
+          <option value="other">Autre</option>
+        </select>
+      </label>
+      <label>Hauteur (U) <input name="u_height" type="number" min="1" max="12" required></label>
+      <label>Consommation (W) <input name="power_w" type="number" min="0" step="0.1"></label>
+      <label>Nombre de ports <input name="ports_count" type="number" min="0" max="96"></label>
+      <div class="inspector-actions">
+        <button value="ok" id="btn-proposal-ok">Ajouter à la palette</button>
+        <button value="cancel" formnovalidate>Annuler</button>
+      </div>
+    </form>
   </dialog>
 
   <script src="/static/js/app.js"></script>

@@ -49,6 +49,17 @@ class EquipmentType(BaseModel):
     color: str = "#64748b"
     # SVG officiel constructeur (inline) — None => placeholder fidèle à l'échelle U.
     faceplate_svg: Optional[str] = None
+    # Image raster (PNG/JPEG) en data URI — « Remplacer par image officielle ».
+    faceplate_image: Optional[str] = None
+
+    @field_validator("faceplate_image")
+    @classmethod
+    def _image_is_data_uri(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not v.startswith("data:image/"):
+            raise ValueError(
+                "faceplate_image doit être un data URI (data:image/…)"
+            )
+        return v
 
 
 class PortUsage(BaseModel):
@@ -263,3 +274,18 @@ def patch_table(project: Project, types: dict[str, EquipmentType]
                     "usage": pu.usage,
                 })
     return rows
+
+
+def patch_table_csv(project: Project, types: dict[str, EquipmentType]) -> str:
+    """Tableau de brassage en CSV (séparateur « ; », convention FR/Excel)."""
+    import csv
+    import io
+
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=";")
+    writer.writerow(["Baie", "U", "Équipement", "Port", "Prise murale",
+                     "VLAN", "Usage"])
+    for r in patch_table(project, types):
+        writer.writerow([r["rack"], f"U{r['u']}", r["equipment"], r["port"],
+                         r["outlet"], r["vlan"], r["usage"]])
+    return buf.getvalue()

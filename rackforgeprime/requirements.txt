@@ -4,6 +4,9 @@ uvicorn[standard]>=0.29
 pydantic>=2.6
 reportlab>=4.1
 svglib>=1.5
+python-multipart>=0.0.9
+pyyaml>=6.0
+pypdf>=4.0
 
 # Développement / tests
 pytest>=8.0
