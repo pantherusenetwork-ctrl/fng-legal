@@ -111,6 +111,14 @@ def main() -> None:
 
     ws = ensure_workspace()
 
+    # Exe fenêtré (--noconsole) : sys.stdout/stderr valent None sous Windows
+    # et le moindre print planterait l'app. On redirige tout vers un log
+    # dans l'espace de travail — utile aussi pour diagnostiquer à distance.
+    if sys.stdout is None or sys.stderr is None:
+        log = open(ws / "rackforge.log", "a", encoding="utf-8", buffering=1)
+        sys.stdout = sys.stdout or log
+        sys.stderr = sys.stderr or log
+
     # Import APRÈS ensure_workspace (l'env RACKFORGE_PROJECTS_DIR est posé).
     import uvicorn
     from app import app  # noqa: WPS433 — objet importé pour le mode packagé
