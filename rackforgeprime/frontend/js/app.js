@@ -34,6 +34,8 @@ let project = null;
 let selectedItemId = null;
 /* Vue active : "physical" (baies) ou "logical" (VLANs / liens). */
 let viewMode = "physical";
+/* Numéros U visibles (toggle façon Visio « Hide U sizes »). */
+let showUNumbers = localStorage.getItem("rfp-show-u") !== "0";
 /* Drag en cours : { type, itemId?, fromRackId?, ghost SVG en cours } */
 let drag = null;
 let itemSeq = 1;
@@ -375,9 +377,10 @@ function renderRackSVG(rack) {
     svg.appendChild(svgEl("line", { x1: innerX, y1: y, x2: innerX + RACK_W, y2: y,
       stroke: C.slotLine, "stroke-width": 1 }));
     for (const rx of [FRAME_PAD, FRAME_PAD + RAIL_W + RACK_W]) {
-      svg.appendChild(svgEl("text", { x: rx + RAIL_W / 2, y: y + U_PX / 2 + 3,
-        "text-anchor": "middle", "font-size": 8, fill: C.dim,
-        "font-family": "monospace" }, String(u)));
+      if (showUNumbers)
+        svg.appendChild(svgEl("text", { x: rx + RAIL_W / 2, y: y + U_PX / 2 + 3,
+          "text-anchor": "middle", "font-size": 8, fill: C.dim,
+          "font-family": "monospace" }, String(u)));
       for (let k = 0; k < 3; k++)
         svg.appendChild(svgEl("rect", { x: rx + 2, y: y + 4 + k * ((U_PX - 8) / 2),
           width: 3, height: 3, rx: 1, fill: C.hole }));
@@ -401,6 +404,20 @@ function renderRackSVG(rack) {
     svg.appendChild(g);
   }
 
+  /* Slots libres cliquables (geste PATCHBOX) : pointillés au survol,
+   * clic = popover d'ajout rapide sans passer par le drag. */
+  const occupied = new Set();
+  for (const it of rack.items) for (const u of itemSpan(it)) occupied.add(u);
+  for (let u = 1; u <= rack.u_height; u++) {
+    if (occupied.has(u)) continue;
+    const slot = svgEl("rect", {
+      x: innerX + 2, y: uToY(rack, u) + 2, width: RACK_W - 4, height: U_PX - 4,
+      rx: 2, class: "slot-free", fill: "transparent",
+    });
+    slot.addEventListener("click", (e) => openSlotPopover(e, rack, u));
+    svg.appendChild(slot);
+  }
+
   /* Stats de la baie. */
   const st = rackStats(rack);
   svg.appendChild(svgEl("text", { x: w / 2, y: h - FOOTER_H / 2, "text-anchor": "middle",
@@ -409,6 +426,83 @@ function renderRackSVG(rack) {
 
   return svg;
 }
+
+/* =====================================================================
+ * Popover d'ajout rapide sur slot libre (esprit PATCHBOX : clic → choisir)
+ * =================================================================== */
+
+function closeSlotPopover() {
+  document.getElementById("slot-popover")?.remove();
+}
+
+function openSlotPopover(evt, rack, u) {
+  closeSlotPopover();
+  const pop = document.createElement("div");
+  pop.id = "slot-popover";
+  pop.innerHTML =
+    `<div class="pop-title">${rack.name} — U${u}</div>` +
+    `<input type="search" placeholder="Filtrer (modèle, marque…)" class="pop-filter">` +
+    `<div class="pop-list"></div><div class="pop-msg"></div>`;
+  /* Géométrie posée en inline : le popover ne dépend pas d'un état de
+     cache CSS pour être utilisable. */
+  pop.style.position = "fixed";
+  pop.style.width = "280px";
+  pop.style.zIndex = "70";
+  document.body.appendChild(pop);
+
+  const list = pop.querySelector(".pop-list");
+  const msg = pop.querySelector(".pop-msg");
+  const filterInput = pop.querySelector(".pop-filter");
+  const fill = (f) => {
+    list.innerHTML = "";
+    const q = (f || "").toLowerCase();
+    for (const t of allTypes()) {
+      if (q && !`${t.vendor} ${t.model}`.toLowerCase().includes(q)) continue;
+      const fits = canPlace(rack, u, t.u_height);
+      const row = document.createElement("div");
+      row.className = "pop-item" + (fits ? "" : " pop-item-off");
+      row.innerHTML =
+        `<span class="role-dot" style="background:${t.color}"></span>` +
+        `<span class="pop-name">${esc(t.vendor)} ${esc(t.model)}</span>` +
+        `<span class="pop-uh">${t.u_height}U</span>`;
+      row.addEventListener("click", () => {
+        if (!fits) {
+          msg.textContent = `Ne rentre pas en U${u} (${t.u_height}U, collision ou bord de baie).`;
+          return;
+        }
+        rack.items.push({
+          id: nextItemId(), type_id: t.id, position_u: u, face: "front",
+          meta: { hostname: "", role: t.category, vlan: "", wall_outlet: "",
+                  port_usage: [], serial: "", notes: "" },
+        });
+        closeSlotPopover();
+        renderAll();
+      });
+      list.appendChild(row);
+    }
+    if (!list.children.length)
+      list.innerHTML = '<div class="pop-empty">Aucun modèle ne correspond.</div>';
+  };
+  fill("");
+  /* Position près du clic, rabattue aux bords (mesurée une fois rempli). */
+  const pad = 8;
+  const rect = pop.getBoundingClientRect();
+  pop.style.left = Math.max(pad, Math.min(evt.clientX + pad,
+    window.innerWidth - rect.width - pad)) + "px";
+  pop.style.top = Math.max(pad, Math.min(evt.clientY + pad,
+    window.innerHeight - rect.height - pad)) + "px";
+  filterInput.addEventListener("input", () => fill(filterInput.value));
+  filterInput.focus();
+}
+
+/* Fermeture du popover : clic ailleurs ou Échap. */
+document.addEventListener("pointerdown", (e) => {
+  const pop = document.getElementById("slot-popover");
+  if (pop && !pop.contains(e.target)) closeSlotPopover();
+}, true);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeSlotPopover();
+});
 
 function renderAll() {
   if (viewMode === "logical") { renderLogical(); return; }
@@ -1007,6 +1101,12 @@ $("#replace-image-input").addEventListener("change", async (e) => {
 });
 
 /* ---- Baies ---- */
+$("#btn-toggle-u").addEventListener("click", () => {
+  showUNumbers = !showUNumbers;
+  localStorage.setItem("rfp-show-u", showUNumbers ? "1" : "0");
+  renderAll();
+});
+
 $("#btn-add-rack").addEventListener("click", () => {
   const letter = String.fromCharCode(65 + project.racks.length); // A, B, C…
   project.racks.push(newRack(letter));

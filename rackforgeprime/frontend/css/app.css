@@ -222,3 +222,36 @@ g.rack-item { cursor: grab; }
 #hover-tip .tip-row span { color: var(--text-dim, #64748b); }
 #hover-tip .tip-empty { color: var(--text-dim, #64748b); font-style: italic; }
 .port-hit { cursor: crosshair; }
+
+/* ---- Slots libres cliquables + popover d ajout rapide (esprit PATCHBOX) ---- */
+.slot-free { cursor: pointer; stroke: transparent; }
+.slot-free:hover {
+  stroke: rgba(34, 211, 238, .45); stroke-width: 1.2;
+  stroke-dasharray: 5 4; fill: rgba(34, 211, 238, .05);
+}
+#slot-popover {
+  position: fixed; z-index: 70; width: 280px;
+  background: var(--panel-2, #131826); border: 1px solid var(--line, #26304a);
+  border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, .6);
+  padding: 10px; font-size: 12.5px;
+}
+#slot-popover .pop-title {
+  font-family: var(--mono, monospace); color: var(--accent, #22d3ee);
+  font-weight: 700; margin-bottom: 7px;
+}
+#slot-popover .pop-filter {
+  width: 100%; box-sizing: border-box; margin-bottom: 7px;
+  background: #0b0e14; border: 1px solid var(--line, #26304a);
+  border-radius: 6px; color: var(--text, #cbd5e1); padding: 5px 8px;
+}
+#slot-popover .pop-list { max-height: 260px; overflow-y: auto; }
+#slot-popover .pop-item {
+  display: flex; align-items: center; gap: 7px; padding: 5px 7px;
+  border-radius: 6px; cursor: pointer;
+}
+#slot-popover .pop-item:hover { background: rgba(34, 211, 238, .10); }
+#slot-popover .pop-item-off { opacity: .38; cursor: not-allowed; }
+#slot-popover .pop-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#slot-popover .pop-uh { font-family: var(--mono, monospace); color: var(--text-dim, #64748b); }
+#slot-popover .pop-msg { color: #f87171; margin-top: 5px; min-height: 1em; }
+#slot-popover .pop-empty { color: var(--text-dim, #64748b); font-style: italic; padding: 6px; }
