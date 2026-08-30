@@ -8,6 +8,7 @@ de validation : un projet qui viole le snap U ou chevauche deux
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -24,7 +25,11 @@ from rackforge.pdf_export import render_project_pdf
 from rackforge.svg_export import render_project_svg
 from rackforge.svg_logical import render_logical_svg
 
-FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+# Packagé (PyInstaller) : le frontend est embarqué sous sys._MEIPASS.
+if getattr(sys, "frozen", False):
+    FRONTEND_DIR = Path(getattr(sys, "_MEIPASS")) / "frontend"
+else:
+    FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
 app = FastAPI(title="RackForgePrime", version="0.1.0", docs_url="/api/docs")
 

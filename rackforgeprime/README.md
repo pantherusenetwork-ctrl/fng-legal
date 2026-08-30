@@ -8,11 +8,33 @@ générées.
 
 ## Démarrage
 
+### Exécutable Windows (recommandé sur le poste de travail)
+
+L'exe est compilé automatiquement par GitHub Actions à chaque push :
+onglet **Actions** du dépôt → run « Build RackForgePrime Windows exe » →
+**Artifacts** → `RackForgePrime-Windows`. Dézippez où vous voulez et
+double-cliquez `RackForgePrime.exe` : le navigateur s'ouvre sur
+l'application, et l'**espace de travail** est créé à côté de l'exe au
+premier lancement :
+
+```
+RackForgePrime-Workspace/
+├── projets/      ← les JSON de projets (source de vérité)
+├── exports/      ← vos SVG / PDF / CSV livrés
+├── catalogue/    ← YAML NetBox et faceplates custom à importer
+├── datasheets/   ← PDF constructeurs à importer
+└── LISEZMOI.txt
+```
+
+Tout est local : le serveur n'écoute que sur 127.0.0.1, rien ne sort du poste.
+
+### Depuis les sources (dev)
+
 ```bash
 cd rackforgeprime
 pip install -r requirements.txt
-python run.py
-# → http://127.0.0.1:8137
+python run.py            # → http://127.0.0.1:8137, navigateur auto-ouvert
+python run.py --no-browser --port 9000   # variantes
 ```
 
 ## Le prototype fait déjà
