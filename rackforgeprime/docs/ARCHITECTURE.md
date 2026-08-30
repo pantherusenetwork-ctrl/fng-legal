@@ -32,6 +32,8 @@ rackforgeprime/
 │       ├── models.py           # Pydantic : Project, Rack, RackItem, EquipmentType…
 │       │                       #   + moteur de placement (snap U, collisions)
 │       ├── catalog.py          # catalogue intégré (Cisco, Fortinet, HPE/Aruba, APC…)
+│       ├── catalog_images.py   # images officielles du workspace (data URI par id)
+│       ├── catalog_packs.py    # packs de types constructeurs (JSON du workspace)
 │       ├── svg_export.py       # élévation de baie → SVG (groupes nommés)
 │       ├── pdf_export.py       # SVG → PDF (svglib/reportlab)
 │       └── storage.py          # sauvegarde/chargement des projets (~/.rackforgeprime ou ./projects)

@@ -59,44 +59,109 @@ def _u_to_y(rack: Rack, u: int) -> int:
     return top + (rack.u_height - u) * U_PX
 
 
+def _port_banks(n: int, color: str, x: int, y: int, w: int,
+                h: int) -> list[str]:
+    """Ports groupés en banques de 6, sur 2 rangées au-delà de 12 — la
+    lecture d'un vrai switch (esprit PATCHBOX), pas une frise de carrés."""
+    s: list[str] = []
+    n = min(n, 48)
+    if not n:
+        return s
+    rows = 2 if n > 12 else 1
+    cols = -(-n // rows)  # ceil
+    pw, gapx, group, ggap = 7, 2, 6, 4
+    ph = 6 if rows == 2 else 8
+    groups = -(-cols // group)
+    total_w = cols * (pw + gapx) - gapx + (groups - 1) * ggap
+    x0 = x + w - 46 - total_w
+    block_h = rows * ph + (rows - 1) * 3
+    y0 = y + (h - block_h) / 2
+    for i in range(n):
+        r, c = i % rows, i // rows
+        px = x0 + c * (pw + gapx) + (c // group) * ggap
+        py = y0 + r * (ph + 3)
+        s.append(f'<rect x="{px:.1f}" y="{py:.1f}" width="{pw}" height="{ph}" '
+                 f'rx="1" fill="#0a0e16" stroke="{color}" stroke-width="0.7"/>')
+        # Languette RJ45 : le détail qui fait « connecteur » et plus « pixel ».
+        s.append(f'<rect x="{px + 2:.1f}" y="{py + ph - 1.6:.1f}" width="3" '
+                 f'height="1.6" fill="{color}" fill-opacity="0.85"/>')
+    return s
+
+
+def _category_decor(t: EquipmentType, x: int, y: int, w: int,
+                    h: int) -> list[str]:
+    """Décor par catégorie pour les types sans ports (serveur, onduleur,
+    passe-câbles) : silhouette reconnaissable au premier coup d'œil."""
+    s: list[str] = []
+    if t.category == "server":
+        # Baies disques verticales, LED d'activité en tête.
+        bw, gap, count = 13, 3, 10
+        x0 = x + w - 46 - count * (bw + gap)
+        for i in range(count):
+            bx = x0 + i * (bw + gap)
+            s.append(f'<rect x="{bx}" y="{y + 4}" width="{bw}" '
+                     f'height="{h - 8}" rx="1" fill="#10151f" '
+                     f'stroke="#2c3547" stroke-width="0.7"/>')
+            s.append(f'<circle cx="{bx + bw / 2:.1f}" cy="{y + 7:.1f}" '
+                     f'r="1.3" fill="{t.color}"/>')
+    elif t.category == "ups":
+        # Écran LCD + grille d'aération.
+        s.append(f'<rect x="{x + w - 200}" y="{y + h / 2 - 8:.1f}" width="30" '
+                 f'height="16" rx="2" fill="#0a2027" stroke="{t.color}" '
+                 f'stroke-width="0.8"/>')
+        for i in range(24):
+            vx = x + w - 155 + i * 5
+            s.append(f'<rect x="{vx}" y="{y + h / 2 - 6:.1f}" width="2" '
+                     f'height="12" rx="1" fill="#10151f"/>')
+    elif t.category == "cable-mgmt":
+        # Anneaux passe-câbles (à droite du libellé, avant la pastille U).
+        for i in range(4):
+            rx0 = x + 200 + i * 50
+            s.append(f'<rect x="{rx0}" y="{y + 3}" width="30" '
+                     f'height="{h - 6}" rx="4" fill="none" '
+                     f'stroke="#3a465c" stroke-width="2"/>')
+    return s
+
+
 def _faceplate_placeholder(t: EquipmentType, x: int, y: int, w: int,
                            label: str) -> list[str]:
     """Placeholder fidèle à l'échelle U quand pas d'image officielle.
 
-    Faceplate sombre, liseré couleur de rôle à gauche, oreilles de fixation,
-    constructeur + modèle, ports schématisés si connus.
+    Style PATCHBOX / Lucidchart : bloc plat teinté par rôle, libellé net,
+    pastille de hauteur U, ports en banques réalistes ou décor de catégorie.
     """
     h = t.u_height * U_PX
+    yc = y + h / 2
     s: list[str] = []
-    # Corps de la faceplate (léger retrait vertical pour lire la séparation U).
+    # Corps plat, coins arrondis (léger retrait pour lire la séparation U).
     s.append(f'<rect x="{x}" y="{y + 1}" width="{w}" height="{h - 2}" '
-             f'rx="2" fill="{C_FACE}" stroke="#2c3547" stroke-width="1"/>')
-    # Liseré de rôle : l'identité couleur lisible à 1 m.
+             f'rx="3" fill="{C_FACE}" stroke="#2c3547" stroke-width="1"/>')
+    # Teinte du rôle sur tout le bloc — l'identité couleur PATCHBOX,
+    # lisible à 1 m sans crier.
+    s.append(f'<rect x="{x}" y="{y + 1}" width="{w}" height="{h - 2}" '
+             f'rx="3" fill="{t.color}" fill-opacity="0.07"/>')
     s.append(f'<rect x="{x}" y="{y + 1}" width="4" height="{h - 2}" '
              f'fill="{t.color}"/>')
     # Oreilles de fixation sur les rails (vis suggérées).
     for ex in (x - RAIL_W + 6, x + w + RAIL_W - 12):
-        s.append(f'<circle cx="{ex + 3}" cy="{y + h / 2:.1f}" r="2.5" '
+        s.append(f'<circle cx="{ex + 3}" cy="{yc:.1f}" r="2.5" '
                  f'fill="{C_HOLE}"/>')
     # Label principal : hostname s'il existe, sinon constructeur + modèle.
-    s.append(f'<text x="{x + 14}" y="{y + h / 2 + 4:.1f}" '
+    s.append(f'<text x="{x + 14}" y="{yc + 4:.1f}" '
              f'font-family="{FONT}" font-size="11" fill="{C_TEXT}">'
              f'{escape(label)}</text>')
-    # Hauteur U rappelée à droite (culture mono/terminal).
-    s.append(f'<text x="{x + w - 8}" y="{y + h / 2 + 4:.1f}" text-anchor="end" '
-             f'font-family="{FONT_MONO}" font-size="9" fill="{C_TEXT_DIM}">'
+    # Pastille de hauteur U (esprit Lucid : badge, pas texte flottant).
+    s.append(f'<rect x="{x + w - 34}" y="{yc - 7:.1f}" width="26" height="14" '
+             f'rx="7" fill="none" stroke="#33405a" stroke-width="1"/>')
+    s.append(f'<text x="{x + w - 21}" y="{yc + 3:.1f}" text-anchor="middle" '
+             f'font-family="{FONT_MONO}" font-size="8.5" fill="{C_TEXT_DIM}">'
              f'{t.u_height}U</text>')
-    # Ports schématisés (max 24 dessinés, sur la moitié droite).
-    n = min(len(t.ports), 24)
-    if n:
-        pw, ph, gap = 7, 5, 2
-        total = n * (pw + gap)
-        px0 = x + w - 40 - total
-        py = y + h - ph - 4
-        for i in range(n):
-            s.append(f'<rect x="{px0 + i * (pw + gap)}" y="{py}" '
-                     f'width="{pw}" height="{ph}" fill="#0c1018" '
-                     f'stroke="{t.color}" stroke-width="0.6"/>')
+    # Serveur / onduleur / passe-câbles : la silhouette prime sur les
+    # quelques ports de management — c'est elle qu'on reconnaît en baie.
+    if t.category in ("server", "ups", "cable-mgmt"):
+        s.extend(_category_decor(t, x, y, w, h))
+    elif t.ports:
+        s.extend(_port_banks(len(t.ports), t.color, x, y, w, h))
     return s
 
 

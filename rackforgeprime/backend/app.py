@@ -18,6 +18,8 @@ from pydantic import ValidationError
 
 from rackforge import storage
 from rackforge.catalog import BUILTIN_TYPES, ROLE_COLORS
+from rackforge.catalog_images import apply_official_images
+from rackforge.catalog_packs import merged_catalog
 from rackforge.importers import import_netbox_yaml, parse_datasheet_pdf
 from rackforge.models import (Project, patch_table, patch_table_csv,
                               rack_stats, type_index)
@@ -48,9 +50,10 @@ def _parse_project(payload: dict) -> Project:
 
 @app.get("/api/catalog")
 def get_catalog() -> dict:
-    """Types intégrés + couleurs de rôle (la palette de gauche)."""
+    """Types intégrés + packs constructeurs + images officielles du workspace."""
+    types = apply_official_images(merged_catalog(BUILTIN_TYPES))
     return {
-        "types": [t.model_dump() for t in BUILTIN_TYPES],
+        "types": [t.model_dump() for t in types],
         "role_colors": ROLE_COLORS,
     }
 

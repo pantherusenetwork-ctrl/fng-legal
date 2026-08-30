@@ -117,11 +117,21 @@ Versionné (`schema_version`), tout est régénérable depuis ce fichier.
   "power_w": 60,
   "ports": [ { "name": "port1", "type": "1000base-t" } ],
   "color": "#f97316",
-  "faceplate_svg": null
+  "faceplate_svg": null,
+  "faceplate_image": null
 }
 ```
-- `faceplate_svg` : chemin/inline d'un SVG officiel ; `null` → placeholder fidèle
-  à l'échelle U (liseré couleur du rôle, constructeur + modèle, ports schématisés).
+- `faceplate_svg` : SVG inline officiel ; `faceplate_image` : image (data URI
+  `data:image/...`) étirée sur le slot U exact. `null` pour les deux →
+  placeholder à l'échelle U (bloc teinté par rôle, constructeur + modèle,
+  pastille U, ports en banques ou décor de catégorie).
+- Images officielles du workspace : un fichier
+  `catalogue/images-officielles/<id-du-type>.png|jpg|svg` est appliqué
+  automatiquement au type de même id (catalogue et exports).
+- Packs constructeurs : chaque `catalogue/types-officiels/*.json` (liste de
+  types au schéma ci-dessus) enrichit la palette ; visibles sur disque, donc
+  validables par l'utilisateur. Remplissage via
+  `scripts/telecharger_pack_constructeurs.py` (volontaire, hors application).
 
 ### 3.5 Lien logique
 ```json

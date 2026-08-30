@@ -40,6 +40,9 @@ projets/     Vos projets (.json). C'est la SOURCE DE VÉRITÉ : versionnez-les,
 exports/     Rangez ici vos SVG / PDF / CSV exportés depuis l'application.
 catalogue/   Déposez ici vos YAML NetBox devicetype-library et vos images /
              SVG de faceplates, puis importez-les depuis la palette.
+             Sous-dossier images-officielles/ : une image nommée
+             <id-du-type>.png (ex : fortinet-fortigate-100f.png) y est
+             chargée automatiquement comme faceplate du type du catalogue.
 datasheets/  Déposez ici les PDF constructeurs à importer.
 
 Lancement : RackForgePrime.exe (ou `python run.py`), l'interface s'ouvre sur
@@ -55,13 +58,16 @@ def ensure_workspace() -> Path:
     base = (Path(sys.executable).resolve().parent if FROZEN
             else Path(__file__).resolve().parent)
     ws = base / "RackForgePrime-Workspace"
-    for sub in ("projets", "exports", "catalogue", "datasheets"):
+    for sub in ("projets", "exports", "catalogue", "datasheets",
+                "catalogue/images-officielles", "catalogue/types-officiels"):
         (ws / sub).mkdir(parents=True, exist_ok=True)
     readme = ws / "LISEZMOI.txt"
     if not readme.exists():
         readme.write_text(LISEZMOI, encoding="utf-8")
     # Le backend (storage.py) lit cette variable pour savoir où sauvegarder.
     os.environ.setdefault("RACKFORGE_PROJECTS_DIR", str(ws / "projets"))
+    # catalog_images.py lit celle-ci pour trouver les images officielles.
+    os.environ.setdefault("RACKFORGE_CATALOG_DIR", str(ws / "catalogue"))
     return ws
 
 

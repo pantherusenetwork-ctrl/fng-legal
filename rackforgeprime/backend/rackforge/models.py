@@ -172,11 +172,18 @@ class Project(BaseModel):
 
 def type_index(project: Project, extra_types: list[EquipmentType] | None = None
                ) -> dict[str, EquipmentType]:
-    """Index id -> type : catalogue intégré + types custom du projet."""
-    # Import local pour éviter le cycle models <-> catalog.
-    from .catalog import BUILTIN_TYPES
+    """Index id -> type : catalogue intégré + types custom du projet.
 
-    index = {t.id: t for t in BUILTIN_TYPES}
+    Les images officielles du workspace sont appliquées ici aussi : l'export
+    SVG/PDF montre les mêmes faceplates que l'écran.
+    """
+    # Imports locaux pour éviter le cycle models <-> catalog.
+    from .catalog import BUILTIN_TYPES
+    from .catalog_images import apply_official_images
+    from .catalog_packs import merged_catalog
+
+    index = {t.id: t
+             for t in apply_official_images(merged_catalog(BUILTIN_TYPES))}
     for t in project.equipment_types:
         index[t.id] = t
     for t in extra_types or []:

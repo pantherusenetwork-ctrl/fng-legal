@@ -179,27 +179,95 @@ function drawFaceplate(g, t, x, y, label, selected) {
         fill: "none", stroke: C.accent, "stroke-width": 1.6 }));
     return;
   }
+  const yc = y + h / 2;
+  /* Corps plat teinté par rôle — style PATCHBOX/Lucid (miroir Python). */
   g.appendChild(svgEl("rect", {
-    x, y: y + 1, width: RACK_W, height: h - 2, rx: 2, fill: C.face,
+    x, y: y + 1, width: RACK_W, height: h - 2, rx: 3, fill: C.face,
     stroke: selected ? C.accent : "#2c3547", "stroke-width": selected ? 1.6 : 1,
+  }));
+  g.appendChild(svgEl("rect", {
+    x, y: y + 1, width: RACK_W, height: h - 2, rx: 3,
+    fill: t.color, "fill-opacity": 0.07,
   }));
   g.appendChild(svgEl("rect", { x, y: y + 1, width: 4, height: h - 2, fill: t.color }));
   g.appendChild(svgEl("text", {
-    x: x + 14, y: y + h / 2 + 4, "font-size": 11, fill: C.text,
+    x: x + 14, y: yc + 4, "font-size": 11, fill: C.text,
     "font-family": "system-ui, sans-serif",
   }, label));
+  /* Pastille de hauteur U. */
+  g.appendChild(svgEl("rect", {
+    x: x + RACK_W - 34, y: yc - 7, width: 26, height: 14, rx: 7,
+    fill: "none", stroke: "#33405a", "stroke-width": 1,
+  }));
   g.appendChild(svgEl("text", {
-    x: x + RACK_W - 8, y: y + h / 2 + 4, "text-anchor": "end",
-    "font-size": 9, fill: C.dim, "font-family": "monospace",
+    x: x + RACK_W - 21, y: yc + 3, "text-anchor": "middle",
+    "font-size": 8.5, fill: C.dim, "font-family": "monospace",
   }, t.u_height + "U"));
-  const n = Math.min((t.ports || []).length, 24);
-  if (n) {
-    const pw = 7, ph = 5, gap = 2, total = n * (pw + gap);
-    const px0 = x + RACK_W - 40 - total, py = y + h - ph - 4;
-    for (let i = 0; i < n; i++)
+  /* Serveur / onduleur / passe-câbles : la silhouette prime sur les
+     quelques ports de management (miroir Python). */
+  if (["server", "ups", "cable-mgmt"].includes(t.category))
+    drawCategoryDecor(g, t, x, y, RACK_W, h);
+  else if ((t.ports || []).length)
+    drawPortBanks(g, (t.ports || []).length, t.color, x, y, RACK_W, h);
+}
+
+/* Ports groupés en banques de 6, 2 rangées au-delà de 12 (miroir Python). */
+function drawPortBanks(g, n, color, x, y, w, h) {
+  n = Math.min(n, 48);
+  const rows = n > 12 ? 2 : 1;
+  const cols = Math.ceil(n / rows);
+  const pw = 7, gapx = 2, group = 6, ggap = 4;
+  const ph = rows === 2 ? 6 : 8;
+  const groups = Math.ceil(cols / group);
+  const totalW = cols * (pw + gapx) - gapx + (groups - 1) * ggap;
+  const x0 = x + w - 46 - totalW;
+  const blockH = rows * ph + (rows - 1) * 3;
+  const y0 = y + (h - blockH) / 2;
+  for (let i = 0; i < n; i++) {
+    const r = i % rows, c = Math.floor(i / rows);
+    const px = x0 + c * (pw + gapx) + Math.floor(c / group) * ggap;
+    const py = y0 + r * (ph + 3);
+    g.appendChild(svgEl("rect", {
+      x: px, y: py, width: pw, height: ph, rx: 1,
+      fill: "#0a0e16", stroke: color, "stroke-width": 0.7,
+    }));
+    g.appendChild(svgEl("rect", {
+      x: px + 2, y: py + ph - 1.6, width: 3, height: 1.6,
+      fill: color, "fill-opacity": 0.85,
+    }));
+  }
+}
+
+/* Décor par catégorie pour les types sans ports (miroir Python). */
+function drawCategoryDecor(g, t, x, y, w, h) {
+  if (t.category === "server") {
+    const bw = 13, gap = 3, count = 10;
+    const x0 = x + w - 46 - count * (bw + gap);
+    for (let i = 0; i < count; i++) {
+      const bx = x0 + i * (bw + gap);
       g.appendChild(svgEl("rect", {
-        x: px0 + i * (pw + gap), y: py, width: pw, height: ph,
-        fill: "#0c1018", stroke: t.color, "stroke-width": 0.6,
+        x: bx, y: y + 4, width: bw, height: h - 8, rx: 1,
+        fill: "#10151f", stroke: "#2c3547", "stroke-width": 0.7,
+      }));
+      g.appendChild(svgEl("circle", {
+        cx: bx + bw / 2, cy: y + 7, r: 1.3, fill: t.color,
+      }));
+    }
+  } else if (t.category === "ups") {
+    g.appendChild(svgEl("rect", {
+      x: x + w - 200, y: y + h / 2 - 8, width: 30, height: 16, rx: 2,
+      fill: "#0a2027", stroke: t.color, "stroke-width": 0.8,
+    }));
+    for (let i = 0; i < 24; i++)
+      g.appendChild(svgEl("rect", {
+        x: x + w - 155 + i * 5, y: y + h / 2 - 6, width: 2, height: 12,
+        rx: 1, fill: "#10151f",
+      }));
+  } else if (t.category === "cable-mgmt") {
+    for (let i = 0; i < 4; i++)
+      g.appendChild(svgEl("rect", {
+        x: x + 200 + i * 50, y: y + 3, width: 30, height: h - 6, rx: 4,
+        fill: "none", stroke: "#3a465c", "stroke-width": 2,
       }));
   }
 }
