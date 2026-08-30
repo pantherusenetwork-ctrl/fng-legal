@@ -162,8 +162,72 @@ function allTypes() {
   return Object.values(typesById);
 }
 
+/* =====================================================================
+ * Info-bulle de survol (esprit AirWave : la config du port sous la souris)
+ * =================================================================== */
+
+let tipEl = null;
+function showTip(html, evt) {
+  if (!tipEl) {
+    tipEl = document.createElement("div");
+    tipEl.id = "hover-tip";
+    document.body.appendChild(tipEl);
+  }
+  tipEl.innerHTML = html;
+  tipEl.style.display = "block";
+  /* Décalé du curseur, rabattu si bord d'écran. */
+  const pad = 14;
+  const rect = tipEl.getBoundingClientRect();
+  let tx = evt.clientX + pad, ty = evt.clientY + pad;
+  if (tx + rect.width > window.innerWidth - 8) tx = evt.clientX - rect.width - pad;
+  if (ty + rect.height > window.innerHeight - 8) ty = evt.clientY - rect.height - pad;
+  tipEl.style.left = tx + "px";
+  tipEl.style.top = ty + "px";
+}
+function hideTip() {
+  if (tipEl) tipEl.style.display = "none";
+}
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
+  (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+/* Un drag qui démarre chasse l'info-bulle. */
+document.addEventListener("pointerdown", hideTip, true);
+
+/* Config d'un port : la ligne de brassage si elle existe, sinon les
+ * valeurs héritées de l'équipement. */
+function portTipHTML(t, item, port) {
+  const pu = (item?.meta?.port_usage || []).find((p) => p.port === port.name);
+  const vlan = pu?.vlan || item?.meta?.vlan || "";
+  const outlet = pu?.outlet || item?.meta?.wall_outlet || "";
+  const rows = [
+    ["Type", port.type],
+    ["VLAN", vlan],
+    ["Prise murale", outlet],
+    ["Usage", pu?.usage || ""],
+  ].filter(([, v]) => v);
+  return `<div class="tip-title">${esc(port.name)}</div>` +
+    (rows.length
+      ? rows.map(([k, v]) => `<div class="tip-row"><span>${k}</span>${esc(v)}</div>`).join("")
+      : `<div class="tip-empty">non brassé — à renseigner dans l'inspecteur</div>`);
+}
+
+/* Résumé d'un équipement (survol d'une image officielle : les ports
+ * individuels n'y sont pas cliquables, on montre la fiche). */
+function itemTipHTML(t, item) {
+  const m = item?.meta || {};
+  const rows = [
+    ["Modèle", `${t.vendor} ${t.model}`],
+    ["Hauteur", t.u_height + "U"],
+    ["VLAN", m.vlan],
+    ["Prise murale", m.wall_outlet],
+    ["N° série", m.serial],
+    ["Ports brassés", (m.port_usage || []).length || ""],
+  ].filter(([, v]) => v);
+  return `<div class="tip-title">${esc(m.hostname || t.model)}</div>` +
+    rows.map(([k, v]) => `<div class="tip-row"><span>${k}</span>${esc(v)}</div>`).join("");
+}
+
 /* Faceplate placeholder — même dessin que _faceplate_placeholder() côté Python. */
-function drawFaceplate(g, t, x, y, label, selected) {
+function drawFaceplate(g, t, x, y, label, selected, item) {
   const h = t.u_height * U_PX;
   if (t.faceplate_image) {
     /* Image officielle : étirée sur le slot U exact (convention TSS/NetBox),
@@ -174,6 +238,12 @@ function drawFaceplate(g, t, x, y, label, selected) {
       preserveAspectRatio: "none", href: t.faceplate_image,
     });
     g.appendChild(img);
+    /* Sur une photo officielle les ports ne sont pas localisables :
+       le survol montre la fiche de l'équipement. */
+    if (item) {
+      img.addEventListener("mousemove", (e) => showTip(itemTipHTML(t, item), e));
+      img.addEventListener("mouseleave", hideTip);
+    }
     if (selected)
       g.appendChild(svgEl("rect", { x, y: y + 1, width: RACK_W, height: h - 2,
         fill: "none", stroke: C.accent, "stroke-width": 1.6 }));
@@ -208,12 +278,14 @@ function drawFaceplate(g, t, x, y, label, selected) {
   if (["server", "ups", "cable-mgmt"].includes(t.category))
     drawCategoryDecor(g, t, x, y, RACK_W, h);
   else if ((t.ports || []).length)
-    drawPortBanks(g, (t.ports || []).length, t.color, x, y, RACK_W, h);
+    drawPortBanks(g, t, item, x, y, RACK_W, h);
 }
 
-/* Ports groupés en banques de 6, 2 rangées au-delà de 12 (miroir Python). */
-function drawPortBanks(g, n, color, x, y, w, h) {
-  n = Math.min(n, 48);
+/* Ports groupés en banques de 6, 2 rangées au-delà de 12 (miroir Python).
+ * Chaque port a une zone de survol élargie → info-bulle de config. */
+function drawPortBanks(g, t, item, x, y, w, h) {
+  const color = t.color;
+  const n = Math.min((t.ports || []).length, 48);
   const rows = n > 12 ? 2 : 1;
   const cols = Math.ceil(n / rows);
   const pw = 7, gapx = 2, group = 6, ggap = 4;
@@ -235,6 +307,15 @@ function drawPortBanks(g, n, color, x, y, w, h) {
       x: px + 2, y: py + ph - 1.6, width: 3, height: 1.6,
       fill: color, "fill-opacity": 0.85,
     }));
+    /* Zone de survol invisible, plus large que le port dessiné. */
+    const port = t.ports[i];
+    const hit = svgEl("rect", {
+      x: px - 1, y: py - 2, width: pw + 3, height: ph + 5,
+      fill: "transparent", class: "port-hit",
+    });
+    hit.addEventListener("mousemove", (e) => showTip(portTipHTML(t, item, port), e));
+    hit.addEventListener("mouseleave", hideTip);
+    g.appendChild(hit);
   }
 }
 
@@ -314,7 +395,7 @@ function renderRackSVG(rack) {
     const g = svgEl("g", { "data-item-id": item.id, class: "rack-item" });
     if (item.id === selectedItemId) g.classList.add("item-selected");
     const label = item.meta.hostname || `${t.vendor} ${t.model}`;
-    drawFaceplate(g, t, innerX, y, label, item.id === selectedItemId);
+    drawFaceplate(g, t, innerX, y, label, item.id === selectedItemId, item);
     /* Clic = inspection ; pointerdown long = déplacement (géré globalement). */
     g.addEventListener("pointerdown", (e) => startItemDrag(e, rack, item));
     svg.appendChild(g);

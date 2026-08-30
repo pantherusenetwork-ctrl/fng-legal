@@ -205,3 +205,20 @@ g.rack-item { cursor: grab; }
   background: var(--panel-2); color: var(--accent);
   position: sticky; top: 0; font-weight: 600;
 }
+
+/* ---- Info-bulle de survol (ports & équipements, esprit AirWave) ---- */
+#hover-tip {
+  display: none; position: fixed; z-index: 60; pointer-events: none;
+  min-width: 170px; max-width: 300px; padding: 9px 12px;
+  background: var(--panel-2, #131826); border: 1px solid var(--accent, #22d3ee);
+  border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .55);
+  font-size: 12px; color: var(--text, #cbd5e1);
+}
+#hover-tip .tip-title {
+  font-family: var(--mono, monospace); font-weight: 700;
+  color: var(--accent, #22d3ee); margin-bottom: 5px;
+}
+#hover-tip .tip-row { display: flex; justify-content: space-between; gap: 14px; padding: 1px 0; }
+#hover-tip .tip-row span { color: var(--text-dim, #64748b); }
+#hover-tip .tip-empty { color: var(--text-dim, #64748b); font-style: italic; }
+.port-hit { cursor: crosshair; }
