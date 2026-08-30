@@ -14,8 +14,14 @@
     </div>
     <input id="project-name" type="text" value="Nouveau projet" title="Nom du projet"
            aria-label="Nom du projet">
+    <nav id="view-toggle" title="Vue physique (baies) ou logique (VLANs, liens)">
+      <button id="btn-view-physical" class="active">Physique</button>
+      <button id="btn-view-logical">Logique</button>
+    </nav>
     <div id="topbar-actions">
-      <button id="btn-add-rack" title="Ajouter une baie 42U">+ Baie</button>
+      <button id="btn-add-rack" class="physical-only" title="Ajouter une baie 42U">+ Baie</button>
+      <button id="btn-add-link" class="logical-only" title="Créer un lien logique entre deux équipements">+ Lien</button>
+      <button id="btn-add-vlan" class="logical-only" title="Déclarer un VLAN (id, nom, couleur)">+ VLAN</button>
       <button id="btn-patch-table" title="Tableau de brassage généré depuis les métadonnées">Brassage</button>
       <span class="sep"></span>
       <button id="btn-export-svg" class="export">SVG</button>
@@ -122,6 +128,49 @@
       <div class="inspector-actions">
         <button value="ok" id="btn-proposal-ok">Ajouter à la palette</button>
         <button value="cancel" formnovalidate>Annuler</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modale lien logique (création + édition) -->
+  <dialog id="link-dialog">
+    <h2 id="link-dialog-title">Nouveau lien</h2>
+    <form id="link-form" method="dialog">
+      <label>Équipement source <select name="from_eq" required></select></label>
+      <label>Port source <input name="from_port" placeholder="ex : port3"></label>
+      <label>Équipement destination <select name="to_eq" required></select></label>
+      <label>Port destination <input name="to_port" placeholder="ex : Gi1/0/48"></label>
+      <label>Type
+        <select name="kind">
+          <option value="trunk">Trunk</option>
+          <option value="access">Access</option>
+          <option value="uplink">Uplink</option>
+          <option value="ha">HA</option>
+          <option value="other">Autre</option>
+        </select>
+      </label>
+      <label>VLANs (séparés par des virgules) <input name="vlans" placeholder="10, 20, 99"></label>
+      <label>Libellé <input name="label" placeholder="ex : Uplink FW → Core"></label>
+      <label>Média <input name="media" placeholder="ex : fibre-om4, cuivre-cat6a"></label>
+      <div class="inspector-actions">
+        <button value="ok">Enregistrer</button>
+        <button value="delete" id="btn-link-delete" class="danger" formnovalidate hidden>Supprimer</button>
+        <button value="cancel" formnovalidate>Annuler</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modale VLAN -->
+  <dialog id="vlan-dialog">
+    <h2>VLANs du projet</h2>
+    <div id="vlan-list"></div>
+    <form id="vlan-form" method="dialog">
+      <label>ID (1–4094) <input name="vid" type="number" min="1" max="4094" required></label>
+      <label>Nom <input name="name" required placeholder="ex : USERS"></label>
+      <label>Couleur <input name="color" type="color" value="#22d3ee"></label>
+      <div class="inspector-actions">
+        <button value="ok">Ajouter</button>
+        <button value="cancel" formnovalidate>Fermer</button>
       </div>
     </form>
   </dialog>

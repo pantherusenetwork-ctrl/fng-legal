@@ -32,6 +32,8 @@ let catalog = { types: [], role_colors: {} };
 let typesById = {};
 let project = null;
 let selectedItemId = null;
+/* Vue active : "physical" (baies) ou "logical" (VLANs / liens). */
+let viewMode = "physical";
 /* Drag en cours : { type, itemId?, fromRackId?, ghost SVG en cours } */
 let drag = null;
 let itemSeq = 1;
@@ -260,6 +262,7 @@ function renderRackSVG(rack) {
 }
 
 function renderAll() {
+  if (viewMode === "logical") { renderLogical(); return; }
   const canvas = $("#canvas");
   canvas.innerHTML = "";
   for (const rack of project.racks) canvas.appendChild(renderRackSVG(rack));
@@ -512,10 +515,16 @@ async function postForBlob(url, filename) {
   URL.revokeObjectURL(a.href);
 }
 
+/* Les exports suivent la vue active : baies en physique, VLANs/liens en logique. */
+function viewSuffix() { return viewMode === "logical" ? "-logique" : ""; }
+function viewQuery() { return viewMode === "logical" ? "?view=logical" : ""; }
+
 $("#btn-export-svg").addEventListener("click", () =>
-  postForBlob("/api/export/svg", currentProject().id + ".svg"));
+  postForBlob("/api/export/svg" + viewQuery(),
+              currentProject().id + viewSuffix() + ".svg"));
 $("#btn-export-pdf").addEventListener("click", () =>
-  postForBlob("/api/export/pdf", currentProject().id + ".pdf"));
+  postForBlob("/api/export/pdf" + viewQuery(),
+              currentProject().id + viewSuffix() + ".pdf"));
 $("#btn-export-json").addEventListener("click", () => {
   const blob = new Blob([JSON.stringify(currentProject(), null, 2)],
                        { type: "application/json" });
@@ -533,6 +542,7 @@ $("#btn-import-json input").addEventListener("change", async (e) => {
     const data = JSON.parse(await file.text());
     project = data;
     if (!project.equipment_types) project.equipment_types = [];
+    if (!project.logical) project.logical = { vlans: [], links: [], positions: {} };
     refreshTypes();
     renderPalette($("#palette-filter").value);
     $("#project-name").value = project.name || "Sans nom";
@@ -543,6 +553,190 @@ $("#btn-import-json input").addEventListener("change", async (e) => {
   }
   e.target.value = "";
 });
+
+/* =====================================================================
+ * Vue logique — le SVG est rendu par le BACKEND (un seul moteur de
+ * dessin : ce qu'on voit est exactement ce qu'on exporte), le frontend
+ * pose l'interactivité par-dessus : drag des nœuds, clic sur les liens.
+ * =================================================================== */
+
+async function renderLogical() {
+  const res = await fetch("/api/export/svg?view=logical", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(currentProject()),
+  });
+  const canvas = $("#canvas");
+  if (!res.ok) {
+    canvas.innerHTML = "";
+    renderStatus('<span class="stat-err">Projet invalide — vue logique indisponible</span>');
+    return;
+  }
+  canvas.innerHTML = await res.text();
+  wireLogical(canvas.querySelector("svg"));
+  renderStatus();
+  saveLocal();
+}
+
+function wireLogical(svg) {
+  if (!svg) return;
+  /* Drag des nœuds : delta appliqué en transform pendant le geste,
+     position persistée dans project.logical.positions au relâcher. */
+  svg.querySelectorAll('g[id^="lnode-"]').forEach((g) => {
+    const eqId = g.id.slice("lnode-".length);
+    const rect = g.querySelector("rect");
+    const ox = parseFloat(rect.getAttribute("x"));
+    const oy = parseFloat(rect.getAttribute("y"));
+    g.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      const sx = e.clientX, sy = e.clientY;
+      let dx = 0, dy = 0;
+      const move = (ev) => {
+        dx = ev.clientX - sx; dy = ev.clientY - sy;
+        g.setAttribute("transform", `translate(${dx},${dy})`);
+      };
+      const up = () => {
+        document.removeEventListener("pointermove", move);
+        document.removeEventListener("pointerup", up);
+        if (Math.abs(dx) + Math.abs(dy) > 3) {
+          if (!project.logical.positions) project.logical.positions = {};
+          project.logical.positions[eqId] =
+            { x: Math.max(0, ox + dx), y: Math.max(30, oy + dy) };
+          renderLogical();
+        }
+      };
+      document.addEventListener("pointermove", move);
+      document.addEventListener("pointerup", up);
+    });
+  });
+  /* Clic sur un lien : édition / suppression. */
+  svg.querySelectorAll('g[id^="link-"]').forEach((g) => {
+    const linkId = g.id.slice("link-".length);
+    g.addEventListener("click", () => {
+      const link = project.logical.links.find((l) => l.id === linkId);
+      if (link) openLinkDialog(link);
+    });
+  });
+}
+
+/* ---- Modale lien ---- */
+
+let editingLink = null; // null = création
+
+function equipmentOptions() {
+  const opts = [];
+  for (const rack of project.racks)
+    for (const item of rack.items) {
+      const t = typesById[item.type_id];
+      if (!t || t.category === "blank" || t.category === "cable-mgmt") continue;
+      const label = item.meta.hostname || `${t.vendor} ${t.model}`;
+      opts.push({ id: item.id, label: `${label} (${rack.name} U${item.position_u})` });
+    }
+  return opts;
+}
+
+function openLinkDialog(link) {
+  editingLink = link || null;
+  const f = $("#link-form");
+  const opts = equipmentOptions();
+  if (opts.length < 2 && !link) {
+    renderStatus('<span class="stat-err">Posez au moins deux équipements avant de créer un lien</span>');
+    return;
+  }
+  for (const name of ["from_eq", "to_eq"]) {
+    f.elements[name].innerHTML = opts
+      .map((o) => `<option value="${o.id}">${o.label}</option>`).join("");
+  }
+  $("#link-dialog-title").textContent = link ? "Modifier le lien" : "Nouveau lien";
+  $("#btn-link-delete").hidden = !link;
+  f.elements.from_eq.value = link ? link.from.equipment_id : opts[0].id;
+  f.elements.from_port.value = link ? link.from.port : "";
+  f.elements.to_eq.value = link ? link.to.equipment_id : (opts[1] || opts[0]).id;
+  f.elements.to_port.value = link ? link.to.port : "";
+  f.elements.kind.value = link ? link.kind : "trunk";
+  f.elements.vlans.value = link ? (link.vlans || []).join(", ") : "";
+  f.elements.label.value = link ? link.label : "";
+  f.elements.media.value = link ? link.media : "";
+  $("#link-dialog").showModal();
+}
+
+$("#link-form").addEventListener("submit", (e) => {
+  const action = e.submitter && e.submitter.value;
+  if (action === "cancel") { editingLink = null; return; }
+  if (action === "delete") {
+    project.logical.links = project.logical.links.filter((l) => l !== editingLink);
+    editingLink = null;
+    renderAll();
+    return;
+  }
+  const f = e.target;
+  const vlans = f.elements.vlans.value.split(",")
+    .map((s) => parseInt(s.trim(), 10)).filter((n) => n >= 1 && n <= 4094);
+  const data = {
+    from: { equipment_id: f.elements.from_eq.value, port: f.elements.from_port.value.trim() },
+    to: { equipment_id: f.elements.to_eq.value, port: f.elements.to_port.value.trim() },
+    kind: f.elements.kind.value, vlans,
+    label: f.elements.label.value.trim(), media: f.elements.media.value.trim(),
+  };
+  if (editingLink) Object.assign(editingLink, data);
+  else project.logical.links.push({
+    id: "lnk-" + Math.random().toString(36).slice(2, 8), ...data });
+  editingLink = null;
+  renderAll();
+});
+
+$("#btn-add-link").addEventListener("click", () => openLinkDialog(null));
+
+/* ---- Modale VLANs ---- */
+
+function renderVlanList() {
+  const wrap = $("#vlan-list");
+  wrap.innerHTML = project.logical.vlans.length ? "" :
+    '<span style="color:var(--text-dim)">Aucun VLAN déclaré.</span>';
+  for (const v of project.logical.vlans) {
+    const row = document.createElement("div");
+    row.className = "vlan-row";
+    row.innerHTML = `<span class="role-dot" style="background:${v.color}"></span>` +
+      `<span>${v.vid} — ${v.name}</span><button title="Supprimer">×</button>`;
+    row.querySelector("button").addEventListener("click", () => {
+      project.logical.vlans = project.logical.vlans.filter((x) => x !== v);
+      renderVlanList();
+      saveLocal();
+    });
+    wrap.appendChild(row);
+  }
+}
+
+$("#btn-add-vlan").addEventListener("click", () => {
+  renderVlanList();
+  $("#vlan-dialog").showModal();
+});
+
+$("#vlan-form").addEventListener("submit", (e) => {
+  if (e.submitter && e.submitter.value === "cancel") { renderAll(); return; }
+  e.preventDefault(); // la modale reste ouverte pour enchaîner les ajouts
+  const f = e.target;
+  project.logical.vlans.push({
+    vid: parseInt(f.elements.vid.value, 10),
+    name: f.elements.name.value.trim(),
+    color: f.elements.color.value,
+  });
+  f.elements.vid.value = ""; f.elements.name.value = "";
+  renderVlanList();
+  saveLocal();
+});
+
+/* ---- Bascule de vue ---- */
+
+function setView(mode) {
+  viewMode = mode;
+  document.body.dataset.view = mode;
+  $("#btn-view-physical").classList.toggle("active", mode === "physical");
+  $("#btn-view-logical").classList.toggle("active", mode === "logical");
+  closeInspector();
+  renderAll();
+}
+$("#btn-view-physical").addEventListener("click", () => setView("physical"));
+$("#btn-view-logical").addEventListener("click", () => setView("logical"));
 
 /* =====================================================================
  * Imports de modèles — YAML NetBox, PDF datasheet, image/SVG custom.
@@ -716,6 +910,8 @@ function loadLocal() {
   catalog = await res.json();
   project = loadLocal() || newProject();
   if (!project.equipment_types) project.equipment_types = [];
+  if (!project.logical) project.logical = { vlans: [], links: [], positions: {} };
+  document.body.dataset.view = viewMode;
   refreshTypes();
   renderPalette("");
   $("#palette-filter").addEventListener("input",

@@ -125,9 +125,18 @@ class LogicalLink(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class Position(BaseModel):
+    """Position d'un nœud sur le schéma logique (px, grille libre)."""
+    x: float
+    y: float
+
+
 class Logical(BaseModel):
     vlans: list[Vlan] = []
     links: list[LogicalLink] = []
+    # Positions des nœuds posées à la main ; un équipement absent d'ici est
+    # placé par l'auto-layout en couches (firewall en haut, serveurs en bas).
+    positions: dict[str, Position] = {}
 
 
 class Project(BaseModel):

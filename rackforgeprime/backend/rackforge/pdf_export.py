@@ -16,11 +16,16 @@ from svglib.svglib import svg2rlg
 
 from .models import Project
 from .svg_export import render_project_svg
+from .svg_logical import render_logical_svg
 
 
-def render_project_pdf(project: Project) -> bytes:
-    """Projet -> PDF (bytes). Le SVG est la source, le PDF une vue."""
-    svg = render_project_svg(project)
+def render_project_pdf(project: Project, view: str = "physical") -> bytes:
+    """Projet -> PDF (bytes). Le SVG est la source, le PDF une vue.
+
+    ``view`` : « physical » (élévation de baies) ou « logical » (VLANs/liens).
+    """
+    svg = (render_logical_svg(project) if view == "logical"
+           else render_project_svg(project))
     drawing = svg2rlg(io.StringIO(svg))
     if drawing is None:  # SVG illisible : bug de génération, pas de l'utilisateur
         raise RuntimeError("Conversion SVG -> PDF impossible (SVG invalide)")

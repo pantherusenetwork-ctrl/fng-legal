@@ -22,6 +22,7 @@ from rackforge.models import (Project, patch_table, patch_table_csv,
                               rack_stats, type_index)
 from rackforge.pdf_export import render_project_pdf
 from rackforge.svg_export import render_project_svg
+from rackforge.svg_logical import render_logical_svg
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
@@ -104,24 +105,28 @@ async def import_datasheet(file: UploadFile = File(...)) -> dict:
 # --- Exports (le JSON reste la source de vérité) ----------------------------
 
 @app.post("/api/export/svg")
-def export_svg(payload: dict) -> Response:
+def export_svg(payload: dict, view: str = "physical") -> Response:
+    """``view=physical`` : élévation de baies ; ``view=logical`` : VLANs/liens."""
     project = _parse_project(payload)
-    svg = render_project_svg(project)
+    svg = (render_logical_svg(project) if view == "logical"
+           else render_project_svg(project))
+    suffix = "-logique" if view == "logical" else ""
     return Response(
         content=svg, media_type="image/svg+xml",
         headers={"Content-Disposition":
-                 f'attachment; filename="{project.id}.svg"'},
+                 f'attachment; filename="{project.id}{suffix}.svg"'},
     )
 
 
 @app.post("/api/export/pdf")
-def export_pdf(payload: dict) -> Response:
+def export_pdf(payload: dict, view: str = "physical") -> Response:
     project = _parse_project(payload)
-    pdf = render_project_pdf(project)
+    pdf = render_project_pdf(project, view=view)
+    suffix = "-logique" if view == "logical" else ""
     return Response(
         content=pdf, media_type="application/pdf",
         headers={"Content-Disposition":
-                 f'attachment; filename="{project.id}.pdf"'},
+                 f'attachment; filename="{project.id}{suffix}.pdf"'},
     )
 
 

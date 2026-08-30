@@ -63,9 +63,21 @@ python -m pytest tests/ -v
   SVG et PDF.
 - **Export CSV du brassage** (séparateur `;`, BOM UTF-8 pour Excel FR).
 
+## Schéma logique (phase 3 — livrée)
+
+- Bascule **Physique / Logique** dans la barre supérieure.
+- Nœuds = les mêmes équipements que les baies (mêmes IDs) ; auto-layout en
+  couches façon DAT (firewall en haut → routeurs → cœur → brassage →
+  serveurs), positions réajustables à la souris et persistées dans le JSON.
+- Liens typés (trunk / access / uplink / HA) : coudes orthogonaux façon
+  Visio/Lucid, étiquette + ports au point médian, pastilles VLAN colorées.
+- Gestion des VLANs du projet (id, nom, couleur) + légende intégrée au dessin.
+- **Un seul moteur de rendu** : la vue à l'écran EST le SVG du backend ;
+  les boutons SVG/PDF exportent la vue active (physique ou logique).
+
 ## Suite (dans l'ordre)
 
-1. Éditeur logique (VLANs, flux, liens) sur les mêmes IDs d'équipements.
-2. Exports VSDX et XML draw.io.
-3. OCR des datasheets scannées.
+1. Exports VSDX et XML draw.io.
+2. OCR des datasheets scannées.
+3. Matrice de flux générée depuis les liens.
 4. Packaging Windows (PyInstaller).
