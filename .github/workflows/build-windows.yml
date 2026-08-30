@@ -11,6 +11,9 @@ on:
       - "rackforgeprime/**"
       - ".github/workflows/build-windows.yml"
 
+permissions:
+  contents: write  # nécessaire pour publier la Release « latest »
+
 jobs:
   build:
     runs-on: windows-latest
@@ -59,3 +62,18 @@ jobs:
           name: RackForgePrime-Windows
           path: dist/RackForgePrime.exe
           retention-days: 30
+
+      # Release « latest » : lien de téléchargement DIRECT et stable,
+      # sans connexion GitHub (dépôt public) :
+      # https://github.com/pantherusenetwork-ctrl/fng-legal/releases/latest/download/RackForgePrime.exe
+      - name: Publier la Release « latest »
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: RackForgePrime — dernière version
+          body: |
+            Exécutable Windows compilé automatiquement depuis la branche de développement.
+            Téléchargez `RackForgePrime.exe`, posez-le où vous voulez (ex. Bureau),
+            double-cliquez : l'espace de travail `RackForgePrime-Workspace` se crée
+            à côté de l'exe et le navigateur s'ouvre sur l'application.
+          files: dist/RackForgePrime.exe
