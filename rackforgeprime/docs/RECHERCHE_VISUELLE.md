@@ -94,3 +94,67 @@ pour la direction artistique de RackForgePrime.
 - **Fallback fidèle** : quand pas d'image officielle Aruba/Fortinet/Cisco →
   placeholder à l'échelle U exacte avec constructeur + modèle + ports schématisés,
   et bouton « Remplacer par image officielle ».
+
+---
+
+## Analyse v2 — PATCHBOX / Lucidchart / Visio (31/08/2026)
+
+Trois analyses menées par agents (PATCHBOX testé en direct dans sa sandbox,
+Lucid via ses templates publics, Visio via docs Microsoft/VisioCafe/Packet
+Pushers). Objectif de Panther : la meilleure application du marché, design
+« mélange PATCHBOX + Lucidchart ». Synthèse des recommandations retenues.
+
+### Enseignements clés
+
+- **PATCHBOX** : zéro friction. Pas de drag obligatoire — clic sur un slot
+  vide (rectangle **pointillé**) → popover de choix → l'équipement apparaît.
+  Façades SVG flat à échelle réelle (RJ45 dessinés en 2×12, LEDs, aération),
+  câblage en 2 clics (départ → arrivée) avec **validation métier** et
+  surlignage des connexions au survol. Export = élévation + **nomenclature
+  (BOM)**.
+- **Lucidchart** : lisibilité logique. Une **teinte unique + silhouettes**
+  par type (pas une couleur par type), liens orthogonaux 2 px à coudes
+  arrondis, **étiquette colorée comme le lien**, conteneurs magnétiques sans
+  remplissage pour les zones, guides d'alignement, mini-map, badge de taille
+  live pendant le drag. Native : **pas de numérotation U** (les utilisateurs
+  la réclament — nous l'avons déjà : différenciateur).
+- **Visio** : le livrable d'ingénierie. Ce qui fait « document DAT » n'est
+  pas le dessin mais le **trio cadre ISO + cartouche auto-rempli (titre,
+  auteur, version, date, page X/Y) + pagination multi-vues** (élévation +
+  logique + inventaire dans un seul PDF). Stencils constructeurs = réplique
+  à l'échelle avec ports individuels, faces avant ET arrière.
+
+### Plan d'application priorisé
+
+**Lot 1 — vite fait, gros effet (facile)**
+1. Slot vide cliquable en pointillés → popover d'ajout rapide (PATCHBOX).
+2. Badge « 2U » live pendant le drag (Lucid).
+3. Feedback de snap coloré : ancrages cyan quand valide, rouge si collision
+   (Visio) — le fantôme rouge existe, ajouter le surlignage du slot cible.
+4. Étiquette de lien logique colorée comme le lien, fond #0b0e14 (Lucid).
+5. Pastilles de couleur d'équipement dans l'inspecteur, recoloration live.
+6. Toggle « masquer les numéros U » (Visio).
+
+**Lot 2 — le cœur visuel (moyen)**
+7. Façades SVG dessinées par gabarit de type — enrichir nos placeholders
+   (banques déjà faites) : LEDs d'état, zone console, aération (PATCHBOX).
+8. Vue logique Lucid-style : silhouettes monochromes cyan par type, liens
+   orthogonaux à coudes arrondis, croisements en « gap ».
+9. Mode câblage 2 clics port→port + surlignage des connexions au survol,
+   autres équipements atténués (PATCHBOX).
+10. Export PDF « livrable DAT » : cadre ISO A4/A3 paysage, cartouche
+    auto-rempli depuis le JSON projet, pagination élévation + logique +
+    tableau de brassage + nomenclature BOM (Visio + PATCHBOX).
+11. Mini-map cliquable en vue logique (Lucid).
+12. Popover contextuel au clic sur un équipement dans le canvas (PATCHBOX).
+
+**Lot 3 — différenciateurs lourds (difficile)**
+13. Vue arrière des baies commutable (déjà en roadmap ; les stencils pros
+    livrent toujours les deux faces).
+14. Zones VLAN = conteneurs magnétiques (déplacer la zone déplace ses
+    équipements) (Lucid).
+15. Validation métier étendue au câblage (budget PoE, profondeur…).
+
+Rapports d'agents complets : conservés dans les transcripts de session du
+31/08/2026 (sources citées : sandbox PATCHBOX, lucid.co/templates,
+support.microsoft.com, visiocafe.com, packetpushers.net).
