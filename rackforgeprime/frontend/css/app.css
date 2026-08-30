@@ -29,8 +29,9 @@ body {
   padding: 8px 14px; background: var(--panel);
   border-bottom: 1px solid var(--line);
 }
-#brand { font-size: 17px; font-weight: 700; letter-spacing: .5px; white-space: nowrap; }
-.brand-mark { color: var(--accent); }
+#brand { font-size: 17px; font-weight: 700; letter-spacing: .5px; white-space: nowrap;
+         display: flex; align-items: center; gap: 8px; }
+.brand-logo { width: 24px; height: 24px; }
 .brand-accent { color: var(--accent); }
 #project-name {
   flex: 0 1 340px; background: var(--panel-2); color: var(--text);

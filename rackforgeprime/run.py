@@ -65,12 +65,48 @@ def ensure_workspace() -> Path:
     return ws
 
 
+def open_app_window(url: str) -> bool:
+    """Ouvre l'UI dans une fenêtre applicative dédiée (mode ``--app`` de
+    Edge/Chrome : pas de barre d'adresse, pas d'onglets — le rendu d'une
+    vraie application de bureau, sans dépendance supplémentaire).
+
+    Retourne False si aucun navigateur Chromium n'est trouvé (l'appelant
+    retombe alors sur le navigateur par défaut).
+    """
+    import shutil
+    import subprocess
+
+    candidates: list[Path] = []
+    if os.name == "nt":
+        pf86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+        pf = os.environ.get("ProgramFiles", r"C:\Program Files")
+        local = os.environ.get("LocalAppData", "")
+        candidates = [
+            Path(pf86) / "Microsoft" / "Edge" / "Application" / "msedge.exe",
+            Path(pf) / "Microsoft" / "Edge" / "Application" / "msedge.exe",
+            Path(pf) / "Google" / "Chrome" / "Application" / "chrome.exe",
+            Path(pf86) / "Google" / "Chrome" / "Application" / "chrome.exe",
+            Path(local) / "Google" / "Chrome" / "Application" / "chrome.exe",
+        ]
+    else:
+        for name in ("chromium", "google-chrome", "chromium-browser"):
+            found = shutil.which(name)
+            if found:
+                candidates.append(Path(found))
+    for exe in candidates:
+        if exe.exists():
+            subprocess.Popen([str(exe), f"--app={url}",
+                              "--window-size=1500,950"])
+            return True
+    return False
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="RackForgePrime — serveur local")
     parser.add_argument("--port", type=int, default=8137)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--no-browser", action="store_true",
-                        help="ne pas ouvrir le navigateur au démarrage")
+                        help="ne pas ouvrir de fenêtre au démarrage")
     args = parser.parse_args()
 
     ws = ensure_workspace()
@@ -83,8 +119,11 @@ def main() -> None:
     print(f"RackForgePrime → {url}")
     print(f"Espace de travail : {ws}")
     if not args.no_browser:
-        # Le serveur met ~1 s à écouter ; on ouvre le navigateur juste après.
-        threading.Timer(1.2, webbrowser.open, [url]).start()
+        # Le serveur met ~1 s à écouter ; fenêtre app dédiée, sinon navigateur.
+        def _open() -> None:
+            if not open_app_window(url):
+                webbrowser.open(url)
+        threading.Timer(1.2, _open).start()
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
 
 

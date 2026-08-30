@@ -32,10 +32,11 @@ jobs:
       - name: Tests (le moteur de placement doit être vert avant de packager)
         run: python -m pytest rackforgeprime/tests/ -q
 
-      - name: Compiler l'exe (PyInstaller onefile)
+      - name: Compiler l'exe (PyInstaller onefile, fenêtré, icône panthère)
         run: >
-          pyinstaller --noconfirm --onefile --clean
+          pyinstaller --noconfirm --onefile --clean --noconsole
           --name RackForgePrime
+          --icon rackforgeprime/assets/icon.ico
           --paths rackforgeprime/backend
           --add-data "rackforgeprime/frontend;frontend"
           --collect-all uvicorn

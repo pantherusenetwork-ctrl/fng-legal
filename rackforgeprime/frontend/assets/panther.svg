@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- RackForgePrime — icône panthère stylisée (marque Panther).
+       Tuile sombre futuriste, silhouette angulaire, œil cyan. -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#141a26"/>
+      <stop offset="1" stop-color="#0b0e14"/>
+    </linearGradient>
+    <linearGradient id="cat" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2a3446"/>
+      <stop offset="1" stop-color="#151a24"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Tuile arrondie avec liseré cyan discret -->
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#tile)"
+        stroke="#22d3ee" stroke-width="6"/>
+
+  <!-- Tête de panthère géométrique, profil gauche, ligne féline fluide -->
+  <path fill="url(#cat)" stroke="#22d3ee" stroke-width="4" stroke-linejoin="round" d="
+    M 48 158
+    L 66 112
+    L 64 76
+    L 92 94
+    L 128 88
+    L 156 66
+    L 162 94
+    L 196 116
+    L 206 142
+    L 178 150
+    L 160 172
+    L 122 184
+    L 84 178
+    Z"/>
+
+  <!-- Oreille interne -->
+  <path fill="#0b0e14" d="M 72 84 L 88 94 L 76 102 Z"/>
+
+  <!-- Œil cyan — le seul point lumineux -->
+  <path fill="#22d3ee" d="M 116 120 L 142 114 L 132 130 Z"/>
+
+  <!-- Gueule : trait anguleux sous le museau -->
+  <path fill="none" stroke="#22d3ee" stroke-width="4" stroke-linecap="round"
+        d="M 206 142 L 184 146 M 178 150 L 166 158"/>
+</svg>
