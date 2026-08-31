@@ -461,6 +461,12 @@ function renderRackSVG(rack) {
   titleG.appendChild(pencil);
   titleG.addEventListener("click", (e) => openRackMenu(e, rack));
   svg.appendChild(titleG);
+  /* Clic droit n'importe où sur la baie (hors équipement) : mêmes
+     options — plus besoin de connaître le clic sur le nom. */
+  svg.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    openRackMenu(e, rack);
+  });
   /* Localisation (salle, adresse) sous le nom — comme à l'export. */
   if (rack.location)
     svg.appendChild(svgEl("text", { x: w / 2, y: 37, "text-anchor": "middle",
@@ -878,6 +884,18 @@ function closeRackMenu() {
   document.getElementById("rack-menu")?.remove();
 }
 
+/* Purge des références d'une baie qui part (liens logiques, positions,
+   sélection) — jamais de liens orphelins dans le projet. */
+function _purgeRackRefs(rack) {
+  const ids = new Set(rack.items.map((i) => i.id));
+  project.logical.links = (project.logical.links || []).filter((l) =>
+    !ids.has(l.from.equipment_id) && !ids.has(l.to.equipment_id));
+  for (const id of ids) {
+    if (project.logical.positions) delete project.logical.positions[id];
+    if (selectedItemId === id) { selectedItemId = null; closeInspector(); }
+  }
+}
+
 function openRackMenu(e, rack) {
   e.stopPropagation();
   closeRackMenu();
@@ -895,6 +913,8 @@ function openRackMenu(e, rack) {
     '<label class="rk-field">Hauteur (U)<input name="u" type="number" min="6" max="60" value="' + rack.u_height + '"></label>' +
     '<label class="rk-field">Localisation<input name="loc" value="' + esc(rack.location || "") + '"></label>' +
     '<div class="rk-actions"><button class="rk-apply">Appliquer</button>' +
+    '<button class="rk-duplicate">Dupliquer</button>' +
+    '<button class="rk-empty menu-danger">Vider</button>' +
     '<button class="rk-delete menu-danger">Supprimer</button></div>' +
     '<div class="rk-msg"></div>';
   document.body.appendChild(menu);
@@ -918,9 +938,38 @@ function openRackMenu(e, rack) {
     closeRackMenu();
     renderAll();
   });
+  menu.querySelector(".rk-duplicate").addEventListener("click", () => {
+    const copy = JSON.parse(JSON.stringify(rack));
+    copy.id = "rack-" + Date.now().toString(36);
+    copy.name = rack.name + " (copie)";
+    // Les équipements copiés prennent de nouveaux ids (liens/brassage
+    // restent sur les originaux — pas de doublons fantômes).
+    copy.items.forEach((it, k) => {
+      it.id = "eq-" + Date.now().toString(36) + "-" + k;
+      it.meta.hostname = it.meta.hostname ? it.meta.hostname + "-copie" : "";
+    });
+    project.racks.splice(project.racks.indexOf(rack) + 1, 0, copy);
+    closeRackMenu();
+    renderAll();
+  });
+  menu.querySelector(".rk-empty").addEventListener("click", () => {
+    if (!rack.items.length) { msg.textContent = "La baie est déjà vide."; return; }
+    if (!confirm(`Vider « ${rack.name} » ? Ses ${rack.items.length} équipements, `
+      + "leurs liens et leur brassage seront retirés du projet.")) return;
+    _purgeRackRefs(rack);
+    rack.items = [];
+    closeRackMenu();
+    renderAll();
+  });
   menu.querySelector(".rk-delete").addEventListener("click", () => {
-    if (rack.items.length) { msg.textContent = "Videz la baie avant de la supprimer."; return; }
-    if (project.racks.length <= 1) { msg.textContent = "Le projet garde au moins une baie."; return; }
+    if (project.racks.length <= 1) {
+      msg.textContent = "Le projet garde au moins une baie (videz-la plutôt).";
+      return;
+    }
+    const n = rack.items.length;
+    if (n && !confirm(`Supprimer « ${rack.name} » et ses ${n} équipements ? `
+      + "Leurs liens et leur brassage partent avec (Ctrl+Z pour annuler).")) return;
+    _purgeRackRefs(rack);
     project.racks = project.racks.filter((r2) => r2 !== rack);
     closeRackMenu();
     renderAll();

@@ -414,9 +414,9 @@ body[data-theme="clair"] #rack-menu { background: rgba(255, 255, 255, .72); bord
   background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
   color: var(--text); padding: 6px 8px; font-size: 13px;
 }
-#rack-menu .rk-actions { display: flex; gap: 8px; margin-top: 4px; }
-#rack-menu .rk-actions button { flex: 1; }
-#rack-menu .rk-delete { color: #f87171; }
+#rack-menu .rk-actions { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+#rack-menu .rk-actions button { flex: 1 1 45%; }
+#rack-menu .rk-delete, #rack-menu .rk-empty { color: #f87171; }
 #rack-menu .rk-msg { color: #f87171; margin-top: 6px; min-height: 1em; font-size: 11.5px; }
 
 /* ---- Barre d outils v2 : groupes, icones, bouton primaire, menu ---- */
