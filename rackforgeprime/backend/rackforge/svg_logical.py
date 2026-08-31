@@ -49,16 +49,16 @@ LINK_STYLES = {
 }
 
 # --- Palettes par thème (cohérentes avec svg_export.PALETTES) ---------------
-# NB : en clair et pastel, le fond du SVG est volontairement plus clair que
-# le chrome CSS de la page (--bg) — le schéma doit rester imprimable tel
+# NB : en clair, le fond du SVG est volontairement plus clair que le
+# chrome CSS de la page (--bg) — le schéma doit rester imprimable tel
 # quel, comme une feuille posée sur le plan de travail. Écart assumé.
 LPALETTES = {
     "sombre": {"bg": "#0b0e14", "node": "#161b28", "line": "#2c3547",
                "text": "#cbd5e1", "dim": "#64748b"},
     "clair": {"bg": "#ffffff", "node": "#f7f8f9", "line": "#d3d8de",
               "text": "#1c2126", "dim": "#6b7480"},
-    "pastel": {"bg": "#e9e3f3", "node": "#faf8fe", "line": "#c8bbdf",
-               "text": "#332e47", "dim": "#6f668c"},
+    "kaki": {"bg": "#15170d", "node": "#212617", "line": "#3a4224",
+             "text": "#dbe0c5", "dim": "#8f9572"},
     "nuit": {"bg": "#000000", "node": "#0d0d11", "line": "#20202a",
              "text": "#dde3ec", "dim": "#59637a"},
 }

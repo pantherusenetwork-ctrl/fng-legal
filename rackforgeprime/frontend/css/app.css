@@ -31,8 +31,14 @@ body {
 }
 #brand { font-size: 17px; font-weight: 700; letter-spacing: .5px; white-space: nowrap;
          display: flex; align-items: center; gap: 8px; }
-.brand-logo { width: 24px; height: 24px; }
+.brand-logo { width: 24px; height: 24px; border-radius: 6px; }
 .brand-accent { color: var(--accent); }
+#brand-version {
+  font-size: 10.5px; font-weight: 600; font-family: var(--mono);
+  color: var(--text-dim); background: var(--panel-2);
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 1px 7px; margin-left: 2px; letter-spacing: 0;
+}
 #project-name {
   flex: 0 1 340px; background: var(--panel-2); color: var(--text);
   border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px;
@@ -515,7 +521,7 @@ body[data-theme="clair"] #search-overlay .search-box { background: rgba(255, 255
 
 /* Photos officielles adoucies sur fond sombre (ecran seulement : les
    exports clair gardent la photo brute) */
-body:not([data-theme="clair"]):not([data-theme="pastel"]) #canvas svg image {
+body:not([data-theme="clair"]) #canvas svg image {
   filter: brightness(.86) saturate(.88);
 }
 
@@ -611,28 +617,26 @@ body:not([data-theme="clair"]):not([data-theme="pastel"]) #canvas svg image {
 }
 
 /* ===== Theme PASTEL — creme chaleureux, accents adoucis ===== */
-body[data-theme="pastel"] {
-  --bg: #e9e3f3;
-  --panel: rgba(250, 248, 255, .85);
-  --panel-2: #e3dcf0;
-  --frame: #f6f3fc;
-  --line: #c8bbdf;
-  --text: #332e47;
-  --text-dim: #6f668c;
-  --accent: #f0823c;
-  --danger: #d95c5c;
+body[data-theme="kaki"] {
+  --bg: #15170d;
+  --panel: rgba(26, 30, 16, .85);
+  --panel-2: #1f2412;
+  --frame: #212617;
+  --line: #3a4224;
+  --text: #dbe0c5;
+  --text-dim: #8f9572;
+  --accent: #e8a020;
+  --danger: #e06c5a;
 }
-body[data-theme="pastel"] #view-toggle button.active { color: #ffffff; }
-body[data-theme="pastel"] .palette-item { background: #faf8fe; box-shadow: 0 1px 3px rgba(71,64,122,.12); }
-body[data-theme="pastel"] #canvas-wrap {
-  background-image: radial-gradient(#c7b9de 1px, transparent 1px);
+body[data-theme="kaki"] #view-toggle button.active { color: #1a1400; }
+body[data-theme="kaki"] #canvas-wrap {
+  background-image: radial-gradient(#2b3119 1px, transparent 1px);
   background-size: 22px 22px;
 }
-body[data-theme="pastel"] #ghost-rack { border-color: #b6a7d3; color: #7b6fa0; }
-body[data-theme="pastel"] #hover-tip, body[data-theme="pastel"] #slot-popover,
-body[data-theme="pastel"] #item-menu, body[data-theme="pastel"] #rack-menu,
-body[data-theme="pastel"] .dropdown-menu, body[data-theme="pastel"] #search-overlay .search-box {
-  background: rgba(248, 245, 254, .8); border-color: rgba(71, 64, 122, .2);
+body[data-theme="kaki"] #hover-tip, body[data-theme="kaki"] #slot-popover,
+body[data-theme="kaki"] #item-menu, body[data-theme="kaki"] #rack-menu,
+body[data-theme="kaki"] .dropdown-menu, body[data-theme="kaki"] #search-overlay .search-box {
+  background: rgba(20, 23, 11, .8);
 }
 
 /* ===== Theme NUIT — noir profond, orange vif (salle machine) ===== */

@@ -37,11 +37,15 @@ if getattr(sys, "frozen", False):
 else:
     FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
-app = FastAPI(title="RackForgePrime", version="0.1.0", docs_url="/api/docs")
+# Version de l'application — à mettre à jour en même temps que le badge
+# affiché dans l'UI (frontend/index.html, #brand-version).
+VERSION = "1.0.0"
+
+app = FastAPI(title="RackForgePrime", version=VERSION, docs_url="/api/docs")
 
 # Un thème ou un rendu inconnu est refusé (422) au lieu d'être rabattu en
 # silence sur le défaut — l'appelant sait tout de suite qu'il s'est trompé.
-Theme = Literal["sombre", "clair", "pastel", "nuit"]
+Theme = Literal["sombre", "clair", "kaki", "nuit"]
 Rendu = Literal["photos", "dessin"]
 
 
@@ -125,7 +129,7 @@ async def import_datasheet(file: UploadFile = File(...)) -> dict:
 def export_svg(payload: dict, view: Literal["physical", "logical"] = "physical",
                theme: Theme = "sombre", rendu: Rendu = "photos") -> Response:
     """``view=physical`` : élévation ; ``view=logical`` : VLANs/liens.
-    ``theme`` : sombre/clair/pastel/nuit. ``rendu`` : photos ou dessin."""
+    ``theme`` : sombre/clair/kaki/nuit. ``rendu`` : photos ou dessin."""
     project = _parse_project(payload)
     svg = (render_logical_svg(project, theme=theme) if view == "logical"
            else render_project_svg(project, theme=theme, rendu=rendu))
@@ -143,7 +147,7 @@ def export_pdf(payload: dict,
                theme: Theme = "sombre", rendu: Rendu = "photos") -> Response:
     """``view`` : physical, logical, ou ``dossier`` (livrable DAT complet :
     élévation + logique + brassage + nomenclature, cadre et cartouche).
-    ``theme`` : sombre/clair/pastel/nuit. ``rendu`` : photos ou dessin."""
+    ``theme`` : sombre/clair/kaki/nuit. ``rendu`` : photos ou dessin."""
     project = _parse_project(payload)
     if view == "dossier":
         pdf = render_project_dossier_pdf(project, theme=theme, rendu=rendu)

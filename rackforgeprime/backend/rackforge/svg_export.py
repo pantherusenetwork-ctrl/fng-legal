@@ -46,14 +46,14 @@ PALETTES: dict[str, dict[str, str]] = {
         "decor_stroke": "#c9ced4", "ring": "#b8bec7", "lcd": "#fdf3ec",
         "band": "#1c2126",
     },
-    "pastel": {
-        "bg": "#e9e3f3", "frame": "#f6f3fc", "rail": "#d8cfe9",
-        "hole": "#b3a5cf", "slot": "#e3dcf0", "slot_line": "#cfc4e2",
-        "text": "#332e47", "dim": "#6f668c", "face": "#faf8fe",
-        "accent": "#f0823c", "face_stroke": "#c8bbdf", "pill": "#a898c6",
-        "port_fill": "#faf8fe", "decor_fill": "#ded5ec",
-        "decor_stroke": "#bdafd6", "ring": "#a294c2", "lcd": "#f1e4f2",
-        "band": "#47407a",
+    "kaki": {
+        "bg": "#15170d", "frame": "#212617", "rail": "#2d3320",
+        "hole": "#0e1107", "slot": "#1a1e10", "slot_line": "#272d18",
+        "text": "#dbe0c5", "dim": "#8f9572", "face": "#252b17",
+        "accent": "#e8a020", "face_stroke": "#3a4224", "pill": "#4a532e",
+        "port_fill": "#14170c", "decor_fill": "#1c2110",
+        "decor_stroke": "#3a4224", "ring": "#4d562f", "lcd": "#1a2a14",
+        "band": "#15170d",
     },
     "nuit": {
         "bg": "#000000", "frame": "#0b0b0e", "rail": "#17171d",
@@ -274,14 +274,15 @@ def render_rack(rack: Rack, types: dict[str, EquipmentType],
             s.append(f'<g transform="translate({inner_x},{y})">'
                      f'{t.faceplate_svg}</g>')
         elif t.faceplate_image and rendu != "dessin":
-            # Image officielle (PNG/JPEG en data URI) étirée sur le slot U
-            # exact — puis le MÊME cadre que les dessins : liseré de rôle,
-            # bandeau hostname, pastille U. Un seul langage visuel.
+            # Image officielle (PNG/JPEG en data URI) aux PROPORTIONS
+            # RESPECTÉES (jamais étirée — une façade déformée fait cheap),
+            # centrée sur le fond de façade — puis le MÊME cadre que les
+            # dessins : liseré de rôle, bandeau hostname, pastille U.
             ih = t.u_height * U_PX
             s.append(f'<rect x="{inner_x}" y="{y + 1}" width="{RACK_W}" '
                      f'height="{ih - 2}" fill="{p["face"]}"/>')
             s.append(f'<image x="{inner_x}" y="{y + 1}" width="{RACK_W}" '
-                     f'height="{ih - 2}" preserveAspectRatio="none" '
+                     f'height="{ih - 2}" preserveAspectRatio="xMidYMid meet" '
                      f'href="{t.faceplate_image}" '
                      f'xlink:href="{t.faceplate_image}"/>')
             s.append(f'<rect x="{inner_x}" y="{y + 1}" width="{RACK_W}" '

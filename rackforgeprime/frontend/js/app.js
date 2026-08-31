@@ -33,13 +33,13 @@ const THEMES = {
     decorFill: "#eef0f3", decorStroke: "#c9ced4", ring: "#b8bec7",
     lcd: "#fdf3ec", band: "#1c2126",
   },
-  pastel: {
-    frame: "#f6f3fc", rail: "#d8cfe9", hole: "#b3a5cf", slot: "#e3dcf0",
-    slotLine: "#cfc4e2", text: "#332e47", dim: "#6f668c", face: "#faf8fe",
-    accent: "#f0823c", danger: "#d95c5c",
-    faceStroke: "#c8bbdf", pill: "#a898c6", portFill: "#faf8fe",
-    decorFill: "#ded5ec", decorStroke: "#bdafd6", ring: "#a294c2",
-    lcd: "#f1e4f2", band: "#47407a",
+  kaki: {
+    frame: "#212617", rail: "#2d3320", hole: "#0e1107", slot: "#1a1e10",
+    slotLine: "#272d18", text: "#dbe0c5", dim: "#8f9572", face: "#252b17",
+    accent: "#e8a020", danger: "#e06c5a",
+    faceStroke: "#3a4224", pill: "#4a532e", portFill: "#14170c",
+    decorFill: "#1c2110", decorStroke: "#3a4224", ring: "#4d562f",
+    lcd: "#1a2a14", band: "#15170d",
   },
   nuit: {
     frame: "#0b0b0e", rail: "#17171d", hole: "#050507", slot: "#060608",
@@ -51,9 +51,12 @@ const THEMES = {
   },
 };
 /* Ordre du cycle du bouton thème. */
-const THEME_ORDER = ["sombre", "clair", "pastel", "nuit"];
+const THEME_ORDER = ["sombre", "clair", "kaki", "nuit"];
 const THEME_LABELS = { sombre: "Sombre", clair: "Clair",
-                       pastel: "Pastel", nuit: "Nuit" };
+                       kaki: "Kaki", nuit: "Nuit" };
+/* "pastel" (supprimé) mémorisé chez un utilisateur → bascule sur kaki. */
+if (localStorage.getItem("rfp-theme") === "pastel")
+  localStorage.setItem("rfp-theme", "kaki");
 let theme = THEMES[localStorage.getItem("rfp-theme")]
   ? localStorage.getItem("rfp-theme") : "sombre";
 let C = THEMES[theme];
@@ -280,12 +283,12 @@ function itemTipHTML(t, item) {
 function drawFaceplate(g, t, x, y, label, selected, item) {
   const h = t.u_height * U_PX;
   if (t.faceplate_image && renderMode !== "dessin") {
-    /* Image officielle : étirée sur le slot U exact (convention TSS/NetBox),
-       cadre de sélection par-dessus. */
+    /* Image officielle : proportions respectées (jamais étirée), centrée
+       sur le fond de façade — même règle que l'export Python. */
     g.appendChild(svgEl("rect", { x, y: y + 1, width: RACK_W, height: h - 2, fill: C.face }));
     const img = svgEl("image", {
       x, y: y + 1, width: RACK_W, height: h - 2,
-      preserveAspectRatio: "none", href: t.faceplate_image,
+      preserveAspectRatio: "xMidYMid meet", href: t.faceplate_image,
     });
     g.appendChild(img);
     /* Sur une photo officielle les ports ne sont pas localisables :
