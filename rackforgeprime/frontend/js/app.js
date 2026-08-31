@@ -1570,6 +1570,20 @@ async function renderLogical() {
   saveLocal();
 }
 
+/* ---- Fond du plan : 5 options, mémorisé, cyclé depuis le bandeau ---- */
+const CANVAS_BGS = ["points", "carreaux", "ruche", "lignes", "uni"];
+const CANVAS_BG_LABELS = { points: "Points", carreaux: "Carreaux",
+                           ruche: "Ruche", lignes: "Lignes", uni: "Uni" };
+let canvasBg = CANVAS_BGS.includes(localStorage.getItem("rfp-canvas-bg"))
+  ? localStorage.getItem("rfp-canvas-bg") : "points";
+document.body.dataset.canvasBg = canvasBg;
+$("#btn-canvas-bg").addEventListener("click", () => {
+  canvasBg = CANVAS_BGS[(CANVAS_BGS.indexOf(canvasBg) + 1) % CANVAS_BGS.length];
+  document.body.dataset.canvasBg = canvasBg;
+  localStorage.setItem("rfp-canvas-bg", canvasBg);
+  renderStatus("Fond du plan : " + CANVAS_BG_LABELS[canvasBg]);
+});
+
 /* ---- Dessin libre (Texte / Zone / Flèche) — esprit draw.io ---------- */
 let annotTool = null; // null | "texte" | "zone" | "fleche"
 

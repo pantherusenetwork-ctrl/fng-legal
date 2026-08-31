@@ -3,6 +3,7 @@
 
 :root {
   --bg: #0b0e14;
+  --grid-color: #1a2233;
   --panel: #11151f;
   --panel-2: #161b28;
   --frame: #1b2230;
@@ -154,6 +155,28 @@ button.danger:hover { border-color: var(--danger); }
 #canvas { display: flex; gap: 40px; align-items: flex-start; min-width: min-content; }
 #canvas svg { display: block; }
 
+/* Fond du plan — 5 options au choix (liberté draw.io), couleur par thème
+   via --grid-color. Posé par JS sur body[data-canvas-bg]. */
+body[data-canvas-bg="points"] #canvas-wrap {
+  background-image: radial-gradient(var(--grid-color) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+body[data-canvas-bg="carreaux"] #canvas-wrap {
+  background-image:
+    linear-gradient(var(--grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+body[data-canvas-bg="lignes"] #canvas-wrap {
+  background-image: linear-gradient(var(--grid-color) 1px, transparent 1px);
+  background-size: 100% 22px;
+}
+body[data-canvas-bg="ruche"] #canvas-wrap {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cg fill='none' stroke='%23888888' stroke-opacity='.22' stroke-width='1'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM0 32.5l13 7.5v16M27 32.5l-13 7.5m0-33L1 0m13 7.5L27 0'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 28px 49px;
+}
+body[data-canvas-bg="uni"] #canvas-wrap { background-image: none; }
+
 /* États de drag rendus dans le SVG */
 .ghost-ok rect { stroke: var(--accent); }
 .item-selected { filter: drop-shadow(0 0 6px rgba(249, 115, 22, .6)); }
@@ -290,6 +313,7 @@ g.rack-item.conn-lit { opacity: 1; }
    ===================================================================== */
 body[data-theme="clair"] {
   --bg: #eef0f3;
+  --grid-color: #dfe3e8;
   --panel: rgba(255, 255, 255, .78);
   --panel-2: #f3f4f6;
   --frame: #ffffff;
@@ -301,10 +325,6 @@ body[data-theme="clair"] {
 }
 body[data-theme="clair"] #view-toggle button.active { color: #ffffff; }
 body[data-theme="clair"] .palette-item { background: #ffffff; box-shadow: 0 1px 2px rgba(28,33,38,.06); }
-body[data-theme="clair"] #canvas-wrap {
-  background-image: radial-gradient(#dfe3e8 1px, transparent 1px);
-  background-size: 22px 22px;
-}
 
 /* Transparence / effet verre — les surfaces qui flottent au-dessus du
    contenu (popovers, menus, bulles) sont translucides et floutees,
@@ -619,6 +639,7 @@ body:not([data-theme="clair"]) #canvas svg image {
 /* ===== Theme KAKI — olive foncé, accent ambre (terrain) ===== */
 body[data-theme="kaki"] {
   --bg: #0c0e06;
+  --grid-color: #20250f;
   --panel: rgba(18, 21, 10, .85);
   --panel-2: #151808;
   --frame: #171a0c;
@@ -629,10 +650,6 @@ body[data-theme="kaki"] {
   --danger: #e06c5a;
 }
 body[data-theme="kaki"] #view-toggle button.active { color: #1a1400; }
-body[data-theme="kaki"] #canvas-wrap {
-  background-image: radial-gradient(#20250f 1px, transparent 1px);
-  background-size: 22px 22px;
-}
 body[data-theme="kaki"] #hover-tip, body[data-theme="kaki"] #slot-popover,
 body[data-theme="kaki"] #item-menu, body[data-theme="kaki"] #rack-menu,
 body[data-theme="kaki"] .dropdown-menu, body[data-theme="kaki"] #search-overlay .search-box {
@@ -642,6 +659,7 @@ body[data-theme="kaki"] .dropdown-menu, body[data-theme="kaki"] #search-overlay 
 /* ===== Theme NUIT — noir profond, orange vif (salle machine) ===== */
 body[data-theme="nuit"] {
   --bg: #000000;
+  --grid-color: #14141c;
   --panel: rgba(9, 12, 18, .82);
   --panel-2: #0d0d11;
   --frame: #0b0b0e;
