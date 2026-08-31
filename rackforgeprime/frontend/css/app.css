@@ -628,6 +628,7 @@ body[data-theme="pastel"] #canvas-wrap {
   background-image: radial-gradient(#c7b9de 1px, transparent 1px);
   background-size: 22px 22px;
 }
+body[data-theme="pastel"] #ghost-rack { border-color: #b6a7d3; color: #7b6fa0; }
 body[data-theme="pastel"] #hover-tip, body[data-theme="pastel"] #slot-popover,
 body[data-theme="pastel"] #item-menu, body[data-theme="pastel"] #rack-menu,
 body[data-theme="pastel"] .dropdown-menu, body[data-theme="pastel"] #search-overlay .search-box {

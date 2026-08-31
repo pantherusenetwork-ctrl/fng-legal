@@ -163,7 +163,7 @@ def layout_nodes(project: Project, types: dict[str, EquipmentType]
             else:
                 pos[n["id"]] = (
                     x0 + i * (NODE_W + NODE_GAP),
-                    MARGIN + 40 + top_extra + rank * LAYER_GAP,
+                    MARGIN + 26 + top_extra + rank * LAYER_GAP,
                 )
     return pos
 
@@ -331,6 +331,7 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
     for nid, (x, y) in pos.items():
         rank = LAYER_RANK.get(cat_by_id.get(nid, "other"), 5)
         ranks.setdefault(rank, []).append(nid)
+    zone_lbls: list[str] = []
     for rank, ids in sorted(ranks.items()):
         xs = [pos[i][0] for i in ids]
         ys = [pos[i][1] for i in ids]
@@ -342,11 +343,19 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
                  f'height="{zh:.0f}" rx="10" fill="none" '
                  f'stroke="{C_LINE}" stroke-width="1" '
                  f'stroke-dasharray="5,4"/>')
-        s.append(f'<text x="{zx + 12:.0f}" y="{zy + 14:.0f}" '
-                 f'font-family="{FONT}" font-size="11" letter-spacing="1.5" '
-                 f'fill="{C_TEXT_DIM}">'
-                 f'{escape(ZONE_LABELS.get(rank, "AUTRES"))}</text>')
         s.append('</g>')
+        # Libellé détouré d'un halo et rendu APRÈS les traits : un
+        # connecteur (WAN, lien inter-couches) ne le coupe jamais.
+        ztxt = ZONE_LABELS.get(rank, "AUTRES")
+        zlw = len(ztxt) * 8.2 + 12
+        zone_lbls.append(f'<g id="zone-label-{rank}">'
+                         f'<rect x="{zx + 6:.0f}" y="{zy + 3:.0f}" '
+                         f'width="{zlw:.0f}" height="15" rx="3" '
+                         f'fill="{C_BG}"/>'
+                         f'<text x="{zx + 12:.0f}" y="{zy + 14:.0f}" '
+                         f'font-family="{FONT}" font-size="11" '
+                         f'letter-spacing="1.5" fill="{C_TEXT_DIM}">'
+                         f'{escape(ztxt)}</text></g>')
 
     # Traits des liens d'abord (sous les nœuds) ; étiquettes gardées pour
     # la fin (au-dessus de tout).
@@ -422,7 +431,8 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
                  f'{escape(n["sub"])}</text>')
         s.append('</g>')
 
-    # Étiquettes de liens par-dessus les nœuds.
+    # Libellés de zones puis étiquettes de liens par-dessus tout.
+    s.extend(zone_lbls)
     s.extend(labels)
 
     # Légende : VLANs puis types de liens.
