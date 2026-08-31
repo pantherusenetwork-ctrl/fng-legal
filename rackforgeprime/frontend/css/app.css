@@ -618,25 +618,25 @@ body:not([data-theme="clair"]) #canvas svg image {
 
 /* ===== Theme PASTEL — creme chaleureux, accents adoucis ===== */
 body[data-theme="kaki"] {
-  --bg: #15170d;
-  --panel: rgba(26, 30, 16, .85);
-  --panel-2: #1f2412;
-  --frame: #212617;
-  --line: #3a4224;
-  --text: #dbe0c5;
-  --text-dim: #8f9572;
-  --accent: #e8a020;
+  --bg: #0c0e06;
+  --panel: rgba(18, 21, 10, .85);
+  --panel-2: #151808;
+  --frame: #171a0c;
+  --line: #2c3118;
+  --text: #d4d9b8;
+  --text-dim: #7f8663;
+  --accent: #eb9c14;
   --danger: #e06c5a;
 }
 body[data-theme="kaki"] #view-toggle button.active { color: #1a1400; }
 body[data-theme="kaki"] #canvas-wrap {
-  background-image: radial-gradient(#2b3119 1px, transparent 1px);
+  background-image: radial-gradient(#20250f 1px, transparent 1px);
   background-size: 22px 22px;
 }
 body[data-theme="kaki"] #hover-tip, body[data-theme="kaki"] #slot-popover,
 body[data-theme="kaki"] #item-menu, body[data-theme="kaki"] #rack-menu,
 body[data-theme="kaki"] .dropdown-menu, body[data-theme="kaki"] #search-overlay .search-box {
-  background: rgba(20, 23, 11, .8);
+  background: rgba(12, 14, 6, .8);
 }
 
 /* ===== Theme NUIT — noir profond, orange vif (salle machine) ===== */

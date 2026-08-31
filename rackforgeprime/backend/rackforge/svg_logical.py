@@ -57,8 +57,8 @@ LPALETTES = {
                "text": "#cbd5e1", "dim": "#64748b"},
     "clair": {"bg": "#ffffff", "node": "#f7f8f9", "line": "#d3d8de",
               "text": "#1c2126", "dim": "#6b7480"},
-    "kaki": {"bg": "#15170d", "node": "#212617", "line": "#3a4224",
-             "text": "#dbe0c5", "dim": "#8f9572"},
+    "kaki": {"bg": "#0c0e06", "node": "#171a0c", "line": "#2c3118",
+             "text": "#d4d9b8", "dim": "#7f8663"},
     "nuit": {"bg": "#000000", "node": "#0d0d11", "line": "#20202a",
              "text": "#dde3ec", "dim": "#59637a"},
 }
