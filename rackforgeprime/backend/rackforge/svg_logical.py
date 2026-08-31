@@ -185,11 +185,16 @@ def _wan_item(project: Project):
     return None
 
 
-def _elbow(x1: float, y1: float, x2: float, y2: float) -> str:
-    """Chemin orthogonal à coude mi-hauteur, coins arrondis (rayon Lucid)."""
+def _elbow(x1: float, y1: float, x2: float, y2: float,
+           my_off: float = 0.0) -> str:
+    """Chemin orthogonal à coude mi-hauteur, coins arrondis (rayon Lucid).
+
+    ``my_off`` décale la hauteur du coude : les liens parallèles prennent
+    chacun leur étage et ne se croisent plus au même endroit.
+    """
     if abs(y1 - y2) < 4:
         return f"M {x1:.0f} {y1:.0f} L {x2:.0f} {y2:.0f}"
-    my = (y1 + y2) / 2
+    my = (y1 + y2) / 2 + my_off
     if abs(x1 - x2) < 4:
         return f"M {x1:.0f} {y1:.0f} L {x2:.0f} {y2:.0f}"
     # Rayon borné par la place disponible sur chaque segment.
@@ -237,9 +242,14 @@ def _render_link(link: LogicalLink, pos: dict[str, tuple[float, float]],
         x1, y1 = ax + NODE_W / 2 + dx, ay + (NODE_H if ay <= by else 0)
         x2, y2 = bx + NODE_W / 2 + dx, by + (NODE_H if by < ay else 0)
     width, color, dash = LINK_STYLES.get(link.kind, LINK_STYLES["other"])
+    # Liens parallèles : chaque coude prend son étage (pas de 8 px,
+    # biaisé vers le HAUT du couloir — le dernier étage resterait sinon
+    # dans la zone du dessous et sa pastille mordrait le libellé).
+    idx, n = fan
+    elbow_off = (idx - (n - 1)) * 8 if (n > 1 and not same_layer) else 0
     s = [f'<g id="link-{escape(link.id)}">']
     dash_attr = f' stroke-dasharray="{dash}"' if dash else ""
-    s.append(f'<path d="{_elbow(x1, y1, x2, y2)}" fill="none" '
+    s.append(f'<path d="{_elbow(x1, y1, x2, y2, elbow_off)}" fill="none" '
              f'stroke="{color}" stroke-width="{width}"{dash_attr}/>')
     s.append('</g>')
     # Étiquette + ports + pastilles VLAN au point médian, dans un groupe
@@ -255,15 +265,13 @@ def _render_link(link: LogicalLink, pos: dict[str, tuple[float, float]],
         mx, my = x2 + tw_side(link) / 2 + 14, max(y1, y2) - 26
     label = link.label or link.kind
     ports = " · ".join(p for p in (link.from_.port, link.to.port) if p)
-    idx, n = fan
     lbl = [f'<g id="link-label-{escape(link.id)}">']
     if n >= 3 and not same_layer:
-        # Faisceau de liens parallèles : pastille numérotée sur chaque
-        # fil, le détail part dans une liste déportée (pratique des
-        # plans d'ingénierie — le couloir reste lisible).
-        # Deux rangées de pastilles, remontées pour ne jamais toucher la
-        # bordure de zone du dessous.
-        my += -18 + 18 * (idx % 2)
+        # Faisceau de liens parallèles : pastille numérotée POSÉE SUR le
+        # segment horizontal de SON coude (chaque coude a son étage — la
+        # pastille ne flotte jamais à côté de son fil), le détail part
+        # dans une liste déportée (pratique des plans d'ingénierie).
+        my = (y1 + y2) / 2 + elbow_off
         lbl.append(f'<circle cx="{mx:.0f}" cy="{my:.0f}" r="7.5" '
                    f'fill="{C_BG}" stroke="{color}" stroke-width="1.3"/>')
         lbl.append(f'<text x="{mx:.0f}" y="{my + 3:.0f}" text-anchor="middle" '
@@ -321,18 +329,17 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
 
     max_x = max((x for x, _ in pos.values()), default=0) + NODE_W + MARGIN
     max_y = max((y for _, y in pos.values()), default=0) + NODE_H + MARGIN
-    # Un faisceau de liens parallèles (>= 3) déporte sa liste numérotée
-    # à droite : on réserve la colonne.
+    # Un faisceau de liens parallèles (>= 3) envoie sa liste numérotée
+    # SOUS la légende (nomenclature en pied de plan — pas de colonne
+    # blanche réservée à droite).
     counts: dict[frozenset, int] = {}
     for link in project.logical.links:
         pair = frozenset((link.from_.equipment_id, link.to.equipment_id))
         counts[pair] = counts.get(pair, 0) + 1
-    # Colonne dimensionnée sur le texte réel (jamais 320 px de vide).
-    stack_w = (min(320, 60 + max((tw_side(lk) for lk in project.logical.links),
-                                 default=0))
-               if any(v >= 3 for v in counts.values()) else 0)
-    total_w = max(max_x + stack_w, 640)
-    total_h = max_y + LEGEND_H + 12
+    stack_count = sum(v for v in counts.values() if v >= 3)
+    legend_block = LEGEND_H + (30 + stack_count * 17 if stack_count else 0)
+    total_w = max(max_x, 640)
+    total_h = max_y + legend_block + 12
 
     s: list[str] = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{total_w}" '
@@ -398,18 +405,6 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
         if stack:
             stacks.append(stack)
 
-    # Liste déportée des faisceaux numérotés, à droite du schéma.
-    if stacks:
-        sx = max((x for x, _ in pos.values()), default=0) + NODE_W + 34
-        sy = min((y for _, y in pos.values()), default=100) + 30
-        labels.append(f'<text x="{sx}" y="{sy - 16}" font-family="{FONT}" '
-                      f'font-size="11.5" letter-spacing="1" '
-                      f'fill="{C_TEXT_DIM}">LIAISONS NUMÉROTÉES</text>')
-        for k, (text, color) in enumerate(stacks):
-            labels.append(f'<text x="{sx}" y="{sy + k * 17}" '
-                          f'font-family="{FONT_MONO}" font-size="11" '
-                          f'fill="{color}">{escape(text)}</text>')
-
     # Nuage WAN / Internet — dessiné seulement s'il est documenté (un
     # port dont l'usage mentionne WAN) : jamais inventé.
     wan = _wan_item(project)
@@ -459,8 +454,9 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
     s.extend(zone_lbls)
     s.extend(labels)
 
-    # Légende : VLANs puis types de liens.
-    ly = total_h - LEGEND_H
+    # Légende : VLANs puis types de liens, puis nomenclature des
+    # faisceaux numérotés (pied de plan).
+    ly = total_h - legend_block
     s.append(f'<line x1="{MARGIN}" y1="{ly}" x2="{total_w - MARGIN}" y2="{ly}" '
              f'stroke="{C_LINE}" stroke-width="1"/>')
     lx = MARGIN
@@ -478,6 +474,15 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
         s.append(f'<text x="{lx + 32}" y="{ly + 48}" font-size="12" '
                  f'font-family="{FONT_MONO}" fill="{C_TEXT_DIM}">{kind}</text>')
         lx += 32 + len(kind) * 6 + 22
+
+    if stacks:
+        s.append(f'<text x="{MARGIN}" y="{ly + 74}" font-family="{FONT}" '
+                 f'font-size="11.5" letter-spacing="1" '
+                 f'fill="{C_TEXT_DIM}">LIAISONS NUMÉROTÉES</text>')
+        for k, (text, color) in enumerate(stacks):
+            s.append(f'<text x="{MARGIN}" y="{ly + 91 + k * 17}" '
+                     f'font-family="{FONT_MONO}" font-size="11" '
+                     f'fill="{color}">{escape(text)}</text>')
 
     s.append('</svg>')
     return "\n".join(s)
