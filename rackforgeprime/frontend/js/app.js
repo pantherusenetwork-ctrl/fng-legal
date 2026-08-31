@@ -1399,6 +1399,8 @@ $("#btn-export-dossier").addEventListener("click", () =>
 $("#btn-export-labels").addEventListener("click", () =>
   postForBlob("/api/export/etiquettes",
               currentProject().id + "-etiquettes.pdf"));
+$("#btn-export-drawio").addEventListener("click", () =>
+  postForBlob("/api/export/drawio", currentProject().id + ".drawio"));
 
 /* PNG : le SVG d'export rasterisé en local (à imprimer, scotcher sur la
  * baie — la demande NetBox n°1182 jamais servie). Échelle 2x. */

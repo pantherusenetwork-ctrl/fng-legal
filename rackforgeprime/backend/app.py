@@ -23,6 +23,7 @@ from rackforge.catalog_packs import merged_catalog
 from rackforge.importers import import_netbox_yaml, parse_datasheet_pdf
 from rackforge.models import (Project, patch_table, patch_table_csv,
                               rack_stats, type_index)
+from rackforge.drawio_export import render_drawio
 from rackforge.pdf_export import (render_labels_pdf,
                                   render_project_dossier_pdf,
                                   render_project_pdf)
@@ -147,6 +148,18 @@ def export_pdf(payload: dict, view: str = "physical",
         content=pdf, media_type="application/pdf",
         headers={"Content-Disposition":
                  f'attachment; filename="{project.id}{suffix}.pdf"'},
+    )
+
+
+@app.post("/api/export/drawio")
+def export_drawio(payload: dict) -> Response:
+    """Fichier .drawio rééditable (2 pages : élévation + logique)."""
+    project = _parse_project(payload)
+    xml = render_drawio(project)
+    return Response(
+        content=xml, media_type="application/vnd.jgraph.mxfile",
+        headers={"Content-Disposition":
+                 f'attachment; filename="{project.id}.drawio"'},
     )
 
 
