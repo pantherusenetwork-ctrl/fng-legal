@@ -63,3 +63,28 @@ Derniers reproches esthétique (v5) et pistes retenues :
 Idées métier notées au passage : taux de charge onduleur calculé
 (capacité catalogue vs charge totale), liens d alimentation vers la
 zone ÉNERGIE.
+
+---
+
+## Cap 9/10 — enseignements de la recherche terrain (31/08/2026, 2 agents)
+
+Sources : issues/discussions GitHub NetBox, NANOG, Cisco Community,
+Capterra/G2, guides TIA-606/DCIM, Packet Pushers, Auvik. Verbatims Reddit
+inaccessibles (fetch bloqué) — non fabriqués.
+
+**Fait dans la foulée** : IP de management + asset tag partout (attente
+pro n°1), import CSV de brassage (plainte n°1 : saisie de masse),
+export PNG (demande NetBox #1182), rendu photos/dessin, baie fantôme,
+taux de charge onduleur.
+
+**Backlog priorisé restant** :
+1. Trace de câble de bout en bout (prise → panneau → switch) — LE moment
+   « enfin ! » du terrain ; on a déjà l'idée « chemin illuminé ».
+2. Étiquettes TIA-606 imprimables générées du brassage (`BAIE-Uxx-Pyy`),
+   identifiants générés depuis la donnée, jamais retapés.
+3. Appariement en masse panneau↔switch (bulk connect, NetBox #2855).
+4. Face avant/arrière des panneaux (pass-through) + vue arrière des baies.
+5. Export draw.io XML (interop) puis VSDX.
+6. Type de média + couleur par ligne de brassage (Cat6a/OM4/DAC).
+7. Vue salle/plan d'étage au-dessus des baies (floorplan) — plus tard.
+Hors périmètre assumé : découverte réseau live, multi-utilisateurs cloud.
