@@ -56,6 +56,9 @@ let selectedItemId = null;
 let viewMode = "physical";
 /* Numéros U visibles (toggle façon Visio « Hide U sizes »). */
 let showUNumbers = localStorage.getItem("rfp-show-u") !== "0";
+/* Rendu des faceplates : "photos" (images officielles) ou "dessin"
+ * (tout en faceplates dessinées — un seul langage visuel). */
+let renderMode = localStorage.getItem("rfp-render") === "dessin" ? "dessin" : "photos";
 /* Drag en cours : { type, itemId?, fromRackId?, ghost SVG en cours } */
 let drag = null;
 let itemSeq = 1;
@@ -253,7 +256,7 @@ function itemTipHTML(t, item) {
 /* Faceplate placeholder — même dessin que _faceplate_placeholder() côté Python. */
 function drawFaceplate(g, t, x, y, label, selected, item) {
   const h = t.u_height * U_PX;
-  if (t.faceplate_image) {
+  if (t.faceplate_image && renderMode !== "dessin") {
     /* Image officielle : étirée sur le slot U exact (convention TSS/NetBox),
        cadre de sélection par-dessus. */
     g.appendChild(svgEl("rect", { x, y: y + 1, width: RACK_W, height: h - 2, fill: C.face }));
@@ -983,6 +986,13 @@ function renderAll() {
   const canvas = $("#canvas");
   canvas.innerHTML = "";
   for (const rack of project.racks) canvas.appendChild(renderRackSVG(rack));
+  /* Baie fantôme : le vide à droite invite à construire la suivante. */
+  const ghost = document.createElement("div");
+  ghost.id = "ghost-rack";
+  ghost.innerHTML = '<div class="ghost-plus">+</div><div>Baie</div>';
+  ghost.title = "Ajouter une baie";
+  ghost.addEventListener("click", () => $("#btn-add-rack").click());
+  canvas.appendChild(ghost);
   renderOnboarding();
   renderStatus();
   saveLocal();
@@ -1285,6 +1295,7 @@ function exportQuery(view) {
   const q = new URLSearchParams();
   q.set("view", view || (viewMode === "logical" ? "logical" : "physical"));
   q.set("theme", theme);
+  q.set("rendu", renderMode);
   return "?" + q.toString();
 }
 
@@ -1711,6 +1722,18 @@ $("#btn-theme").addEventListener("click", () => {
   localStorage.setItem("rfp-theme", theme);
   applyTheme();
 });
+
+function syncRenderButton() {
+  const lbl = $("#btn-render-label");
+  if (lbl) lbl.textContent = renderMode === "dessin" ? "Dessin" : "Photos";
+}
+$("#btn-render").addEventListener("click", () => {
+  renderMode = renderMode === "dessin" ? "photos" : "dessin";
+  localStorage.setItem("rfp-render", renderMode);
+  syncRenderButton();
+  renderAll();
+});
+syncRenderButton();
 
 $("#btn-toggle-u").addEventListener("click", () => {
   showUNumbers = !showUNumbers;

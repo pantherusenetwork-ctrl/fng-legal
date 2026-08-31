@@ -578,3 +578,15 @@ body:not([data-theme="clair"]) #canvas svg image {
 #device-legend .lg-reserve { background: #eab308; }
 .dpf-fields { grid-template-columns: repeat(4, 1fr); }
 .dpf-fields select { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; color: var(--text); padding: 6px 9px; font-size: 13px; }
+
+/* ---- Baie fantome : + Baie en place de la suivante ---- */
+#ghost-rack {
+  width: 150px; min-height: 260px; align-self: stretch; max-height: 560px;
+  border: 2px dashed var(--line); border-radius: 12px;
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 8px; cursor: pointer;
+  color: var(--text-dim); font-size: 14px; font-weight: 500;
+  transition: border-color .15s, color .15s, background .15s;
+}
+#ghost-rack:hover { border-color: var(--accent); color: var(--accent); background: rgba(249, 115, 22, .05); }
+#ghost-rack .ghost-plus { font-size: 30px; line-height: 1; }

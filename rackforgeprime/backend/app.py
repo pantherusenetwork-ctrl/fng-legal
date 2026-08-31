@@ -114,12 +114,12 @@ async def import_datasheet(file: UploadFile = File(...)) -> dict:
 
 @app.post("/api/export/svg")
 def export_svg(payload: dict, view: str = "physical",
-               theme: str = "sombre") -> Response:
+               theme: str = "sombre", rendu: str = "photos") -> Response:
     """``view=physical`` : élévation ; ``view=logical`` : VLANs/liens.
-    ``theme`` : sombre (écran) ou clair (impression)."""
+    ``theme`` : sombre/clair. ``rendu`` : photos ou dessin (élévation)."""
     project = _parse_project(payload)
     svg = (render_logical_svg(project, theme=theme) if view == "logical"
-           else render_project_svg(project, theme=theme))
+           else render_project_svg(project, theme=theme, rendu=rendu))
     suffix = "-logique" if view == "logical" else ""
     return Response(
         content=svg, media_type="image/svg+xml",
@@ -130,16 +130,16 @@ def export_svg(payload: dict, view: str = "physical",
 
 @app.post("/api/export/pdf")
 def export_pdf(payload: dict, view: str = "physical",
-               theme: str = "sombre") -> Response:
+               theme: str = "sombre", rendu: str = "photos") -> Response:
     """``view`` : physical, logical, ou ``dossier`` (livrable DAT complet :
     élévation + logique + brassage + nomenclature, cadre et cartouche).
-    ``theme`` : sombre (écran) ou clair (impression)."""
+    ``theme`` : sombre/clair. ``rendu`` : photos ou dessin."""
     project = _parse_project(payload)
     if view == "dossier":
-        pdf = render_project_dossier_pdf(project, theme=theme)
+        pdf = render_project_dossier_pdf(project, theme=theme, rendu=rendu)
         suffix = "-dossier"
     else:
-        pdf = render_project_pdf(project, view=view, theme=theme)
+        pdf = render_project_pdf(project, view=view, theme=theme, rendu=rendu)
         suffix = "-logique" if view == "logical" else ""
     return Response(
         content=pdf, media_type="application/pdf",

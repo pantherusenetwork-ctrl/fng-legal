@@ -47,14 +47,15 @@ def _pdf_palette(theme: str) -> dict:
 
 
 def render_project_pdf(project: Project, view: str = "physical",
-                       theme: str = "sombre") -> bytes:
+                       theme: str = "sombre",
+                       rendu: str = "photos") -> bytes:
     """Projet -> PDF (bytes). Le SVG est la source, le PDF une vue.
 
     ``view`` : « physical » (élévation de baies) ou « logical » (VLANs/liens).
     ``theme`` : « sombre » (écran) ou « clair » (impression).
     """
     svg = (render_logical_svg(project, theme=theme) if view == "logical"
-           else render_project_svg(project, theme=theme))
+           else render_project_svg(project, theme=theme, rendu=rendu))
     drawing = svg2rlg(io.StringIO(svg))
     if drawing is None:  # SVG illisible : bug de génération, pas de l'utilisateur
         raise RuntimeError("Conversion SVG -> PDF impossible (SVG invalide)")
@@ -210,8 +211,8 @@ def _bom_rows(project: Project) -> list[list[str]]:
     return rows
 
 
-def render_project_dossier_pdf(project: Project,
-                               theme: str = "sombre") -> bytes:
+def render_project_dossier_pdf(project: Project, theme: str = "sombre",
+                               rendu: str = "photos") -> bytes:
     """Dossier complet : élévation, vue logique, brassage, nomenclature.
 
     Chaque page porte le cadre et le cartouche auto-rempli — le livrable
@@ -235,7 +236,8 @@ def render_project_dossier_pdf(project: Project,
 
     _page_frame(c, page_w, page_h, project, "Élévation physique",
                 page_no, total, pal)
-    _draw_svg_page(c, render_project_svg(project, theme=theme), page_w, page_h)
+    _draw_svg_page(c, render_project_svg(project, theme=theme, rendu=rendu),
+                   page_w, page_h)
     c.showPage()
     page_no += 1
 
@@ -260,6 +262,14 @@ def render_project_dossier_pdf(project: Project,
     total_w_charge = sum(
         types[i.type_id].power_w
         for r in project.racks for i in r.items if i.type_id in types)
+    # Capacité onduleur déduite des VA du nom de modèle (facteur 0,9) —
+    # estimation affichée comme telle, jamais présentée comme mesurée.
+    import re as _re
+    ups_va = sum(
+        int(m.group(1))
+        for r in project.racks for i in r.items
+        if (t := types.get(i.type_id)) and t.category == "ups"
+        and (m := _re.search(r"(\d{3,5})", t.model)))
     for k, chunk in enumerate(bom_pages):
         _page_frame(c, page_w, page_h, project, "Nomenclature",
                     page_no, total, pal)
@@ -268,14 +278,21 @@ def render_project_dossier_pdf(project: Project,
             ["Constructeur", "Modèle", "Hauteur", "Qté", "U totaux", "Conso totale"],
             [16, 30, 10, 8, 10, 14], chunk, pal)
         if k == len(bom_pages) - 1:
-            # Bilan énergie : la somme que l'exploitant confronte à la
-            # capacité de son onduleur.
+            # Bilan énergie : charge vs capacité onduleur (quand un UPS
+            # est en baie, sa capacité est déduite des VA du modèle).
+            if ups_va:
+                cap_w = ups_va * 0.9
+                taux = 100 * total_w_charge / cap_w if cap_w else 0
+                bilan = (f"Charge totale estimée : {total_w_charge:g} W · "
+                         f"capacité onduleur ≈ {cap_w:g} W "
+                         f"({ups_va} VA × 0,9, déduite du modèle) → "
+                         f"taux de charge ≈ {taux:.0f} %")
+            else:
+                bilan = (f"Charge totale estimée : {total_w_charge:g} W "
+                         f"(hors budget PoE délivré — aucun onduleur en baie)")
             c.setFillColorRGB(*pal["accent"])
             c.setFont("Helvetica-Bold", 11)
-            c.drawString(_MARGIN + 10, _MARGIN + _CARTOUCHE_H + 12,
-                         f"Charge totale estimée : {total_w_charge:g} W "
-                         f"(hors budget PoE délivré — à confronter à la "
-                         f"capacité de l'onduleur)")
+            c.drawString(_MARGIN + 10, _MARGIN + _CARTOUCHE_H + 12, bilan)
         c.showPage()
         page_no += 1
 

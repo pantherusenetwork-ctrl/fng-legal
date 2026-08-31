@@ -193,8 +193,12 @@ def _faceplate_placeholder(t: EquipmentType, x: int, y: int, w: int,
 
 def render_rack(rack: Rack, types: dict[str, EquipmentType],
                 offset_x: int = 0, offset_y: int = 0,
-                theme: str = "sombre") -> str:
-    """Rend une baie complète dans un <g> nommé."""
+                theme: str = "sombre", rendu: str = "photos") -> str:
+    """Rend une baie complète dans un <g> nommé.
+
+    ``rendu="dessin"`` ignore les images officielles : toute la baie en
+    faceplates dessinées — un seul langage visuel.
+    """
     p = palette(theme)
     w, h = _rack_size(rack)
     inner_x = FRAME_PAD + RAIL_W
@@ -245,11 +249,11 @@ def render_rack(rack: Rack, types: dict[str, EquipmentType],
         y = _u_to_y(rack, top_u if not rack.desc_units else item.position_u)
         label = item.meta.hostname or f"{t.vendor} {t.model}"
         s.append(f'<g id="item-{escape(item.id)}">')
-        if t.faceplate_svg:
+        if t.faceplate_svg and rendu != "dessin":
             # SVG officiel : injecté tel quel, cadré à l'échelle U.
             s.append(f'<g transform="translate({inner_x},{y})">'
                      f'{t.faceplate_svg}</g>')
-        elif t.faceplate_image:
+        elif t.faceplate_image and rendu != "dessin":
             # Image officielle (PNG/JPEG en data URI) étirée sur le slot U
             # exact — puis le MÊME cadre que les dessins : liseré de rôle,
             # bandeau hostname, pastille U. Un seul langage visuel.
@@ -287,7 +291,8 @@ def render_rack(rack: Rack, types: dict[str, EquipmentType],
     return "\n".join(s)
 
 
-def render_project_svg(project: Project, theme: str = "sombre") -> str:
+def render_project_svg(project: Project, theme: str = "sombre",
+                       rendu: str = "photos") -> str:
     """SVG complet : toutes les baies du projet côte à côte."""
     p = palette(theme)
     types = type_index(project)
@@ -312,7 +317,7 @@ def render_project_svg(project: Project, theme: str = "sombre") -> str:
     x = 20
     for rack, (w, _h) in zip(racks, sizes):
         parts.append(render_rack(rack, types, offset_x=x, offset_y=52,
-                                 theme=theme))
+                                 theme=theme, rendu=rendu))
         x += w + GAP_X
     parts.append('</svg>')
     return "\n".join(parts)
