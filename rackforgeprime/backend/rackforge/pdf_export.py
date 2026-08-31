@@ -38,12 +38,12 @@ _PDF_PALETTES = {
         "row_line": (0.91, 0.92, 0.93),
     },
     "pastel": {
-        "bg": (0.949, 0.937, 0.969),   # #f2eff7
-        "frame": (0.878, 0.835, 0.784),  # #e0d5c8
-        "text": (0.239, 0.220, 0.200),   # #3d3833
-        "dim": (0.541, 0.506, 0.467),    # #8a8177
+        "bg": (0.914, 0.890, 0.953),   # #e9e3f3
+        "frame": (0.725, 0.667, 0.831),  # #b9aad4
+        "text": (0.200, 0.180, 0.278),   # #332e47
+        "dim": (0.435, 0.400, 0.549),    # #6f668c
         "accent": (0.941, 0.510, 0.235),  # #f0823c
-        "row_line": (0.925, 0.898, 0.855),
+        "row_line": (0.851, 0.816, 0.914),  # #d9d0e9
     },
     "nuit": {
         "bg": (0.0, 0.0, 0.0),         # #000000
@@ -158,11 +158,12 @@ def _draw_svg_page(c, svg: str, page_w: float, page_h: float) -> None:
         raise RuntimeError("Conversion SVG -> PDF impossible (SVG invalide)")
     x, y, w, h = _content_zone(page_w, page_h)
     # Le dessin REMPLIT la page (agrandi si besoin, borné pour ne pas
-    # pixelliser les textes) et est centré — plus de page aux 2/3 vide.
+    # pixelliser les textes), centré en largeur mais ANCRÉ EN HAUT comme
+    # une page de rapport — jamais de marge morte au-dessus du dessin.
     scale = min(w / drawing.width, h / drawing.height, 1.75)
     dw, dh = drawing.width * scale, drawing.height * scale
     drawing.scale(scale, scale)
-    renderPDF.draw(drawing, c, x + (w - dw) / 2, y + (h - dh) / 2)
+    renderPDF.draw(drawing, c, x + (w - dw) / 2, y + h - dh)
 
 
 def _draw_table_page(c, page_w: float, page_h: float, title: str,

@@ -54,8 +54,8 @@ LPALETTES = {
                "text": "#cbd5e1", "dim": "#64748b"},
     "clair": {"bg": "#ffffff", "node": "#f7f8f9", "line": "#d3d8de",
               "text": "#1c2126", "dim": "#6b7480"},
-    "pastel": {"bg": "#f2eff7", "node": "#fdfcff", "line": "#d6cde6",
-               "text": "#37324a", "dim": "#7d7694"},
+    "pastel": {"bg": "#e9e3f3", "node": "#faf8fe", "line": "#c8bbdf",
+               "text": "#332e47", "dim": "#6f668c"},
     "nuit": {"bg": "#000000", "node": "#0d0d11", "line": "#20202a",
              "text": "#dde3ec", "dim": "#59637a"},
 }
@@ -275,9 +275,13 @@ def _render_link(link: LogicalLink, pos: dict[str, tuple[float, float]],
                 break
             my += 19
         placed.append((mx, my, tw))
-    lbl.append(f'<rect x="{mx - tw / 2 - 4:.0f}" y="{my - 17:.0f}" '
-               f'width="{tw + 8:.0f}" height="14" rx="3" fill="{C_BG}" '
-               f'stroke="{C_LINE}" stroke-width="0.5"/>')
+    # Halo plein fond, sans contour et assez haut pour couvrir les
+    # pastilles VLAN : l'étiquette détoure proprement les bordures de
+    # zone qu'elle croise (pratique des plans d'ingénierie).
+    halo_h = 30 if link.vlans else 16
+    lbl.append(f'<rect x="{mx - tw / 2 - 6:.0f}" y="{my - 18:.0f}" '
+               f'width="{tw + 12:.0f}" height="{halo_h}" rx="4" '
+               f'fill="{C_BG}"/>')
     # Étiquette colorée comme le lien (convention Lucid : la couleur porte
     # la sémantique du flux, le texte la reprend).
     lbl.append(f'<text x="{mx:.0f}" y="{my - 7:.0f}" text-anchor="middle" '

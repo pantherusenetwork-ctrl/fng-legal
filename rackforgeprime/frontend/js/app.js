@@ -34,12 +34,12 @@ const THEMES = {
     lcd: "#fdf3ec", band: "#1c2126",
   },
   pastel: {
-    frame: "#fbfafe", rail: "#e2dcee", hole: "#c8bedb", slot: "#ece7f4",
-    slotLine: "#ddd5ea", text: "#37324a", dim: "#7d7694", face: "#fdfcff",
+    frame: "#f6f3fc", rail: "#d8cfe9", hole: "#b3a5cf", slot: "#e3dcf0",
+    slotLine: "#cfc4e2", text: "#332e47", dim: "#6f668c", face: "#faf8fe",
     accent: "#f0823c", danger: "#d95c5c",
-    faceStroke: "#d6cde6", pill: "#bfb4d4", portFill: "#fdfcff",
-    decorFill: "#eae4f2", decorStroke: "#cdc2df", ring: "#b3a7c9",
-    lcd: "#f6e8f0", band: "#37324a",
+    faceStroke: "#c8bbdf", pill: "#a898c6", portFill: "#faf8fe",
+    decorFill: "#ded5ec", decorStroke: "#bdafd6", ring: "#a294c2",
+    lcd: "#f1e4f2", band: "#47407a",
   },
   nuit: {
     frame: "#0b0b0e", rail: "#17171d", hole: "#050507", slot: "#060608",

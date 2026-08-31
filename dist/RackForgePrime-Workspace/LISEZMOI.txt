@@ -1,0 +1,15 @@
+RackForgePrime — espace de travail
+==================================
+
+projets/     Vos projets (.json). C'est la SOURCE DE VÉRITÉ : versionnez-les,
+             diffez-les, les dessins se régénèrent depuis ces fichiers.
+exports/     Rangez ici vos SVG / PDF / CSV exportés depuis l'application.
+catalogue/   Déposez ici vos YAML NetBox devicetype-library et vos images /
+             SVG de faceplates, puis importez-les depuis la palette.
+             Sous-dossier images-officielles/ : une image nommée
+             <id-du-type>.png (ex : fortinet-fortigate-100f.png) y est
+             chargée automatiquement comme faceplate du type du catalogue.
+datasheets/  Déposez ici les PDF constructeurs à importer.
+
+Lancement : RackForgePrime.exe (ou `python run.py`), l'interface s'ouvre sur
+http://127.0.0.1:8137 — tout est local, aucune donnée ne sort du poste.
