@@ -404,6 +404,8 @@ function renderRackSVG(rack) {
     /* Survol = surlignage des équipements connectés (esprit PATCHBOX). */
     g.addEventListener("mouseenter", () => { if (!drag) highlightConnections(item.id); });
     g.addEventListener("mouseleave", clearHighlight);
+    /* Clic droit = menu contextuel (dupliquer, connecter, supprimer). */
+    g.addEventListener("contextmenu", (e) => openItemMenu(e, rack, item));
     svg.appendChild(g);
   }
 
@@ -429,6 +431,87 @@ function renderRackSVG(rack) {
 
   return svg;
 }
+
+/* =====================================================================
+ * Menu contextuel d'équipement (clic droit) : dupliquer, connecter, supprimer
+ * =================================================================== */
+
+/* U libre le plus proche de la position d'origine (pour la duplication). */
+function nearestFreeSlot(rack, uHeight, fromU) {
+  let best = null;
+  for (let u = 1; u <= rack.u_height - uHeight + 1; u++) {
+    if (!canPlace(rack, u, uHeight)) continue;
+    if (best === null || Math.abs(u - fromU) < Math.abs(best - fromU)) best = u;
+  }
+  return best;
+}
+
+function duplicateItem(rack, item) {
+  const t = typesById[item.type_id];
+  const u = nearestFreeSlot(rack, t.u_height, item.position_u);
+  if (u === null) {
+    renderStatus('<span class="stat-err">Duplication impossible : plus de place dans la baie</span>');
+    return;
+  }
+  const meta = JSON.parse(JSON.stringify(item.meta));
+  if (meta.hostname) meta.hostname += " (copie)";
+  rack.items.push({ id: nextItemId(), type_id: item.type_id,
+                    position_u: u, face: item.face || "front", meta });
+  renderAll();
+}
+
+function closeItemMenu() {
+  document.getElementById("item-menu")?.remove();
+}
+
+function openItemMenu(e, rack, item) {
+  e.preventDefault();
+  e.stopPropagation();
+  closeItemMenu();
+  closeSlotPopover();
+  const t = typesById[item.type_id];
+  const name = item.meta.hostname || `${t.vendor} ${t.model}`;
+  const menu = document.createElement("div");
+  menu.id = "item-menu";
+  menu.style.position = "fixed";
+  menu.style.zIndex = "70";
+  menu.innerHTML = `<div class="menu-title">${esc(name)}</div>`;
+  const actions = [
+    ["Dupliquer", () => duplicateItem(rack, item)],
+    ["Démarrer une connexion", () => {
+      selectItem(item.id);
+      $("#btn-start-connection").click();
+    }],
+    ["Ouvrir les métadonnées", () => selectItem(item.id)],
+    ["Supprimer", () => {
+      rack.items = rack.items.filter((i) => i.id !== item.id);
+      if (selectedItemId === item.id) { selectedItemId = null; closeInspector(); }
+      renderAll();
+    }, "danger"],
+  ];
+  for (const [label, fn, cls] of actions) {
+    const row = document.createElement("div");
+    row.className = "menu-item" + (cls ? " menu-" + cls : "");
+    row.textContent = label;
+    row.addEventListener("click", () => { closeItemMenu(); fn(); });
+    menu.appendChild(row);
+  }
+  document.body.appendChild(menu);
+  const pad = 6;
+  const r = menu.getBoundingClientRect();
+  menu.style.left = Math.max(pad, Math.min(e.clientX,
+    window.innerWidth - r.width - pad)) + "px";
+  menu.style.top = Math.max(pad, Math.min(e.clientY,
+    window.innerHeight - r.height - pad)) + "px";
+}
+
+document.addEventListener("pointerdown", (e) => {
+  const menu = document.getElementById("item-menu");
+  if (menu && !menu.contains(e.target)) closeItemMenu();
+}, true);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeItemMenu();
+});
 
 /* =====================================================================
  * Popover d'ajout rapide sur slot libre (esprit PATCHBOX : clic → choisir)

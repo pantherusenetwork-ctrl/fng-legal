@@ -260,3 +260,19 @@ g.rack-item { cursor: grab; }
 body.connecting #canvas svg { cursor: crosshair; }
 g.rack-item.conn-dim { opacity: .3; transition: opacity .12s; }
 g.rack-item.conn-lit { opacity: 1; }
+
+/* ---- Menu contextuel d equipement ---- */
+#item-menu {
+  min-width: 190px; background: var(--panel-2, #131826);
+  border: 1px solid var(--line, #26304a); border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .6); padding: 6px; font-size: 12.5px;
+}
+#item-menu .menu-title {
+  font-family: var(--mono, monospace); color: var(--accent, #22d3ee);
+  font-weight: 700; padding: 5px 9px 7px; border-bottom: 1px solid var(--line, #26304a);
+  margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#item-menu .menu-item { padding: 6px 9px; border-radius: 6px; cursor: pointer; color: var(--text, #cbd5e1); }
+#item-menu .menu-item:hover { background: rgba(34, 211, 238, .10); }
+#item-menu .menu-danger { color: #f87171; }
+#item-menu .menu-danger:hover { background: rgba(248, 113, 113, .10); }
