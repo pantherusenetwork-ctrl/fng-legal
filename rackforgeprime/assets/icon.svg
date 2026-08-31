@@ -1,19 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
   <!-- Icône RackForgePrime v2 — hache-marteau de forge orageuse
        (inspiration libre, dessin original) : tête massive, manche court,
-       double éclair cyan de la DA. -->
+       double éclair orange de la DA. -->
   <rect x="8" y="8" width="240" height="240" rx="52" fill="#0b0e14"/>
   <rect x="8" y="8" width="240" height="240" rx="52" fill="none"
         stroke="#1b2230" stroke-width="6"/>
 
   <!-- Éclair principal (derrière l'arme) -->
   <polygon points="188,20 122,102 154,102 88,214 186,96 148,96 216,20"
-           fill="#22d3ee"/>
+           fill="#f97316"/>
   <polygon points="180,32 130,96 160,96 108,182 176,90 142,90 200,32"
-           fill="#9deefb" fill-opacity="0.6"/>
+           fill="#ffd0a8" fill-opacity="0.6"/>
   <!-- Petit éclair secondaire -->
   <polygon points="70,52 48,92 64,92 40,136 78,88 62,88 88,52"
-           fill="#22d3ee" fill-opacity="0.8"/>
+           fill="#f97316" fill-opacity="0.8"/>
 
   <!-- Manche court vertical, bois sombre strié -->
   <rect x="117" y="112" width="22" height="112" rx="10" fill="#3d2f22"/>
@@ -42,6 +42,6 @@
   <!-- Rivets -->
   <circle cx="128" cy="74" r="5" fill="#252a35"/>
   <circle cx="128" cy="106" r="5" fill="#252a35"/>
-  <!-- Filet cyan sur la gorge : signature DA -->
-  <rect x="124" y="88" width="8" height="8" fill="#22d3ee"/>
+  <!-- Filet orange sur la gorge : signature DA -->
+  <rect x="124" y="88" width="8" height="8" fill="#f97316"/>
 </svg>

@@ -34,7 +34,7 @@ C_SLOT_LINE = "#1a2130"
 C_TEXT = "#cbd5e1"
 C_TEXT_DIM = "#64748b"
 C_FACE = "#1a1f2b"
-C_ACCENT = "#22d3ee"
+C_ACCENT = "#f97316"
 
 FONT = "Helvetica, Arial, sans-serif"
 FONT_MONO = "Courier, monospace"
@@ -230,6 +230,18 @@ def render_rack(rack: Rack, types: dict[str, EquipmentType],
                      f'height="{ih - 2}" preserveAspectRatio="none" '
                      f'href="{t.faceplate_image}" '
                      f'xlink:href="{t.faceplate_image}"/>')
+            # Bandeau d'identification superposé : photo ou dessin, la
+            # baie parle d'une seule voix (miroir app.js).
+            if label:
+                bw = min(len(label) * 6.2 + 14, RACK_W - 60)
+                s.append(f'<rect x="{inner_x + 4}" y="{y + ih - 14}" '
+                         f'width="{bw:.0f}" height="12" rx="2" '
+                         f'fill="#0b0e14" fill-opacity="0.78"/>')
+                s.append(f'<rect x="{inner_x + 4}" y="{y + ih - 14}" '
+                         f'width="3" height="12" fill="{t.color}"/>')
+                s.append(f'<text x="{inner_x + 11}" y="{y + ih - 5}" '
+                         f'font-family="{FONT}" font-size="9" '
+                         f'fill="#f1f5f9">{escape(label)}</text>')
         else:
             s.extend(_faceplate_placeholder(t, inner_x, y, RACK_W, label))
         s.append('</g>')

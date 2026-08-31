@@ -21,27 +21,58 @@
       <button id="btn-view-logical">Logique</button>
     </nav>
     <div id="topbar-actions">
-      <button id="btn-undo" title="Annuler (Ctrl+Z)" disabled>
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5 3 7l3.5 3.5 M3 7h6a4 4 0 0 1 0 8H8"></path></svg>
-      </button>
-      <button id="btn-redo" title="Rétablir (Ctrl+Y)" disabled>
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3.5 13 7l-3.5 3.5 M13 7H7a4 4 0 0 0 0 8h1"></path></svg>
-      </button>
-      <span class="sep"></span>
-      <button id="btn-add-rack" class="physical-only" title="Ajouter une baie 42U">+ Baie</button>
-      <button id="btn-toggle-u" class="physical-only" title="Afficher / masquer les numéros U">n°U</button>
-      <button id="btn-add-link" class="logical-only" title="Créer un lien logique entre deux équipements">+ Lien</button>
-      <button id="btn-add-vlan" class="logical-only" title="Déclarer un VLAN (id, nom, couleur)">+ VLAN</button>
-      <button id="btn-patch-table" title="Tableau de brassage généré depuis les métadonnées">Brassage</button>
-      <span class="sep"></span>
-      <button id="btn-export-svg" class="export">SVG</button>
-      <button id="btn-export-pdf" class="export">PDF</button>
-      <button id="btn-export-dossier" class="export"
-              title="Livrable complet : élévation + logique + brassage + nomenclature, avec cartouche">Dossier</button>
-      <button id="btn-export-json" class="export">JSON</button>
-      <label id="btn-import-json" class="export" title="Charger un projet JSON">
-        Ouvrir<input type="file" accept=".json" hidden>
-      </label>
+      <span class="tb-group" aria-label="Édition">
+        <button id="btn-undo" title="Annuler (Ctrl+Z)" disabled>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5 3 7l3.5 3.5 M3 7h6a4 4 0 0 1 0 8H8"></path></svg>
+        </button>
+        <button id="btn-redo" title="Rétablir (Ctrl+Y)" disabled>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3.5 13 7l-3.5 3.5 M13 7H7a4 4 0 0 0 0 8h1"></path></svg>
+        </button>
+      </span>
+      <span class="tb-group" aria-label="Construction">
+        <button id="btn-add-rack" class="physical-only" title="Ajouter une baie 42U">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="1.5" width="10" height="13" rx="1.5"></rect><path d="M5.5 5h5 M5.5 8h5 M5.5 11h5"></path></svg>
+          Baie
+        </button>
+        <button id="btn-toggle-u" class="physical-only" title="Afficher / masquer les numéros U">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 2v8a4 4 0 0 0 8 0V2"></path></svg>
+          n°U
+        </button>
+        <button id="btn-add-link" class="logical-only" title="Créer un lien logique entre deux équipements">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.5 9.5 9.5 6.5 M4 12l-1.2 1.2a2.6 2.6 0 0 1-3.7-3.7L1.5 7 M12 4l1.2-1.2a2.6 2.6 0 0 1 3.7 3.7L14.5 9" transform="translate(-.7 -.3) scale(.95)"></path></svg>
+          Lien
+        </button>
+        <button id="btn-add-vlan" class="logical-only" title="Déclarer un VLAN (id, nom, couleur)">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"></circle><circle cx="8" cy="8" r="2.4" fill="currentColor" stroke="none"></circle></svg>
+          VLAN
+        </button>
+      </span>
+      <span class="tb-group" aria-label="Livrables">
+        <button id="btn-patch-table" title="Tableau de brassage généré depuis les métadonnées">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"></rect><path d="M1.5 6h13 M6 6v7.5 M10.5 6v7.5"></path></svg>
+          Brassage
+        </button>
+        <button id="btn-export-dossier" class="primary"
+                title="Livrable complet : élévation + logique + brassage + nomenclature, avec cartouche">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M9.5 1.5H4a1.5 1.5 0 0 0-1.5 1.5v10A1.5 1.5 0 0 0 4 14.5h8a1.5 1.5 0 0 0 1.5-1.5V5.5z"></path><path d="M9.5 1.5V5.5h4 M5.5 9h5 M5.5 11.5h5"></path></svg>
+          Dossier
+        </button>
+        <span class="dropdown">
+          <button id="btn-export-menu" title="Exporter le projet (SVG, PDF, JSON)">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8 M4.8 7l3.2 3.2L11.2 7 M2.5 13.5h11"></path></svg>
+            Exporter
+          </button>
+          <span id="export-menu" class="dropdown-menu" hidden>
+            <button id="btn-export-svg">SVG <small>rééditable draw.io / Inkscape</small></button>
+            <button id="btn-export-pdf">PDF <small>la vue affichée</small></button>
+            <button id="btn-export-json">JSON <small>le projet, source de vérité</small></button>
+          </span>
+        </span>
+        <label id="btn-import-json" title="Charger un projet JSON">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 4.5v8A1.5 1.5 0 0 0 3 14h10a1.5 1.5 0 0 0 1.5-1.5v-6A1.5 1.5 0 0 0 13 5H8L6.4 3H3a1.5 1.5 0 0 0-1.5 1.5z"></path></svg>
+          Ouvrir<input type="file" accept=".json" hidden>
+        </label>
+      </span>
       <button id="btn-theme" title="Changer de design (sombre / clair)">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
           <circle cx="8" cy="8" r="3.2"></circle>
@@ -187,7 +218,7 @@
     <form id="vlan-form" method="dialog">
       <label>ID (1–4094) <input name="vid" type="number" min="1" max="4094" required></label>
       <label>Nom <input name="name" required placeholder="ex : USERS"></label>
-      <label>Couleur <input name="color" type="color" value="#22d3ee"></label>
+      <label>Couleur <input name="color" type="color" value="#f97316"></label>
       <div class="inspector-actions">
         <button value="ok">Ajouter</button>
         <button value="cancel" formnovalidate>Fermer</button>

@@ -20,7 +20,7 @@ const THEMES = {
   sombre: {
     frame: "#1b2230", rail: "#2a3446", hole: "#0e1420", slot: "#0e131d",
     slotLine: "#1a2130", text: "#cbd5e1", dim: "#64748b", face: "#1a1f2b",
-    accent: "#22d3ee", danger: "#f87171",
+    accent: "#f97316", danger: "#f87171",
     faceStroke: "#2c3547", pill: "#33405a", portFill: "#0a0e16",
     decorFill: "#10151f", decorStroke: "#2c3547", ring: "#3a465c",
     lcd: "#0a2027",
@@ -265,6 +265,22 @@ function drawFaceplate(g, t, x, y, label, selected, item) {
     if (item) {
       img.addEventListener("mousemove", (e) => showTip(itemTipHTML(t, item), e));
       img.addEventListener("mouseleave", hideTip);
+    }
+    /* Bandeau d'identification superposé : photo ou dessin, la baie
+       parle d'une seule voix (miroir Python). */
+    if (label) {
+      const bw = Math.min(label.length * 6.2 + 14, RACK_W - 60);
+      g.appendChild(svgEl("rect", {
+        x: x + 4, y: y + h - 14, width: bw, height: 12, rx: 2,
+        fill: "rgba(11,14,20,.78)",
+      }));
+      g.appendChild(svgEl("rect", {
+        x: x + 4, y: y + h - 14, width: 3, height: 12, fill: t.color,
+      }));
+      g.appendChild(svgEl("text", {
+        x: x + 11, y: y + h - 5, "font-size": 9, fill: "#f1f5f9",
+        "font-family": "system-ui, sans-serif",
+      }, label));
     }
     if (selected)
       g.appendChild(svgEl("rect", { x, y: y + 1, width: RACK_W, height: h - 2,
@@ -722,6 +738,12 @@ function renderStatus(extra) {
  * Palette
  * =================================================================== */
 
+/* Catégories repliées (persistées) — la palette de 90+ modèles se
+ * balaye par groupes, pas en liste infinie. */
+let collapsedCats;
+try { collapsedCats = new Set(JSON.parse(localStorage.getItem("rfp-collapsed") || "[]")); }
+catch { collapsedCats = new Set(); }
+
 function renderPalette(filter) {
   const wrap = $("#palette-groups");
   wrap.innerHTML = "";
@@ -731,10 +753,22 @@ function renderPalette(filter) {
       t.category === cat &&
       (!f || `${t.vendor} ${t.model}`.toLowerCase().includes(f)));
     if (!types.length) continue;
+    /* Un filtre actif déplie tout : on cherche, on doit voir. */
+    const collapsed = !f && collapsedCats.has(cat);
     const title = document.createElement("div");
-    title.className = "palette-group-title";
-    title.innerHTML = `<span class="role-dot" style="background:${catalog.role_colors[cat] || "#666"}"></span>${label}`;
+    title.className = "palette-group-title" + (collapsed ? " collapsed" : "");
+    title.innerHTML =
+      `<span class="role-dot" style="background:${catalog.role_colors[cat] || "#666"}"></span>` +
+      `${label} <span class="group-count">${types.length}</span>` +
+      `<span class="chevron">${collapsed ? "▸" : "▾"}</span>`;
+    title.addEventListener("click", () => {
+      if (collapsedCats.has(cat)) collapsedCats.delete(cat);
+      else collapsedCats.add(cat);
+      localStorage.setItem("rfp-collapsed", JSON.stringify([...collapsedCats]));
+      renderPalette($("#palette-filter").value);
+    });
     wrap.appendChild(title);
+    if (collapsed) continue;
     for (const t of types) {
       const card = document.createElement("div");
       card.className = "palette-item";
@@ -802,7 +836,7 @@ document.addEventListener("pointermove", (e) => {
   g.appendChild(svgEl("rect", {
     x: FRAME_PAD + RAIL_W, y: y + 1, width: RACK_W,
     height: drag.type.u_height * U_PX - 2, rx: 2,
-    fill: ok ? "rgba(34,211,238,.12)" : "rgba(248,113,113,.15)",
+    fill: ok ? "rgba(249,115,22,.12)" : "rgba(248,113,113,.15)",
     stroke: ok ? C.accent : C.danger, "stroke-width": 1.5,
     "stroke-dasharray": ok ? "" : "5,4",
   }));
@@ -1370,6 +1404,17 @@ function applyTheme() {
 }
 $("#btn-undo").addEventListener("click", () => restoreHistory(history.index - 1));
 $("#btn-redo").addEventListener("click", () => restoreHistory(history.index + 1));
+
+/* Menu Exporter : SVG / PDF / JSON regroupés. */
+$("#btn-export-menu").addEventListener("click", (e) => {
+  e.stopPropagation();
+  $("#export-menu").hidden = !$("#export-menu").hidden;
+});
+$("#export-menu").addEventListener("click", () => { $("#export-menu").hidden = true; });
+document.addEventListener("pointerdown", (e) => {
+  if (!$("#export-menu").hidden && !e.target.closest(".dropdown"))
+    $("#export-menu").hidden = true;
+}, true);
 
 $("#btn-theme").addEventListener("click", () => {
   theme = theme === "clair" ? "sombre" : "clair";
