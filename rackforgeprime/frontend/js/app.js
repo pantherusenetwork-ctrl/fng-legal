@@ -1648,6 +1648,8 @@ function setAnnotTool(tool) {
     texte: "Cliquez l'endroit du schéma où poser le texte",
     zone: "Cliquez-glissez pour encadrer la zone",
     fleche: "Cliquez-glissez du départ vers l'arrivée",
+    ligne: "Cliquez-glissez pour tracer la ligne (diagonale libre)",
+    ellipse: "Cliquez-glissez pour entourer en ellipse",
   };
   renderStatus(annotTool ? hints[annotTool] + " — Échap pour annuler" : "");
 }
@@ -1687,10 +1689,12 @@ function wireAnnotTools(svg) {
       if (text) addAnnotation({ kind: "texte", x: start.x, y: start.y, text });
       return;
     }
-    /* zone / flèche : glisser avec aperçu en direct. */
+    /* zone / ellipse / flèche / ligne : glisser avec aperçu en direct. */
     const kind = annotTool;
     const ns = "http://www.w3.org/2000/svg";
-    const ghost = document.createElementNS(ns, kind === "zone" ? "rect" : "line");
+    const tag = { zone: "rect", ellipse: "ellipse",
+                  fleche: "line", ligne: "line" }[kind];
+    const ghost = document.createElementNS(ns, tag);
     ghost.setAttribute("stroke", "#f97316");
     ghost.setAttribute("stroke-width", "1.6");
     ghost.setAttribute("stroke-dasharray", "6,4");
@@ -1704,6 +1708,11 @@ function wireAnnotTools(svg) {
         ghost.setAttribute("y", Math.min(start.y, cur.y));
         ghost.setAttribute("width", Math.abs(cur.x - start.x));
         ghost.setAttribute("height", Math.abs(cur.y - start.y));
+      } else if (kind === "ellipse") {
+        ghost.setAttribute("cx", (start.x + cur.x) / 2);
+        ghost.setAttribute("cy", (start.y + cur.y) / 2);
+        ghost.setAttribute("rx", Math.abs(cur.x - start.x) / 2);
+        ghost.setAttribute("ry", Math.abs(cur.y - start.y) / 2);
       } else {
         ghost.setAttribute("x1", start.x); ghost.setAttribute("y1", start.y);
         ghost.setAttribute("x2", cur.x); ghost.setAttribute("y2", cur.y);
@@ -1715,9 +1724,9 @@ function wireAnnotTools(svg) {
       ghost.remove();
       setAnnotTool(kind);
       if (Math.abs(cur.x - start.x) + Math.abs(cur.y - start.y) < 8) return;
-      const text = kind === "zone"
-        ? (prompt("Titre de la zone (optionnel) :") || "")
-        : (prompt("Étiquette de la flèche (optionnel) :") || "");
+      const text = (kind === "zone" || kind === "ellipse")
+        ? (prompt("Titre (optionnel) :") || "")
+        : (prompt("Étiquette (optionnel) :") || "");
       addAnnotation({ kind, x: start.x, y: start.y, x2: cur.x, y2: cur.y, text });
     };
     document.addEventListener("pointermove", move);
@@ -1734,7 +1743,8 @@ function wireLogical(svg) {
     g.addEventListener("contextmenu", (e) => {
       const a = (project.logical.annotations || []).find((x) => x.id === anId);
       if (!a) return;
-      _logicalMenu(e, a.text || { texte: "Texte", zone: "Zone", fleche: "Flèche" }[a.kind], [
+      _logicalMenu(e, a.text || { texte: "Texte", zone: "Zone", fleche: "Flèche",
+                                  ligne: "Ligne", ellipse: "Ellipse" }[a.kind], [
         ["Modifier le texte", () => {
           const t = prompt("Texte :", a.text);
           if (t !== null) { a.text = t; renderLogical(); }

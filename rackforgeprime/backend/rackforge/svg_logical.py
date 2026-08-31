@@ -345,17 +345,35 @@ def _render_annotations(project: Project) -> tuple[list[str], list[str]]:
                    f'font-family="{FONT}" font-size="12" font-weight="bold" '
                    f'fill="{color}">{escape(a.text)}</text>' if a.text else "")
                 + '</g>')
-        elif a.kind == "fleche":
-            ang = math.atan2(a.y2 - a.y, a.x2 - a.x)
+        elif a.kind == "ellipse":
+            cx, cy = (a.x + a.x2) / 2, (a.y + a.y2) / 2
+            rx = max(abs(a.x2 - a.x) / 2, 12)
+            ry = max(abs(a.y2 - a.y) / 2, 12)
+            under.append(
+                f'<g {gid}><ellipse cx="{cx:.0f}" cy="{cy:.0f}" '
+                f'rx="{rx:.0f}" ry="{ry:.0f}" fill="none" stroke="{color}" '
+                f'stroke-width="1.4" stroke-dasharray="7,5"/>'
+                + (f'<text x="{cx:.0f}" y="{cy - ry - 6:.0f}" '
+                   f'text-anchor="middle" font-family="{FONT}" font-size="12" '
+                   f'font-weight="bold" fill="{color}">{escape(a.text)}</text>'
+                   if a.text else "")
+                + '</g>')
+        elif a.kind in ("fleche", "ligne"):
             hx, hy = a.x2, a.y2
-            p1 = (hx - 11 * math.cos(ang - 0.42), hy - 11 * math.sin(ang - 0.42))
-            p2 = (hx - 11 * math.cos(ang + 0.42), hy - 11 * math.sin(ang + 0.42))
+            head = ""
+            if a.kind == "fleche":
+                ang = math.atan2(a.y2 - a.y, a.x2 - a.x)
+                p1 = (hx - 11 * math.cos(ang - 0.42),
+                      hy - 11 * math.sin(ang - 0.42))
+                p2 = (hx - 11 * math.cos(ang + 0.42),
+                      hy - 11 * math.sin(ang + 0.42))
+                head = (f'<path d="M {hx:.0f} {hy:.0f} L {p1[0]:.0f} '
+                        f'{p1[1]:.0f} L {p2[0]:.0f} {p2[1]:.0f} Z" '
+                        f'fill="{color}"/>')
             over.append(
                 f'<g {gid}><line x1="{a.x:.0f}" y1="{a.y:.0f}" '
                 f'x2="{hx:.0f}" y2="{hy:.0f}" stroke="{color}" '
-                f'stroke-width="2"/>'
-                f'<path d="M {hx:.0f} {hy:.0f} L {p1[0]:.0f} {p1[1]:.0f} '
-                f'L {p2[0]:.0f} {p2[1]:.0f} Z" fill="{color}"/>'
+                f'stroke-width="2"/>{head}'
                 + (f'<text x="{(a.x + hx) / 2:.0f}" '
                    f'y="{(a.y + hy) / 2 - 8:.0f}" text-anchor="middle" '
                    f'font-family="{FONT}" font-size="12" fill="{color}">'
