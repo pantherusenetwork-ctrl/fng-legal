@@ -339,10 +339,25 @@ function drawFaceplate(g, t, x, y, label, selected, item) {
     fill: t.color, "fill-opacity": 0.07,
   }));
   g.appendChild(svgEl("rect", { x, y: y + 1, width: 4, height: h - 2, fill: t.color }));
-  g.appendChild(svgEl("text", {
-    x: x + 14, y: yc + 4, "font-size": 11, fill: C.text,
-    "font-family": "system-ui, sans-serif",
-  }, label));
+  /* Serveur / onduleur / passe-câbles : la silhouette prime sur les
+     quelques ports de management (miroir Python). */
+  if (["server", "ups", "cable-mgmt"].includes(t.category))
+    drawCategoryDecor(g, t, x, y, RACK_W, h);
+  else if ((t.ports || []).length)
+    drawPortBanks(g, t, item, x, y, RACK_W, h);
+  /* Libellé sur plaquette sombre en bas à gauche (même langage que les
+     photos) : le texte ne se réécrit jamais sur le matériel. */
+  if (label) {
+    const bw = Math.min(label.length * 6.2 + 14, RACK_W - 60);
+    g.appendChild(svgEl("rect", {
+      x: x + 6, y: y + h - 15, width: bw, height: 12, rx: 2,
+      fill: C.band, "fill-opacity": 0.85,
+    }));
+    g.appendChild(svgEl("text", {
+      x: x + 12, y: y + h - 6, "font-size": 9, fill: "#f1f5f9",
+      "font-family": "system-ui, sans-serif",
+    }, label));
+  }
   /* Pastille de hauteur U. */
   g.appendChild(svgEl("rect", {
     x: x + RACK_W - 34, y: yc - 7, width: 26, height: 14, rx: 7,
@@ -352,12 +367,6 @@ function drawFaceplate(g, t, x, y, label, selected, item) {
     x: x + RACK_W - 21, y: yc + 3, "text-anchor": "middle",
     "font-size": 8.5, fill: C.dim, "font-family": "monospace",
   }, t.u_height + "U"));
-  /* Serveur / onduleur / passe-câbles : la silhouette prime sur les
-     quelques ports de management (miroir Python). */
-  if (["server", "ups", "cable-mgmt"].includes(t.category))
-    drawCategoryDecor(g, t, x, y, RACK_W, h);
-  else if ((t.ports || []).length)
-    drawPortBanks(g, t, item, x, y, RACK_W, h);
 }
 
 /* Ports groupés en banques de 6, 2 rangées au-delà de 12 (miroir Python).

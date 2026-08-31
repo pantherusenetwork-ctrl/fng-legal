@@ -197,17 +197,23 @@ def _faceplate_placeholder(t: EquipmentType, x: int, y: int, w: int,
     for ex in (x - RAIL_W + 6, x + w + RAIL_W - 12):
         s.append(f'<circle cx="{ex + 3}" cy="{yc:.1f}" r="2.5" '
                  f'fill="{p["hole"]}"/>')
-    # Label principal : hostname s'il existe, sinon constructeur + modèle.
-    s.append(f'<text x="{x + 14}" y="{yc + 4:.1f}" '
-             f'font-family="{FONT}" font-size="11" fill="{p["text"]}">'
-             f'{escape(label)}</text>')
-    s.extend(_u_pill(t, x, yc, w, p))
     # Serveur / onduleur / passe-câbles : la silhouette prime sur les
     # quelques ports de management — c'est elle qu'on reconnaît en baie.
     if t.category in ("server", "ups", "cable-mgmt"):
         s.extend(_category_decor(t, x, y, w, h, p))
     elif t.ports:
         s.extend(_port_banks(len(t.ports), t.color, x, y, w, h, p))
+    # Libellé sur PLAQUETTE sombre en bas à gauche — même langage que les
+    # photos officielles : le texte ne se réécrit jamais sur le matériel.
+    if label:
+        bw = min(len(label) * 6.2 + 14, w - 60)
+        s.append(f'<rect x="{x + 6}" y="{y + h - 15}" width="{bw:.0f}" '
+                 f'height="12" rx="2" fill="{p["band"]}" '
+                 f'fill-opacity="0.85"/>')
+        s.append(f'<text x="{x + 12}" y="{y + h - 6}" '
+                 f'font-family="{FONT}" font-size="9" fill="#f1f5f9">'
+                 f'{escape(label)}</text>')
+    s.extend(_u_pill(t, x, yc, w, p))
     return s
 
 
