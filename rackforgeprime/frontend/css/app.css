@@ -325,3 +325,67 @@ body:not([data-theme="clair"]) #item-menu {
 /* Bouton theme : icone seule */
 #btn-theme { display: flex; align-items: center; padding: 6px 9px; }
 #btn-theme svg { display: block; }
+
+/* =====================================================================
+   Finition « au detail pres » — micro-interactions, focus, scrollbars,
+   et prise en main guidee (mieux que PATCHBOX).
+   ===================================================================== */
+
+button, .import-btn, .palette-item, .pop-item, .menu-item {
+  transition: background .12s ease, border-color .12s ease,
+              color .12s ease, box-shadow .12s ease, transform .12s ease;
+}
+button:hover, .import-btn:hover { border-color: var(--accent); color: var(--accent); }
+button:active { transform: translateY(1px); }
+button:disabled { opacity: .35; pointer-events: none; }
+button:focus-visible, input:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
+#btn-undo, #btn-redo { display: flex; align-items: center; padding: 6px 8px; }
+#btn-undo svg, #btn-redo svg { display: block; }
+
+.palette-item { cursor: grab; }
+.palette-item:hover {
+  transform: translateX(2px);
+  border-color: var(--accent);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .18);
+}
+.palette-item:active { cursor: grabbing; }
+
+body { transition: background .25s ease, color .25s ease; }
+#topbar, #statusbar, #palette, #inspector { transition: background .25s ease, border-color .25s ease; }
+
+/* Scrollbars fines et discretes */
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* Prise en main guidee : carte de verre sur baie vide */
+#canvas-wrap { position: relative; }
+#onboard-card {
+  position: absolute; top: 84px; left: 50%; transform: translateX(-50%);
+  width: 330px; z-index: 5; pointer-events: none;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 14px; padding: 18px 20px;
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, .25);
+}
+#onboard-card h3 {
+  margin: 0 0 12px; font-size: 14.5px; color: var(--accent);
+}
+.onboard-step { display: flex; gap: 12px; align-items: flex-start; padding: 6px 0; }
+.onboard-step .num {
+  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+  background: var(--accent); color: var(--bg); font-weight: 700;
+  font-size: 12px; display: flex; align-items: center; justify-content: center;
+}
+.onboard-step .txt { font-size: 12.5px; line-height: 1.45; color: var(--text); }
+.onboard-step .txt b { color: var(--accent); }
+
+/* Topbar : retour a la ligne propre en fenetre etroite */
+#topbar { flex-wrap: wrap; row-gap: 6px; }
+#topbar-actions { flex-wrap: wrap; row-gap: 6px; }
+#topbar-actions button { white-space: nowrap; }

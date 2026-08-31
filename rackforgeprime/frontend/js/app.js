@@ -615,8 +615,28 @@ function renderAll() {
   const canvas = $("#canvas");
   canvas.innerHTML = "";
   for (const rack of project.racks) canvas.appendChild(renderRackSVG(rack));
+  renderOnboarding();
   renderStatus();
   saveLocal();
+}
+
+/* Carte de prise en main : visible tant que les baies sont vides,
+ * disparaît au premier équipement posé (esprit PATCHBOX, en mieux). */
+function renderOnboarding() {
+  document.getElementById("onboard-card")?.remove();
+  const empty = project.racks.every((r) => r.items.length === 0);
+  if (!empty) return;
+  const card = document.createElement("div");
+  card.id = "onboard-card";
+  card.innerHTML =
+    "<h3>Votre première baie en 30 secondes</h3>" +
+    '<div class="onboard-step"><span class="num">1</span><span class="txt">' +
+    "<b>Glissez</b> un équipement depuis la palette de gauche… ou <b>cliquez un U libre</b> dans la baie.</span></div>" +
+    '<div class="onboard-step"><span class="num">2</span><span class="txt">' +
+    "Cliquez l'équipement posé pour remplir <b>hostname, VLAN, prise, brassage</b>.</span></div>" +
+    '<div class="onboard-step"><span class="num">3</span><span class="txt">' +
+    "Survolez un port pour voir sa config, puis exportez le <b>Dossier</b> complet.</span></div>";
+  $("#canvas-wrap").appendChild(card);
 }
 
 function renderStatus(extra) {
@@ -1278,6 +1298,9 @@ function applyTheme() {
   C = THEMES[theme];
   renderAll();
 }
+$("#btn-undo").addEventListener("click", () => restoreHistory(history.index - 1));
+$("#btn-redo").addEventListener("click", () => restoreHistory(history.index + 1));
+
 $("#btn-theme").addEventListener("click", () => {
   theme = theme === "clair" ? "sombre" : "clair";
   localStorage.setItem("rfp-theme", theme);
@@ -1325,7 +1348,54 @@ $("#btn-export-csv").addEventListener("click", () =>
 function saveLocal() {
   try { localStorage.setItem("rackforgeprime.project", JSON.stringify(project)); }
   catch { /* stockage plein ou bloqué : non bloquant */ }
+  pushHistory();
 }
+
+/* =====================================================================
+ * Undo / redo — instantanés du projet (la source de vérité est un JSON,
+ * l'historique est donc trivial et fiable). Ctrl+Z / Ctrl+Y.
+ * =================================================================== */
+
+const history = { stack: [], index: -1, muted: false, MAX: 100 };
+
+function pushHistory() {
+  if (history.muted || !project) return;
+  const snap = JSON.stringify(project);
+  if (history.stack[history.index] === snap) return;
+  history.stack.length = history.index + 1;
+  history.stack.push(snap);
+  if (history.stack.length > history.MAX) history.stack.shift();
+  history.index = history.stack.length - 1;
+  updateUndoButtons();
+}
+
+function restoreHistory(index) {
+  if (index < 0 || index >= history.stack.length) return;
+  history.index = index;
+  history.muted = true;
+  project = JSON.parse(history.stack[index]);
+  $("#project-name").value = project.name || "";
+  refreshTypes();
+  renderAll();
+  history.muted = false;
+  updateUndoButtons();
+}
+
+function updateUndoButtons() {
+  const u = $("#btn-undo"), r = $("#btn-redo");
+  if (u) u.disabled = history.index <= 0;
+  if (r) r.disabled = history.index >= history.stack.length - 1;
+}
+
+document.addEventListener("keydown", (e) => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const k = e.key.toLowerCase();
+  /* Pas d'interception dans un champ de saisie (undo natif du champ). */
+  const tag = document.activeElement?.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA") return;
+  if (k === "z" && !e.shiftKey) { e.preventDefault(); restoreHistory(history.index - 1); }
+  else if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); restoreHistory(history.index + 1); }
+});
 function loadLocal() {
   try {
     const raw = localStorage.getItem("rackforgeprime.project");
