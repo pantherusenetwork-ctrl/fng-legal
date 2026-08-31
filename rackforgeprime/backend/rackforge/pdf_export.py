@@ -165,7 +165,7 @@ def _draw_table_page(c, page_w: float, page_h: float, title: str,
     ty = top - 30
     scale_w = w / sum(col_w)
     c.setFont("Helvetica-Bold", 10)
-    c.setFillColorRGB(*pal["accent"])
+    c.setFillColorRGB(*pal["text"])
     cx = x
     for head, cw in zip(headers, col_w):
         c.drawString(cx + 3, ty, head)

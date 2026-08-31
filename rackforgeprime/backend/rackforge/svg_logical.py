@@ -140,22 +140,38 @@ def layout_nodes(project: Project, types: dict[str, EquipmentType]
 
     pos: dict[str, tuple[float, float]] = {}
     manual = project.logical.positions
+    # Couches centrées sur la plus large (lecture en colonne, pas en
+    # escalier) + léger décalage alterné anti-traversée de nœuds.
+    row_w = {rank: len(row) * (NODE_W + NODE_GAP) - NODE_GAP
+             for rank, row in layers.items()}
+    max_w = max(row_w.values(), default=NODE_W)
+    # Un WAN documenté (usage contenant « WAN ») réserve de la place en
+    # tête pour le nuage Internet.
+    top_extra = 78 if _wan_item(project) else 0
     for rank in sorted(layers):
         row = layers[rank]
-        # Décalage horizontal alterné par couche : les colonnes des couches
-        # successives ne s'alignent plus, un lien qui traverse une couche
-        # ne passe plus AU TRAVERS de ses nœuds.
         stagger = (rank % 2) * (NODE_W / 2 + 30)
+        x0 = MARGIN + 26 + (max_w - row_w[rank]) / 2 + stagger
         for i, n in enumerate(row):
             if n["id"] in manual:
                 p = manual[n["id"]]
                 pos[n["id"]] = (p.x, p.y)
             else:
                 pos[n["id"]] = (
-                    MARGIN + 26 + stagger + i * (NODE_W + NODE_GAP),
-                    MARGIN + 40 + rank * LAYER_GAP,
+                    x0 + i * (NODE_W + NODE_GAP),
+                    MARGIN + 40 + top_extra + rank * LAYER_GAP,
                 )
     return pos
+
+
+def _wan_item(project: Project):
+    """Premier équipement dont un port documente le WAN (usage « WAN… »)."""
+    for rack in project.racks:
+        for item in rack.items:
+            for pu in item.meta.port_usage:
+                if "wan" in (pu.usage or "").lower():
+                    return item
+    return None
 
 
 def _elbow(x1: float, y1: float, x2: float, y2: float) -> str:
@@ -177,13 +193,22 @@ def _elbow(x1: float, y1: float, x2: float, y2: float) -> str:
             f"L {x2:.0f} {y2:.0f}")
 
 
+def tw_side(link: LogicalLink) -> float:
+    """Largeur estimée de l'étiquette complète d'un lien (px)."""
+    label = link.label or link.kind
+    ports = " · ".join(p for p in (link.from_.port, link.to.port) if p)
+    return max(len(label + (f"  ({ports})" if ports else "")) * 5.6, 30)
+
+
 def _render_link(link: LogicalLink, pos: dict[str, tuple[float, float]],
-                 vlan_colors: dict[int, str]) -> tuple[list[str], list[str]]:
+                 vlan_colors: dict[int, str],
+                 placed: list[tuple[float, float, float]] | None = None,
+                 fan: tuple[int, int] = (0, 1)) -> tuple[list[str], list[str]]:
     """(trait, étiquette) — le trait passe SOUS les nœuds, l'étiquette
     au-dessus de tout (sinon les nœuds la recouvrent)."""
     a, b = pos.get(link.from_.equipment_id), pos.get(link.to.equipment_id)
     if a is None or b is None:
-        return [], []  # extrémité inconnue : lien ignoré au dessin
+        return [], [], None  # extrémité inconnue : lien ignoré au dessin
     (ax, ay), (bx, by) = a, b
     same_layer = abs(ay - by) < NODE_H / 2
     if same_layer:
@@ -193,8 +218,11 @@ def _render_link(link: LogicalLink, pos: dict[str, tuple[float, float]],
         x2, y2 = right[0], right[1] + NODE_H / 2
     else:
         # Couches différentes : bas du nœud du haut -> haut du nœud du bas.
-        x1, y1 = ax + NODE_W / 2, ay + (NODE_H if ay <= by else 0)
-        x2, y2 = bx + NODE_W / 2, by + (NODE_H if by < ay else 0)
+        # Liens parallèles (même paire) : en éventail, jamais superposés.
+        idx, n = fan
+        dx = (idx - (n - 1) / 2) * min(44, (NODE_W - 24) / max(n - 1, 1))
+        x1, y1 = ax + NODE_W / 2 + dx, ay + (NODE_H if ay <= by else 0)
+        x2, y2 = bx + NODE_W / 2 + dx, by + (NODE_H if by < ay else 0)
     width, color, dash = LINK_STYLES.get(link.kind, LINK_STYLES["other"])
     s = [f'<g id="link-{escape(link.id)}">']
     dash_attr = f' stroke-dasharray="{dash}"' if dash else ""
@@ -208,28 +236,53 @@ def _render_link(link: LogicalLink, pos: dict[str, tuple[float, float]],
         # L'entre-deux est trop étroit : étiquette au-dessus des nœuds.
         my = min(a[1], b[1]) - 2
     elif abs(y2 - y1) > LAYER_GAP * 1.2:
-        # Lien qui traverse plusieurs couches : étiquette près du départ,
-        # sur le segment vertical — jamais sur une couche intermédiaire.
-        mx, my = x1, min(y1, y2) + 42
+        # Lien qui traverse plusieurs couches : étiquette À CÔTÉ du
+        # segment vertical, près de l'ARRIVÉE (le couloir du départ est
+        # occupé par les faisceaux) — jamais sur une couche intermédiaire.
+        mx, my = x2 + tw_side(link) / 2 + 14, max(y1, y2) - 26
     label = link.label or link.kind
     ports = " · ".join(p for p in (link.from_.port, link.to.port) if p)
-    text = label + (f"  ({ports})" if ports else "")
-    tw = max(len(text) * 5.4, 30)
+    idx, n = fan
     lbl = [f'<g id="link-label-{escape(link.id)}">']
+    if n >= 3 and not same_layer:
+        # Faisceau de liens parallèles : pastille numérotée sur chaque
+        # fil, le détail part dans une liste déportée (pratique des
+        # plans d'ingénierie — le couloir reste lisible).
+        my += -10 + 20 * (idx % 2)
+        lbl.append(f'<circle cx="{mx:.0f}" cy="{my:.0f}" r="7.5" '
+                   f'fill="{C_BG}" stroke="{color}" stroke-width="1.3"/>')
+        lbl.append(f'<text x="{mx:.0f}" y="{my + 3:.0f}" text-anchor="middle" '
+                   f'font-family="{FONT_MONO}" font-size="9" '
+                   f'font-weight="bold" fill="{color}">{idx + 1}</text>')
+        lbl.append('</g>')
+        stack = (f"{idx + 1}.  {label}" + (f"  ({ports})" if ports else ""),
+                 color)
+        return s, lbl, stack
+    text = label + (f"  ({ports})" if ports else "")
+    tw = max(len(text) * 5.6, 30)
+    # Anti-chevauchement : si une étiquette déjà posée est trop proche,
+    # celle-ci descend d'un cran (jusqu'à trouver une place).
+    if placed is not None:
+        for _ in range(6):
+            if not any(abs(mx - px) < (tw + pw) / 2 + 8 and abs(my - py) < 16
+                       for px, py, pw in placed):
+                break
+            my += 19
+        placed.append((mx, my, tw))
     lbl.append(f'<rect x="{mx - tw / 2 - 4:.0f}" y="{my - 17:.0f}" '
                f'width="{tw + 8:.0f}" height="14" rx="3" fill="{C_BG}" '
                f'stroke="{C_LINE}" stroke-width="0.5"/>')
     # Étiquette colorée comme le lien (convention Lucid : la couleur porte
     # la sémantique du flux, le texte la reprend).
     lbl.append(f'<text x="{mx:.0f}" y="{my - 7:.0f}" text-anchor="middle" '
-               f'font-family="{FONT_MONO}" font-size="9" fill="{color}">'
+               f'font-family="{FONT_MONO}" font-size="9.5" fill="{color}">'
                f'{escape(text)}</text>')
     for j, vid in enumerate(link.vlans[:8]):
         lbl.append(f'<circle cx="{mx - len(link.vlans[:8]) * 6 + 6 + j * 12:.0f}" '
                    f'cy="{my + 8:.0f}" r="4" '
                    f'fill="{vlan_colors.get(vid, "#64748b")}"/>')
     lbl.append('</g>')
-    return s, lbl
+    return s, lbl, None
 
 
 def render_logical_svg(project: Project, theme: str = "sombre") -> str:
@@ -242,7 +295,14 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
 
     max_x = max((x for x, _ in pos.values()), default=0) + NODE_W + MARGIN
     max_y = max((y for _, y in pos.values()), default=0) + NODE_H + MARGIN
-    total_w = max(max_x, 640)
+    # Un faisceau de liens parallèles (>= 3) déporte sa liste numérotée
+    # à droite : on réserve la colonne.
+    counts: dict[frozenset, int] = {}
+    for link in project.logical.links:
+        pair = frozenset((link.from_.equipment_id, link.to.equipment_id))
+        counts[pair] = counts.get(pair, 0) + 1
+    stack_w = 320 if any(v >= 3 for v in counts.values()) else 0
+    total_w = max(max_x + stack_w, 640)
     total_h = max_y + LEGEND_H + 40
 
     s: list[str] = [
@@ -281,10 +341,57 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
     # Traits des liens d'abord (sous les nœuds) ; étiquettes gardées pour
     # la fin (au-dessus de tout).
     labels: list[str] = []
+    placed: list[tuple[float, float, float]] = []
+    # Liens parallèles (même paire d'équipements) : index d'éventail.
+    pair_total: dict[frozenset, int] = {}
     for link in project.logical.links:
-        line, lbl = _render_link(link, pos, vlan_colors)
+        pair = frozenset((link.from_.equipment_id, link.to.equipment_id))
+        pair_total[pair] = pair_total.get(pair, 0) + 1
+    pair_seen: dict[frozenset, int] = {}
+    stacks: list[tuple[str, str]] = []
+    for link in project.logical.links:
+        pair = frozenset((link.from_.equipment_id, link.to.equipment_id))
+        idx = pair_seen.get(pair, 0)
+        pair_seen[pair] = idx + 1
+        line, lbl, stack = _render_link(link, pos, vlan_colors, placed,
+                                        fan=(idx, pair_total[pair]))
         s.extend(line)
         labels.extend(lbl)
+        if stack:
+            stacks.append(stack)
+
+    # Liste déportée des faisceaux numérotés, à droite du schéma.
+    if stacks:
+        sx = max((x for x, _ in pos.values()), default=0) + NODE_W + 34
+        sy = min((y for _, y in pos.values()), default=100) + 30
+        labels.append(f'<text x="{sx}" y="{sy - 16}" font-family="{FONT}" '
+                      f'font-size="10" letter-spacing="1" '
+                      f'fill="{C_TEXT_DIM}">LIAISONS NUMÉROTÉES</text>')
+        for k, (text, color) in enumerate(stacks):
+            labels.append(f'<text x="{sx}" y="{sy + k * 17}" '
+                          f'font-family="{FONT_MONO}" font-size="9.5" '
+                          f'fill="{color}">{escape(text)}</text>')
+
+    # Nuage WAN / Internet — dessiné seulement s'il est documenté (un
+    # port dont l'usage mentionne WAN) : jamais inventé.
+    wan = _wan_item(project)
+    if wan is not None and wan.id in pos:
+        wx = pos[wan.id][0] + NODE_W / 2
+        wy = pos[wan.id][1] - 62
+        s.append(f'<g id="wan-cloud">')
+        s.append(f'<path d="M {wx - 46:.0f} {wy + 14:.0f} '
+                 f'a 16 16 0 0 1 14 -22 a 20 20 0 0 1 36 -6 '
+                 f'a 15 15 0 0 1 24 12 a 13 13 0 0 1 -8 24 '
+                 f'l -56 0 a 14 14 0 0 1 -10 -8 z" '
+                 f'fill="{C_NODE}" stroke="{C_TEXT_DIM}" '
+                 f'stroke-width="1.3" stroke-dasharray="5,3"/>')
+        s.append(f'<text x="{wx:.0f}" y="{wy + 8:.0f}" text-anchor="middle" '
+                 f'font-family="{FONT}" font-size="10.5" font-weight="bold" '
+                 f'fill="{C_TEXT}">WAN — Internet</text>')
+        s.append(f'<line x1="{wx:.0f}" y1="{wy + 26:.0f}" x2="{wx:.0f}" '
+                 f'y2="{pos[wan.id][1]:.0f}" stroke="{C_TEXT_DIM}" '
+                 f'stroke-width="1.5" stroke-dasharray="5,3"/>')
+        s.append('</g>')
 
     # Nœuds.
     for n in nodes:
@@ -298,9 +405,9 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
         s.extend(_node_glyph(n["category"], x + 8, y, n["color"]))
         # Libellé jamais tronqué en plein mot : ellipse au-delà de 26 car.
         lbl = n["label"] if len(n["label"]) <= 26 else n["label"][:25] + "…"
-        s.append(f'<text x="{x + 38:.0f}" y="{y + 24:.0f}" font-size="12" '
+        s.append(f'<text x="{x + 38:.0f}" y="{y + 24:.0f}" font-size="12.5" '
                  f'fill="{C_TEXT}">{escape(lbl)}</text>')
-        s.append(f'<text x="{x + 38:.0f}" y="{y + 40:.0f}" font-size="9" '
+        s.append(f'<text x="{x + 38:.0f}" y="{y + 40:.0f}" font-size="9.5" '
                  f'font-family="{FONT_MONO}" fill="{C_TEXT_DIM}">'
                  f'{escape(n["sub"])}</text>')
         s.append('</g>')
@@ -315,7 +422,7 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
     lx = MARGIN
     for v in project.logical.vlans:
         s.append(f'<circle cx="{lx + 5}" cy="{ly + 20}" r="5" fill="{v.color}"/>')
-        s.append(f'<text x="{lx + 14}" y="{ly + 24}" font-size="10" '
+        s.append(f'<text x="{lx + 14}" y="{ly + 24}" font-size="10.5" '
                  f'font-family="{FONT_MONO}" fill="{C_TEXT}">'
                  f'{v.vid} {escape(v.name)}</text>')
         lx += 24 + len(f"{v.vid} {v.name}") * 6
@@ -324,7 +431,7 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
         dash_attr = f' stroke-dasharray="{dash}"' if dash else ""
         s.append(f'<line x1="{lx}" y1="{ly + 45}" x2="{lx + 26}" y2="{ly + 45}" '
                  f'stroke="{color}" stroke-width="{w}"{dash_attr}/>')
-        s.append(f'<text x="{lx + 32}" y="{ly + 48}" font-size="10" '
+        s.append(f'<text x="{lx + 32}" y="{ly + 48}" font-size="10.5" '
                  f'font-family="{FONT_MONO}" fill="{C_TEXT_DIM}">{kind}</text>')
         lx += 32 + len(kind) * 6 + 22
 
