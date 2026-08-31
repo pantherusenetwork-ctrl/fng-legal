@@ -1245,13 +1245,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeSlotPopover();
 });
 
-function updateRevisionBadge() {
-  const b = $("#btn-revision");
-  if (b) b.textContent = "V" + projectVersion();
-}
-
 function renderAll() {
-  updateRevisionBadge();
   if (viewMode === "logical") { renderLogical(); return; }
   if (viewMode === "diagram") { renderDiagram(); return; }
   const canvas = $("#canvas");
@@ -1733,7 +1727,7 @@ function projectVersion() {
   if (/^\d+$/.test(r)) return parseInt(r, 10);
   return r.toUpperCase().charCodeAt(0) - 64; // A=1, B=2…
 }
-$("#btn-revision").addEventListener("click", async () => {
+$("#btn-new-version").addEventListener("click", async () => {
   const cur = projectVersion();
   const objet = await askText(`Passer le projet en V${cur + 1}`,
     `Le projet est en V${cur}. Qu'est-ce qui change dans cette nouvelle version ?`);
@@ -1745,7 +1739,6 @@ $("#btn-revision").addEventListener("click", async () => {
   project.revision = String(cur + 1);
   project.revisions.push({ indice: "V" + (cur + 1),
     date: new Date().toLocaleDateString("fr-FR"), objet });
-  updateRevisionBadge();
   saveLocal();
   renderStatus(`Projet passé en V${cur + 1} — historique dans le dossier DAT`);
 });
