@@ -40,8 +40,20 @@ def images_dir() -> Path | None:
 
 
 def _to_data_uri(path: Path) -> str:
-    mime = _MIME[path.suffix.lower()]
-    payload = base64.b64encode(path.read_bytes()).decode("ascii")
+    raw = path.read_bytes()
+    # Le MIME est déduit des OCTETS, pas de l'extension : le catalogue
+    # contient des JPEG déguisés en .png — une data URI menteuse passe
+    # dans un navigateur (qui sniffe) mais peut être refusée par un
+    # convertisseur strict (svglib, draw.io).
+    if raw.startswith(b"\x89PNG"):
+        mime = "image/png"
+    elif raw.startswith(b"\xff\xd8"):
+        mime = "image/jpeg"
+    elif raw.lstrip()[:5] in (b"<svg ", b"<?xml"):
+        mime = "image/svg+xml"
+    else:
+        mime = _MIME[path.suffix.lower()]
+    payload = base64.b64encode(raw).decode("ascii")
     return f"data:{mime};base64,{payload}"
 
 

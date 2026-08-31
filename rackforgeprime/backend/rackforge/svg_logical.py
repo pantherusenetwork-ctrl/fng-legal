@@ -413,7 +413,9 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
     wan = _wan_item(project)
     if wan is not None and wan.id in pos:
         wx = pos[wan.id][0] + NODE_W / 2
-        wy = pos[wan.id][1] - 62
+        # Borné : un nœud WAN déplacé à la main près du bord haut ne doit
+        # pas envoyer le nuage hors du canvas (y négatif).
+        wy = max(pos[wan.id][1] - 62, 34)
         s.append(f'<g id="wan-cloud">')
         s.append(f'<path d="M {wx - 46:.0f} {wy + 14:.0f} '
                  f'a 16 16 0 0 1 14 -22 a 20 20 0 0 1 36 -6 '

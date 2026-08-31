@@ -54,8 +54,16 @@ def _parse_project(payload: dict) -> Project:
     try:
         return Project.model_validate(payload)
     except ValidationError as exc:
-        # On remonte les messages du moteur de placement tels quels.
-        msgs = [e.get("msg", str(e)) for e in exc.errors()]
+        # Messages du moteur de placement, débarrassés du préfixe pydantic
+        # anglais, et préfixés du chemin du champ fautif (sinon impossible
+        # de savoir QUEL équipement pose problème).
+        msgs = []
+        for e in exc.errors():
+            msg = e.get("msg", str(e))
+            if msg.startswith("Value error, "):
+                msg = msg[len("Value error, "):]
+            loc = ".".join(str(p) for p in e.get("loc", ()))
+            msgs.append(f"{loc} : {msg}" if loc else msg)
         raise HTTPException(status_code=422, detail=msgs)
 
 

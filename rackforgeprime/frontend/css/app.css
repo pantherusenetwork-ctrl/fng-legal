@@ -616,7 +616,7 @@ body:not([data-theme="clair"]) #canvas svg image {
   border: 1px solid var(--line); border-radius: 99px; padding: 1px 9px; margin-left: 6px;
 }
 
-/* ===== Theme PASTEL — creme chaleureux, accents adoucis ===== */
+/* ===== Theme KAKI — olive foncé, accent ambre (terrain) ===== */
 body[data-theme="kaki"] {
   --bg: #0c0e06;
   --panel: rgba(18, 21, 10, .85);
