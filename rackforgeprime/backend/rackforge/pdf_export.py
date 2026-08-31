@@ -178,11 +178,18 @@ def _draw_table_page(c, page_w: float, page_h: float, title: str,
         c.setFillColorRGB(*pal["text"])
         cx = x
         for val, cw in zip(row, col_w):
-            c.drawString(cx + 3, ty, str(val)[:60])
+            # Tronqué à la largeur réelle de la colonne : une colonne
+            # générée n'entre jamais en collision avec la suivante.
+            txt = str(val)
+            max_w = cw * scale_w - 8
+            while txt and c.stringWidth(txt, "Helvetica", 10) > max_w:
+                txt = txt[:-2] + "…" if len(txt) > 2 else ""
+            c.drawString(cx + 3, ty, txt)
             cx += cw * scale_w
         c.setStrokeColorRGB(*pal["row_line"])
         c.line(x, ty - 5, x + w, ty - 5)
         ty -= line_h
+    return ty
 
 
 # Lignes de tableau par page A4 paysage (corps 10 pt, interligne 18 pt).
@@ -347,37 +354,49 @@ def render_project_dossier_pdf(project: Project, theme: str = "sombre",
     total_w_charge = sum(
         types[i.type_id].power_w
         for r in project.racks for i in r.items if i.type_id in types)
-    # Capacité onduleur déduite des VA du nom de modèle (facteur 0,9) —
-    # estimation affichée comme telle, jamais présentée comme mesurée.
+    # Capacité onduleur : valeurs constructeur pour les gammes connues
+    # (APC : 1500 VA -> 1000 W réels), sinon VA du modèle × 0,66 marqué
+    # comme estimation — jamais présentée comme mesurée.
     import re as _re
-    ups_va = sum(
-        int(m.group(1))
-        for r in project.racks for i in r.items
-        if (t := types.get(i.type_id)) and t.category == "ups"
-        and (m := _re.search(r"(\d{3,5})", t.model)))
+    _UPS_W = {"1500": 1000, "2200": 1980, "3000": 2700}
+    ups_w, ups_estime = 0.0, False
+    for r in project.racks:
+        for i in r.items:
+            t = types.get(i.type_id)
+            if not t or t.category != "ups":
+                continue
+            m = _re.search(r"(\d{3,5})", t.model)
+            if not m:
+                continue
+            va = m.group(1)
+            if va in _UPS_W:
+                ups_w += _UPS_W[va]
+            else:
+                ups_w += int(va) * 0.66
+                ups_estime = True
     for k, chunk in enumerate(bom_pages):
         _page_frame(c, page_w, page_h, project, "Nomenclature",
                     page_no, total, pal)
-        _draw_table_page(
+        end_y = _draw_table_page(
             c, page_w, page_h, "Nomenclature (BOM)",
             ["Constructeur", "Modèle", "Hauteur", "Qté", "U totaux", "Conso totale"],
             [16, 30, 10, 8, 10, 14], chunk, pal)
         if k == len(bom_pages) - 1:
-            # Bilan énergie : charge vs capacité onduleur (quand un UPS
-            # est en baie, sa capacité est déduite des VA du modèle).
-            if ups_va:
-                cap_w = ups_va * 0.9
-                taux = 100 * total_w_charge / cap_w if cap_w else 0
+            # Bilan énergie sous le tableau (pas collé au pied de page) :
+            # charge vs capacité onduleur.
+            if ups_w:
+                taux = 100 * total_w_charge / ups_w
+                src = ("estimée du modèle" if ups_estime
+                       else "valeur constructeur")
                 bilan = (f"Charge totale estimée : {total_w_charge:g} W · "
-                         f"capacité onduleur ≈ {cap_w:g} W "
-                         f"({ups_va} VA × 0,9, déduite du modèle) → "
+                         f"capacité onduleur {ups_w:g} W ({src}) → "
                          f"taux de charge ≈ {taux:.0f} %")
             else:
                 bilan = (f"Charge totale estimée : {total_w_charge:g} W "
                          f"(hors budget PoE délivré — aucun onduleur en baie)")
             c.setFillColorRGB(*pal["accent"])
             c.setFont("Helvetica-Bold", 11)
-            c.drawString(_MARGIN + 10, _MARGIN + _CARTOUCHE_H + 12, bilan)
+            c.drawString(_MARGIN + 22, end_y - 14, bilan)
         c.showPage()
         page_no += 1
 

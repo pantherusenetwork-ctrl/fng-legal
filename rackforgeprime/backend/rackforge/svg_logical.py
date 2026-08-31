@@ -20,8 +20,8 @@ from xml.sax.saxutils import escape
 from .models import EquipmentType, LogicalLink, Project, type_index
 
 # --- Géométrie --------------------------------------------------------------
-NODE_W = 190
-NODE_H = 56
+NODE_W = 214
+NODE_H = 64
 LAYER_GAP = 120      # espace vertical entre couches (zones comprises)
 NODE_GAP = 40        # espace horizontal entre nœuds d'une couche
 MARGIN = 40
@@ -275,7 +275,7 @@ def _render_link(link: LogicalLink, pos: dict[str, tuple[float, float]],
     # Étiquette colorée comme le lien (convention Lucid : la couleur porte
     # la sémantique du flux, le texte la reprend).
     lbl.append(f'<text x="{mx:.0f}" y="{my - 7:.0f}" text-anchor="middle" '
-               f'font-family="{FONT_MONO}" font-size="9.5" fill="{color}">'
+               f'font-family="{FONT_MONO}" font-size="11" fill="{color}">'
                f'{escape(text)}</text>')
     for j, vid in enumerate(link.vlans[:8]):
         lbl.append(f'<circle cx="{mx - len(link.vlans[:8]) * 6 + 6 + j * 12:.0f}" '
@@ -310,7 +310,7 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
         f'height="{total_h}" viewBox="0 0 {total_w} {total_h}" '
         f'font-family="{FONT}">',
         f'<rect x="0" y="0" width="{total_w}" height="{total_h}" fill="{C_BG}"/>',
-        f'<text x="{MARGIN}" y="28" font-size="16" font-weight="bold" '
+        f'<text x="{MARGIN}" y="28" font-size="18" font-weight="bold" '
         f'fill="{C_TEXT}">{escape(project.name)} — schéma logique</text>',
     ]
 
@@ -333,7 +333,7 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
                  f'stroke="{C_LINE}" stroke-width="1" '
                  f'stroke-dasharray="5,4"/>')
         s.append(f'<text x="{zx + 12:.0f}" y="{zy + 14:.0f}" '
-                 f'font-family="{FONT}" font-size="9" letter-spacing="1.5" '
+                 f'font-family="{FONT}" font-size="11" letter-spacing="1.5" '
                  f'fill="{C_TEXT_DIM}">'
                  f'{escape(ZONE_LABELS.get(rank, "AUTRES"))}</text>')
         s.append('</g>')
@@ -365,11 +365,11 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
         sx = max((x for x, _ in pos.values()), default=0) + NODE_W + 34
         sy = min((y for _, y in pos.values()), default=100) + 30
         labels.append(f'<text x="{sx}" y="{sy - 16}" font-family="{FONT}" '
-                      f'font-size="10" letter-spacing="1" '
+                      f'font-size="11.5" letter-spacing="1" '
                       f'fill="{C_TEXT_DIM}">LIAISONS NUMÉROTÉES</text>')
         for k, (text, color) in enumerate(stacks):
             labels.append(f'<text x="{sx}" y="{sy + k * 17}" '
-                          f'font-family="{FONT_MONO}" font-size="9.5" '
+                          f'font-family="{FONT_MONO}" font-size="11" '
                           f'fill="{color}">{escape(text)}</text>')
 
     # Nuage WAN / Internet — dessiné seulement s'il est documenté (un
@@ -386,7 +386,7 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
                  f'fill="{C_NODE}" stroke="{C_TEXT_DIM}" '
                  f'stroke-width="1.3" stroke-dasharray="5,3"/>')
         s.append(f'<text x="{wx:.0f}" y="{wy + 8:.0f}" text-anchor="middle" '
-                 f'font-family="{FONT}" font-size="10.5" font-weight="bold" '
+                 f'font-family="{FONT}" font-size="12" font-weight="bold" '
                  f'fill="{C_TEXT}">WAN — Internet</text>')
         s.append(f'<line x1="{wx:.0f}" y1="{wy + 26:.0f}" x2="{wx:.0f}" '
                  f'y2="{pos[wan.id][1]:.0f}" stroke="{C_TEXT_DIM}" '
@@ -405,9 +405,9 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
         s.extend(_node_glyph(n["category"], x + 8, y, n["color"]))
         # Libellé jamais tronqué en plein mot : ellipse au-delà de 26 car.
         lbl = n["label"] if len(n["label"]) <= 26 else n["label"][:25] + "…"
-        s.append(f'<text x="{x + 38:.0f}" y="{y + 24:.0f}" font-size="12.5" '
+        s.append(f'<text x="{x + 38:.0f}" y="{y + 24:.0f}" font-size="14" '
                  f'fill="{C_TEXT}">{escape(lbl)}</text>')
-        s.append(f'<text x="{x + 38:.0f}" y="{y + 40:.0f}" font-size="9.5" '
+        s.append(f'<text x="{x + 38:.0f}" y="{y + 40:.0f}" font-size="11" '
                  f'font-family="{FONT_MONO}" fill="{C_TEXT_DIM}">'
                  f'{escape(n["sub"])}</text>')
         s.append('</g>')
@@ -422,7 +422,7 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
     lx = MARGIN
     for v in project.logical.vlans:
         s.append(f'<circle cx="{lx + 5}" cy="{ly + 20}" r="5" fill="{v.color}"/>')
-        s.append(f'<text x="{lx + 14}" y="{ly + 24}" font-size="10.5" '
+        s.append(f'<text x="{lx + 14}" y="{ly + 24}" font-size="12" '
                  f'font-family="{FONT_MONO}" fill="{C_TEXT}">'
                  f'{v.vid} {escape(v.name)}</text>')
         lx += 24 + len(f"{v.vid} {v.name}") * 6
@@ -431,7 +431,7 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
         dash_attr = f' stroke-dasharray="{dash}"' if dash else ""
         s.append(f'<line x1="{lx}" y1="{ly + 45}" x2="{lx + 26}" y2="{ly + 45}" '
                  f'stroke="{color}" stroke-width="{w}"{dash_attr}/>')
-        s.append(f'<text x="{lx + 32}" y="{ly + 48}" font-size="10.5" '
+        s.append(f'<text x="{lx + 32}" y="{ly + 48}" font-size="12" '
                  f'font-family="{FONT_MONO}" fill="{C_TEXT_DIM}">{kind}</text>')
         lx += 32 + len(kind) * 6 + 22
 
