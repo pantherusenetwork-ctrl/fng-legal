@@ -42,14 +42,30 @@ LINK_STYLES = {
     "other": (1.4, "#94a3b8", "3,3"),
 }
 
-# --- Palette (identique à svg_export.py) ------------------------------------
-C_BG = "#0b0e14"
-C_NODE = "#161b28"
-C_LINE = "#2c3547"
-C_TEXT = "#cbd5e1"
-C_TEXT_DIM = "#64748b"
+# --- Palettes par thème (cohérentes avec svg_export.PALETTES) ---------------
+LPALETTES = {
+    "sombre": {"bg": "#0b0e14", "node": "#161b28", "line": "#2c3547",
+               "text": "#cbd5e1", "dim": "#64748b"},
+    "clair": {"bg": "#ffffff", "node": "#f7f8f9", "line": "#d3d8de",
+              "text": "#1c2126", "dim": "#6b7480"},
+}
+# Palette active du rendu en cours (posée par render_logical_svg — module
+# mono-thread côté serveur, même modèle que le reste du fichier).
+_P = LPALETTES["sombre"]
+C_BG = _P["bg"]
+C_NODE = _P["node"]
+C_LINE = _P["line"]
+C_TEXT = _P["text"]
+C_TEXT_DIM = _P["dim"]
 FONT = "Helvetica, Arial, sans-serif"
 FONT_MONO = "Courier, monospace"
+
+
+def _set_theme(theme: str) -> None:
+    global _P, C_BG, C_NODE, C_LINE, C_TEXT, C_TEXT_DIM
+    _P = LPALETTES.get(theme, LPALETTES["sombre"])
+    C_BG, C_NODE, C_LINE = _P["bg"], _P["node"], _P["line"]
+    C_TEXT, C_TEXT_DIM = _P["text"], _P["dim"]
 
 
 def _node_glyph(category: str, x: float, y: float, color: str) -> list[str]:
@@ -201,8 +217,9 @@ def _render_link(link: LogicalLink, pos: dict[str, tuple[float, float]],
     return s, lbl
 
 
-def render_logical_svg(project: Project) -> str:
+def render_logical_svg(project: Project, theme: str = "sombre") -> str:
     """Schéma logique complet du projet -> SVG."""
+    _set_theme(theme)
     types = type_index(project)
     nodes = _collect_nodes(project, types)
     pos = layout_nodes(project, types)

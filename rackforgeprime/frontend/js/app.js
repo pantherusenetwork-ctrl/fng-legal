@@ -266,22 +266,32 @@ function drawFaceplate(g, t, x, y, label, selected, item) {
       img.addEventListener("mousemove", (e) => showTip(itemTipHTML(t, item), e));
       img.addEventListener("mouseleave", hideTip);
     }
-    /* Bandeau d'identification superposé : photo ou dessin, la baie
-       parle d'une seule voix (miroir Python). */
+    /* Le MÊME cadre que les dessins : bordure, liseré de rôle, bandeau
+       hostname, pastille U — un seul langage visuel (miroir Python). */
+    g.appendChild(svgEl("rect", {
+      x, y: y + 1, width: RACK_W, height: h - 2, rx: 2, fill: "none",
+      stroke: C.faceStroke, "stroke-width": 1,
+    }));
+    g.appendChild(svgEl("rect", { x, y: y + 1, width: 4, height: h - 2, fill: t.color }));
     if (label) {
       const bw = Math.min(label.length * 6.2 + 14, RACK_W - 60);
       g.appendChild(svgEl("rect", {
-        x: x + 4, y: y + h - 14, width: bw, height: 12, rx: 2,
+        x: x + 6, y: y + h - 15, width: bw, height: 12, rx: 2,
         fill: "rgba(11,14,20,.78)",
       }));
-      g.appendChild(svgEl("rect", {
-        x: x + 4, y: y + h - 14, width: 3, height: 12, fill: t.color,
-      }));
       g.appendChild(svgEl("text", {
-        x: x + 11, y: y + h - 5, "font-size": 9, fill: "#f1f5f9",
+        x: x + 12, y: y + h - 6, "font-size": 9, fill: "#f1f5f9",
         "font-family": "system-ui, sans-serif",
       }, label));
     }
+    g.appendChild(svgEl("rect", {
+      x: x + RACK_W - 34, y: y + h / 2 - 7, width: 26, height: 14, rx: 7,
+      fill: C.face, "fill-opacity": 0.85, stroke: C.pill, "stroke-width": 1,
+    }));
+    g.appendChild(svgEl("text", {
+      x: x + RACK_W - 21, y: y + h / 2 + 3, "text-anchor": "middle",
+      "font-size": 8.5, fill: C.dim, "font-family": "monospace",
+    }, t.u_height + "U"));
     if (selected)
       g.appendChild(svgEl("rect", { x, y: y + 1, width: RACK_W, height: h - 2,
         fill: "none", stroke: C.accent, "stroke-width": 1.6 }));
@@ -305,7 +315,7 @@ function drawFaceplate(g, t, x, y, label, selected, item) {
   /* Pastille de hauteur U. */
   g.appendChild(svgEl("rect", {
     x: x + RACK_W - 34, y: yc - 7, width: 26, height: 14, rx: 7,
-    fill: "none", stroke: C.pill, "stroke-width": 1,
+    fill: C.face, "fill-opacity": 0.85, stroke: C.pill, "stroke-width": 1,
   }));
   g.appendChild(svgEl("text", {
     x: x + RACK_W - 21, y: yc + 3, "text-anchor": "middle",
@@ -1127,18 +1137,24 @@ async function postForBlob(url, filename) {
   URL.revokeObjectURL(a.href);
 }
 
-/* Les exports suivent la vue active : baies en physique, VLANs/liens en logique. */
+/* Les exports suivent la vue active ET le thème affiché : ce que tu
+ * vois est ce que tu livres. */
 function viewSuffix() { return viewMode === "logical" ? "-logique" : ""; }
-function viewQuery() { return viewMode === "logical" ? "?view=logical" : ""; }
+function exportQuery(view) {
+  const q = new URLSearchParams();
+  q.set("view", view || (viewMode === "logical" ? "logical" : "physical"));
+  q.set("theme", theme);
+  return "?" + q.toString();
+}
 
 $("#btn-export-svg").addEventListener("click", () =>
-  postForBlob("/api/export/svg" + viewQuery(),
+  postForBlob("/api/export/svg" + exportQuery(),
               currentProject().id + viewSuffix() + ".svg"));
 $("#btn-export-pdf").addEventListener("click", () =>
-  postForBlob("/api/export/pdf" + viewQuery(),
+  postForBlob("/api/export/pdf" + exportQuery(),
               currentProject().id + viewSuffix() + ".pdf"));
 $("#btn-export-dossier").addEventListener("click", () =>
-  postForBlob("/api/export/pdf?view=dossier",
+  postForBlob("/api/export/pdf" + exportQuery("dossier"),
               currentProject().id + "-dossier.pdf"));
 $("#btn-export-json").addEventListener("click", () => {
   const blob = new Blob([JSON.stringify(currentProject(), null, 2)],
@@ -1176,7 +1192,7 @@ $("#btn-import-json input").addEventListener("change", async (e) => {
  * =================================================================== */
 
 async function renderLogical() {
-  const res = await fetch("/api/export/svg?view=logical", {
+  const res = await fetch("/api/export/svg?view=logical&theme=" + theme, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify(currentProject()),
   });
@@ -1546,6 +1562,8 @@ document.addEventListener("pointerdown", (e) => {
   if (!$("#export-menu").hidden && !e.target.closest(".dropdown"))
     $("#export-menu").hidden = true;
 }, true);
+
+$("#btn-search").addEventListener("click", openSearch);
 
 $("#btn-theme").addEventListener("click", () => {
   theme = theme === "clair" ? "sombre" : "clair";

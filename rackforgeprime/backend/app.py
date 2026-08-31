@@ -113,11 +113,13 @@ async def import_datasheet(file: UploadFile = File(...)) -> dict:
 # --- Exports (le JSON reste la source de vérité) ----------------------------
 
 @app.post("/api/export/svg")
-def export_svg(payload: dict, view: str = "physical") -> Response:
-    """``view=physical`` : élévation de baies ; ``view=logical`` : VLANs/liens."""
+def export_svg(payload: dict, view: str = "physical",
+               theme: str = "sombre") -> Response:
+    """``view=physical`` : élévation ; ``view=logical`` : VLANs/liens.
+    ``theme`` : sombre (écran) ou clair (impression)."""
     project = _parse_project(payload)
-    svg = (render_logical_svg(project) if view == "logical"
-           else render_project_svg(project))
+    svg = (render_logical_svg(project, theme=theme) if view == "logical"
+           else render_project_svg(project, theme=theme))
     suffix = "-logique" if view == "logical" else ""
     return Response(
         content=svg, media_type="image/svg+xml",
@@ -127,15 +129,17 @@ def export_svg(payload: dict, view: str = "physical") -> Response:
 
 
 @app.post("/api/export/pdf")
-def export_pdf(payload: dict, view: str = "physical") -> Response:
+def export_pdf(payload: dict, view: str = "physical",
+               theme: str = "sombre") -> Response:
     """``view`` : physical, logical, ou ``dossier`` (livrable DAT complet :
-    élévation + logique + brassage + nomenclature, cadre et cartouche)."""
+    élévation + logique + brassage + nomenclature, cadre et cartouche).
+    ``theme`` : sombre (écran) ou clair (impression)."""
     project = _parse_project(payload)
     if view == "dossier":
-        pdf = render_project_dossier_pdf(project)
+        pdf = render_project_dossier_pdf(project, theme=theme)
         suffix = "-dossier"
     else:
-        pdf = render_project_pdf(project, view=view)
+        pdf = render_project_pdf(project, view=view, theme=theme)
         suffix = "-logique" if view == "logical" else ""
     return Response(
         content=pdf, media_type="application/pdf",

@@ -503,3 +503,12 @@ body[data-theme="clair"] #search-overlay .search-box { background: rgba(255, 255
 #statusbar { display: flex; align-items: center; gap: 16px; }
 #tip-text { margin-left: auto; color: var(--text-dim); font-size: 12px; cursor: pointer; }
 #tip-text:hover { color: var(--accent); }
+
+/* ---- Bouton recherche visible + typo barre d etat ---- */
+#btn-search { display: flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel-2); padding: 6px 10px; }
+#btn-search .kbd-hint {
+  font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+  border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px;
+}
+#statusbar { font-size: 13px; }
+#tip-text { font-size: 12.5px; }

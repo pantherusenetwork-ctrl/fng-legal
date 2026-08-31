@@ -19,23 +19,42 @@ from .models import Project, patch_table, type_index
 from .svg_export import render_project_svg
 from .svg_logical import render_logical_svg
 
-# Palette du dossier (cohérente avec la DA écran).
-_BG = (0.043, 0.055, 0.078)      # #0b0e14
-_FRAME = (0.16, 0.20, 0.29)      # #2a3446
-_TEXT = (0.80, 0.84, 0.88)       # #cbd5e1
-_DIM = (0.39, 0.45, 0.55)        # #64748b
-_ACCENT = (0.976, 0.451, 0.086)  # #f97316 — l'orange, seule couleur de marque
+# Palettes du dossier par thème (sombre = écran, clair = impression DAT).
+_PDF_PALETTES = {
+    "sombre": {
+        "bg": (0.043, 0.055, 0.078),   # #0b0e14
+        "frame": (0.16, 0.20, 0.29),   # #2a3446
+        "text": (0.80, 0.84, 0.88),    # #cbd5e1
+        "dim": (0.39, 0.45, 0.55),     # #64748b
+        "accent": (0.976, 0.451, 0.086),  # #f97316
+        "row_line": (0.10, 0.13, 0.19),
+    },
+    "clair": {
+        "bg": (1.0, 1.0, 1.0),
+        "frame": (0.79, 0.81, 0.83),   # #c9ced4
+        "text": (0.11, 0.13, 0.15),    # #1c2126
+        "dim": (0.42, 0.46, 0.50),     # #6b7480
+        "accent": (0.918, 0.345, 0.047),  # #ea580c
+        "row_line": (0.91, 0.92, 0.93),
+    },
+}
 _CARTOUCHE_H = 46
 _MARGIN = 18
 
 
-def render_project_pdf(project: Project, view: str = "physical") -> bytes:
+def _pdf_palette(theme: str) -> dict:
+    return _PDF_PALETTES.get(theme, _PDF_PALETTES["sombre"])
+
+
+def render_project_pdf(project: Project, view: str = "physical",
+                       theme: str = "sombre") -> bytes:
     """Projet -> PDF (bytes). Le SVG est la source, le PDF une vue.
 
     ``view`` : « physical » (élévation de baies) ou « logical » (VLANs/liens).
+    ``theme`` : « sombre » (écran) ou « clair » (impression).
     """
-    svg = (render_logical_svg(project) if view == "logical"
-           else render_project_svg(project))
+    svg = (render_logical_svg(project, theme=theme) if view == "logical"
+           else render_project_svg(project, theme=theme))
     drawing = svg2rlg(io.StringIO(svg))
     if drawing is None:  # SVG illisible : bug de génération, pas de l'utilisateur
         raise RuntimeError("Conversion SVG -> PDF impossible (SVG invalide)")
@@ -52,8 +71,8 @@ def render_project_pdf(project: Project, view: str = "physical") -> bytes:
     c = pdf_canvas.Canvas(buf, pagesize=landscape(A4))
     c.setTitle(project.name)
     c.setAuthor("RackForgePrime")
-    # Fond sombre pleine page : le rendu écran et le PDF sont le même visuel.
-    c.setFillColorRGB(*_BG)
+    # Fond pleine page dans le thème demandé.
+    c.setFillColorRGB(*_pdf_palette(theme)["bg"])
     c.rect(0, 0, page_w, page_h, stroke=0, fill=1)
     renderPDF.draw(drawing, c, margin,
                    page_h - margin - drawing.height * scale)
@@ -70,11 +89,12 @@ def render_project_pdf(project: Project, view: str = "physical") -> bytes:
 # seul PDF. Aucun champ n'est saisi deux fois : tout vient du JSON du projet.
 
 def _page_frame(c, page_w: float, page_h: float, project: Project,
-                section: str, page_no: int, total: int) -> None:
-    """Fond sombre, cadre, et cartouche bas-droite d'une page du dossier."""
-    c.setFillColorRGB(*_BG)
+                section: str, page_no: int, total: int,
+                pal: dict) -> None:
+    """Fond, cadre, et cartouche bas d'une page du dossier."""
+    c.setFillColorRGB(*pal["bg"])
     c.rect(0, 0, page_w, page_h, stroke=0, fill=1)
-    c.setStrokeColorRGB(*_FRAME)
+    c.setStrokeColorRGB(*pal["frame"])
     c.setLineWidth(1.2)
     c.rect(_MARGIN, _MARGIN, page_w - 2 * _MARGIN, page_h - 2 * _MARGIN)
     # Bandeau cartouche sur toute la largeur, en bas du cadre.
@@ -87,10 +107,10 @@ def _page_frame(c, page_w: float, page_h: float, project: Project,
 
     def cell(x: float, x_next: float, label: str, value: str,
              accent: bool = False) -> None:
-        c.setFillColorRGB(*_DIM)
+        c.setFillColorRGB(*pal["dim"])
         c.setFont("Helvetica", 6.5)
         c.drawString(x + 8, y0 + _CARTOUCHE_H - 13, label.upper())
-        c.setFillColorRGB(*(_ACCENT if accent else _TEXT))
+        c.setFillColorRGB(*(pal["accent"] if accent else pal["text"]))
         c.setFont("Helvetica-Bold", 10)
         # Tronqué à la largeur réelle de la case (jamais de débordement).
         max_w = x_next - x - 16
@@ -130,39 +150,39 @@ def _draw_svg_page(c, svg: str, page_w: float, page_h: float) -> None:
 
 def _draw_table_page(c, page_w: float, page_h: float, title: str,
                      headers: list[str], col_w: list[float],
-                     rows: list[list[str]]) -> None:
+                     rows: list[list[str]], pal: dict) -> None:
     """Une page de tableau (les lignes DOIVENT tenir : paginé par l'appelant)."""
     x, y, w, _h = _content_zone(page_w, page_h)
-    top = page_h - _MARGIN - 26
-    c.setFillColorRGB(*_ACCENT)
-    c.setFont("Helvetica-Bold", 13)
+    top = page_h - _MARGIN - 30
+    c.setFillColorRGB(*pal["accent"])
+    c.setFont("Helvetica-Bold", 15)
     c.drawString(x, top, title)
-    line_h = 15
-    ty = top - 24
+    line_h = 18
+    ty = top - 30
     scale_w = w / sum(col_w)
-    c.setFont("Helvetica-Bold", 8.5)
-    c.setFillColorRGB(*_ACCENT)
+    c.setFont("Helvetica-Bold", 10)
+    c.setFillColorRGB(*pal["accent"])
     cx = x
     for head, cw in zip(headers, col_w):
         c.drawString(cx + 3, ty, head)
         cx += cw * scale_w
-    c.setStrokeColorRGB(*_FRAME)
-    c.line(x, ty - 4, x + w, ty - 4)
-    ty -= line_h + 2
-    c.setFont("Helvetica", 8.5)
+    c.setStrokeColorRGB(*pal["frame"])
+    c.line(x, ty - 5, x + w, ty - 5)
+    ty -= line_h + 3
+    c.setFont("Helvetica", 10)
     for row in rows:
-        c.setFillColorRGB(*_TEXT)
+        c.setFillColorRGB(*pal["text"])
         cx = x
         for val, cw in zip(row, col_w):
             c.drawString(cx + 3, ty, str(val)[:60])
             cx += cw * scale_w
-        c.setStrokeColorRGB(0.10, 0.13, 0.19)
-        c.line(x, ty - 4, x + w, ty - 4)
+        c.setStrokeColorRGB(*pal["row_line"])
+        c.line(x, ty - 5, x + w, ty - 5)
         ty -= line_h
 
 
-# Lignes de tableau par page A4 paysage (zone utile ~ 480 pt).
-_ROWS_PER_PAGE = 26
+# Lignes de tableau par page A4 paysage (corps 10 pt, interligne 18 pt).
+_ROWS_PER_PAGE = 22
 
 
 def _paginate(rows: list, per_page: int = _ROWS_PER_PAGE) -> list[list]:
@@ -187,12 +207,15 @@ def _bom_rows(project: Project) -> list[list[str]]:
     return rows
 
 
-def render_project_dossier_pdf(project: Project) -> bytes:
+def render_project_dossier_pdf(project: Project,
+                               theme: str = "sombre") -> bytes:
     """Dossier complet : élévation, vue logique, brassage, nomenclature.
 
     Chaque page porte le cadre et le cartouche auto-rempli — le livrable
-    à joindre tel quel en annexe d'un DAT.
+    à joindre tel quel en annexe d'un DAT. ``theme="clair"`` pour un
+    dossier imprimable en blanc.
     """
+    pal = _pdf_palette(theme)
     page_w, page_h = landscape(A4)
     patch_rows = [[r["rack"], f"U{r['u']}", r["equipment"], r["port"],
                    r["outlet"], r["vlan"], r["usage"]]
@@ -207,32 +230,35 @@ def render_project_dossier_pdf(project: Project) -> bytes:
     c.setAuthor("RackForgePrime")
     page_no = 1
 
-    _page_frame(c, page_w, page_h, project, "Élévation physique", page_no, total)
-    _draw_svg_page(c, render_project_svg(project), page_w, page_h)
+    _page_frame(c, page_w, page_h, project, "Élévation physique",
+                page_no, total, pal)
+    _draw_svg_page(c, render_project_svg(project, theme=theme), page_w, page_h)
     c.showPage()
     page_no += 1
 
-    _page_frame(c, page_w, page_h, project, "Architecture logique", page_no, total)
-    _draw_svg_page(c, render_logical_svg(project), page_w, page_h)
+    _page_frame(c, page_w, page_h, project, "Architecture logique",
+                page_no, total, pal)
+    _draw_svg_page(c, render_logical_svg(project, theme=theme), page_w, page_h)
     c.showPage()
     page_no += 1
 
     for chunk in patch_pages:
         _page_frame(c, page_w, page_h, project, "Tableau de brassage",
-                    page_no, total)
+                    page_no, total, pal)
         _draw_table_page(
             c, page_w, page_h, "Tableau de brassage — généré, jamais dessiné",
             ["Baie", "U", "Équipement", "Port", "Prise murale", "VLAN", "Usage"],
-            [10, 6, 24, 12, 14, 8, 26], chunk)
+            [10, 6, 24, 12, 14, 8, 26], chunk, pal)
         c.showPage()
         page_no += 1
 
     for chunk in bom_pages:
-        _page_frame(c, page_w, page_h, project, "Nomenclature", page_no, total)
+        _page_frame(c, page_w, page_h, project, "Nomenclature",
+                    page_no, total, pal)
         _draw_table_page(
             c, page_w, page_h, "Nomenclature (BOM)",
             ["Constructeur", "Modèle", "Hauteur", "Qté", "U totaux", "Conso totale"],
-            [16, 30, 10, 8, 10, 14], chunk)
+            [16, 30, 10, 8, 10, 14], chunk, pal)
         c.showPage()
         page_no += 1
 
