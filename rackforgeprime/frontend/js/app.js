@@ -1416,8 +1416,11 @@ $("#btn-export-csv").addEventListener("click", () =>
 
 /* ---- Sauvegarde de secours (localStorage) ---- */
 function saveLocal() {
-  try { localStorage.setItem("rackforgeprime.project", JSON.stringify(project)); }
-  catch { /* stockage plein ou bloqué : non bloquant */ }
+  /* Le mode démo (?demo=1) n'écrase jamais le projet sauvegardé. */
+  if (!new URLSearchParams(location.search).has("demo")) {
+    try { localStorage.setItem("rackforgeprime.project", JSON.stringify(project)); }
+    catch { /* stockage plein ou bloqué : non bloquant */ }
+  }
   pushHistory();
 }
 
@@ -1477,10 +1480,65 @@ function loadLocal() {
  * Démarrage
  * =================================================================== */
 
+/* Projet de démonstration (?demo=1) : une baie remplie et câblée,
+ * utile pour découvrir l'application et pour les captures. */
+function demoProject() {
+  const p = newProject();
+  p.name = "Démo — Baie LT1";
+  p.racks[0].u_height = 24;
+  p.racks[0].location = "Salle technique";
+  p.racks[0].items = [
+    { id: "eq-01", type_id: "fortinet-fortigate-100f", position_u: 22, face: "front",
+      meta: { hostname: "FWL-01", role: "firewall", vlan: "", wall_outlet: "",
+              port_usage: [{ port: "port1", outlet: "PM-R12", vlan: "99", usage: "Mgmt" }],
+              serial: "", notes: "" } },
+    { id: "eq-02", type_id: "fortinet-fortigate-600e", position_u: 20, face: "front",
+      meta: { hostname: "FWL-02", role: "firewall", vlan: "", wall_outlet: "",
+              port_usage: [], serial: "", notes: "" } },
+    { id: "eq-03", type_id: "aruba-6300m-48g", position_u: 16, face: "front",
+      meta: { hostname: "SW-CORE-01", role: "switch", vlan: "10", wall_outlet: "",
+              port_usage: [], serial: "", notes: "" } },
+    { id: "eq-04", type_id: "generic-patch-panel-24", position_u: 14, face: "front",
+      meta: { hostname: "", role: "patch-panel", vlan: "", wall_outlet: "",
+              port_usage: [], serial: "", notes: "" } },
+    { id: "eq-05", type_id: "dell-poweredge-r650", position_u: 8, face: "front",
+      meta: { hostname: "SRV-HYP-01", role: "server", vlan: "20", wall_outlet: "",
+              port_usage: [], serial: "", notes: "" } },
+    { id: "eq-06", type_id: "apc-smart-ups-3000-2u", position_u: 2, face: "front",
+      meta: { hostname: "", role: "ups", vlan: "", wall_outlet: "",
+              port_usage: [], serial: "", notes: "" } },
+  ];
+  p.logical = {
+    vlans: [{ vid: 10, name: "USERS", color: "#22d3ee" },
+            { vid: 99, name: "MGMT-AP", color: "#f59e0b" }],
+    links: [
+      { id: "lk-1", from: { equipment_id: "eq-01", port: "port16" },
+        to: { equipment_id: "eq-02", port: "port16" }, kind: "ha",
+        vlans: [], label: "HA", media: "" },
+      { id: "lk-2", from: { equipment_id: "eq-01", port: "port1" },
+        to: { equipment_id: "eq-03", port: "1/1/47" }, kind: "trunk",
+        vlans: [10, 99], label: "Uplink FW", media: "fibre" },
+      { id: "lk-3", from: { equipment_id: "eq-03", port: "1/1/1" },
+        to: { equipment_id: "eq-05", port: "eno1" }, kind: "access",
+        vlans: [10], label: "", media: "" },
+    ],
+    positions: {},
+  };
+  return p;
+}
+
 (async function init() {
   const res = await fetch("/api/catalog");
   catalog = await res.json();
-  project = loadLocal() || newProject();
+  /* Paramètres d'URL : ?theme=clair|sombre force le thème,
+     ?demo=1 charge le projet de démonstration. */
+  const qs = new URLSearchParams(location.search);
+  if (THEMES[qs.get("theme")]) {
+    theme = qs.get("theme");
+    C = THEMES[theme];
+    document.body.dataset.theme = theme;
+  }
+  project = qs.has("demo") ? demoProject() : (loadLocal() || newProject());
   if (!project.equipment_types) project.equipment_types = [];
   if (!project.logical) project.logical = { vlans: [], links: [], positions: {} };
   document.body.dataset.view = viewMode;
