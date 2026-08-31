@@ -71,6 +71,7 @@
             <button id="btn-export-svg">SVG <small>rééditable draw.io / Inkscape</small></button>
             <button id="btn-export-pdf">PDF <small>la vue affichée</small></button>
             <button id="btn-export-json">JSON <small>le projet, source de vérité</small></button>
+            <button id="btn-export-png">PNG <small>image à imprimer / coller en baie</small></button>
           </span>
         </span>
         <label id="btn-import-json" title="Charger un projet JSON">
@@ -207,8 +208,14 @@
     <h2>Tableau de brassage</h2>
     <p class="dialog-hint">Généré automatiquement depuis les métadonnées — aucun dessin ne remplace ce tableau.</p>
     <div id="patch-table-wrap"></div>
-    <button id="btn-export-csv" class="export">Exporter CSV</button>
-    <button id="btn-close-patch">Fermer</button>
+    <div class="patch-actions">
+      <button id="btn-export-csv" class="export">Exporter CSV</button>
+      <label class="import-btn" title="Réimporter un CSV de brassage (même format que l'export : Baie;U;Équipement;Port;Prise;VLAN;Usage;État)">
+        Importer CSV<input type="file" accept=".csv,.txt" hidden id="patch-csv-input">
+      </label>
+      <span id="patch-import-msg" class="dialog-hint"></span>
+      <button id="btn-close-patch" style="margin-left:auto">Fermer</button>
+    </div>
   </dialog>
 
   <!-- Modale de validation d'un type importé (YAML / PDF / image) :

@@ -1314,6 +1314,46 @@ $("#btn-export-pdf").addEventListener("click", () =>
 $("#btn-export-dossier").addEventListener("click", () =>
   postForBlob("/api/export/pdf" + exportQuery("dossier"),
               currentProject().id + "-dossier.pdf"));
+
+/* PNG : le SVG d'export rasterisé en local (à imprimer, scotcher sur la
+ * baie — la demande NetBox n°1182 jamais servie). Échelle 2x. */
+$("#btn-export-png").addEventListener("click", async () => {
+  const res = await fetch("/api/export/svg" + exportQuery(), {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(currentProject()),
+  });
+  if (!res.ok) {
+    renderStatus('<span class="stat-err">Export refusé — projet invalide</span>');
+    return;
+  }
+  const svgText = await res.text();
+  const size = /viewBox="0 0 (\d+(?:\.\d+)?) (\d+(?:\.\d+)?)"/.exec(svgText);
+  const w = size ? parseFloat(size[1]) : 1200;
+  const h = size ? parseFloat(size[2]) : 900;
+  const img = new Image();
+  const url = URL.createObjectURL(new Blob([svgText], { type: "image/svg+xml" }));
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = w * 2;
+    canvas.height = h * 2;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(2, 2);
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+    canvas.toBlob((blob) => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = currentProject().id + viewSuffix() + ".png";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }, "image/png");
+  };
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    renderStatus('<span class="stat-err">Rasterisation PNG impossible</span>');
+  };
+  img.src = url;
+});
 $("#btn-export-json").addEventListener("click", () => {
   const blob = new Blob([JSON.stringify(currentProject(), null, 2)],
                        { type: "application/json" });
@@ -1777,6 +1817,98 @@ $("#btn-patch-table").addEventListener("click", async () => {
   $("#patch-dialog").showModal();
 });
 $("#btn-close-patch").addEventListener("click", () => $("#patch-dialog").close());
+
+/* ---- Import CSV de brassage (le retour d'Excel, là où vivent les
+ * équipes câblage — plainte n°1 du terrain : la saisie de masse). ---- */
+
+/* Parse CSV « ; » avec guillemets doubles (le format de notre export). */
+function parseCSV(text) {
+  const rows = [];
+  for (const line of text.replace(/^﻿/, "").split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const cells = [];
+    let cur = "", inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQ) {
+        if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+        else if (ch === '"') inQ = false;
+        else cur += ch;
+      } else if (ch === '"') inQ = true;
+      else if (ch === ";") { cells.push(cur); cur = ""; }
+      else cur += ch;
+    }
+    cells.push(cur);
+    rows.push(cells);
+  }
+  return rows;
+}
+
+const ETAT_FROM_LABEL = { "up": "up", "down": "down", "réservé": "reserve",
+                          "reserve": "reserve", "": "" };
+
+function importPatchCSV(text) {
+  const rows = parseCSV(text);
+  if (!rows.length) return { ok: 0, ko: 0, motifs: ["fichier vide"] };
+  /* En-tête : on repère les colonnes par leur nom (ordre libre). */
+  const head = rows[0].map((h) => h.trim().toLowerCase());
+  const col = (names) => head.findIndex((h) => names.some((n) => h.includes(n)));
+  const ci = {
+    rack: col(["baie"]), u: col(["u"]), eq: col(["équipement", "equipement"]),
+    port: col(["port"]), outlet: col(["prise"]), vlan: col(["vlan"]),
+    usage: col(["usage"]), etat: col(["état", "etat"]),
+  };
+  if (ci.eq < 0 || ci.port < 0)
+    return { ok: 0, ko: rows.length - 1,
+             motifs: ["colonnes Équipement et Port introuvables dans l'en-tête"] };
+  let ok = 0, ko = 0;
+  const motifs = new Set();
+  for (const r of rows.slice(1)) {
+    const eqName = (r[ci.eq] || "").trim();
+    const portName = (r[ci.port] || "").trim();
+    if (!eqName || !portName || portName === "—") { ko++; continue; }
+    /* Cible : hostname exact d'abord, sinon libellé constructeur+modèle,
+       restreint à la baie si la colonne existe. */
+    let target = null;
+    for (const rack of project.racks) {
+      if (ci.rack >= 0 && (r[ci.rack] || "").trim() &&
+          rack.name !== (r[ci.rack] || "").trim()) continue;
+      for (const item of rack.items) {
+        const t = typesById[item.type_id];
+        if (item.meta.hostname === eqName ||
+            (t && `${t.vendor} ${t.model}` === eqName)) { target = item; break; }
+      }
+      if (target) break;
+    }
+    if (!target) { ko++; motifs.add(`équipement introuvable : ${eqName}`); continue; }
+    target.meta.port_usage = target.meta.port_usage || [];
+    let pu = target.meta.port_usage.find((p) => p.port === portName);
+    if (!pu) {
+      pu = { port: portName, outlet: "", vlan: "", usage: "", etat: "" };
+      target.meta.port_usage.push(pu);
+    }
+    if (ci.outlet >= 0) pu.outlet = (r[ci.outlet] || "").trim();
+    if (ci.vlan >= 0) pu.vlan = (r[ci.vlan] || "").trim();
+    if (ci.usage >= 0) pu.usage = (r[ci.usage] || "").trim();
+    if (ci.etat >= 0)
+      pu.etat = ETAT_FROM_LABEL[(r[ci.etat] || "").trim().toLowerCase()] || "";
+    ok++;
+  }
+  return { ok, ko, motifs: [...motifs].slice(0, 3) };
+}
+
+$("#patch-csv-input").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const res = importPatchCSV(await file.text());
+  $("#patch-import-msg").textContent =
+    `${res.ok} ligne(s) appliquée(s), ${res.ko} ignorée(s)` +
+    (res.motifs.length ? ` — ${res.motifs.join(" · ")}` : "");
+  renderAll();
+  $("#patch-dialog").close();     // showModal refuse un dialog déjà ouvert
+  $("#btn-patch-table").click();  // recharge le tableau affiché
+  e.target.value = "";
+});
 $("#btn-export-csv").addEventListener("click", () =>
   postForBlob("/api/patch-table.csv", currentProject().id + "-brassage.csv"));
 

@@ -590,3 +590,7 @@ body:not([data-theme="clair"]) #canvas svg image {
 }
 #ghost-rack:hover { border-color: var(--accent); color: var(--accent); background: rgba(249, 115, 22, .05); }
 #ghost-rack .ghost-plus { font-size: 30px; line-height: 1; }
+
+/* ---- Actions du tableau de brassage ---- */
+.patch-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+#patch-import-msg { max-width: 380px; }
