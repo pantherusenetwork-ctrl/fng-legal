@@ -54,13 +54,13 @@ LINK_STYLES = {
 # quel, comme une feuille posée sur le plan de travail. Écart assumé.
 LPALETTES = {
     "sombre": {"bg": "#0b0e14", "node": "#161b28", "line": "#2c3547",
-               "text": "#cbd5e1", "dim": "#64748b"},
+               "text": "#cbd5e1", "dim": "#64748b", "accent": "#f97316"},
     "clair": {"bg": "#ffffff", "node": "#f7f8f9", "line": "#d3d8de",
-              "text": "#1c2126", "dim": "#6b7480"},
+              "text": "#1c2126", "dim": "#6b7480", "accent": "#ea580c"},
     "kaki": {"bg": "#0c0e06", "node": "#171a0c", "line": "#2c3118",
-             "text": "#d4d9b8", "dim": "#7f8663"},
+             "text": "#d4d9b8", "dim": "#7f8663", "accent": "#eb9c14"},
     "nuit": {"bg": "#000000", "node": "#0d0d11", "line": "#20202a",
-             "text": "#dde3ec", "dim": "#59637a"},
+             "text": "#dde3ec", "dim": "#59637a", "accent": "#ff7a1a"},
 }
 # Palette active du rendu en cours (posée par render_logical_svg — module
 # mono-thread côté serveur, même modèle que le reste du fichier).
@@ -70,15 +70,17 @@ C_NODE = _P["node"]
 C_LINE = _P["line"]
 C_TEXT = _P["text"]
 C_TEXT_DIM = _P["dim"]
+C_ACCENT = _P["accent"]
 FONT = "Helvetica, Arial, sans-serif"
 FONT_MONO = "Courier, monospace"
 
 
 def _set_theme(theme: str) -> None:
-    global _P, C_BG, C_NODE, C_LINE, C_TEXT, C_TEXT_DIM
+    global _P, C_BG, C_NODE, C_LINE, C_TEXT, C_TEXT_DIM, C_ACCENT
     _P = LPALETTES.get(theme, LPALETTES["sombre"])
     C_BG, C_NODE, C_LINE = _P["bg"], _P["node"], _P["line"]
     C_TEXT, C_TEXT_DIM = _P["text"], _P["dim"]
+    C_ACCENT = _P["accent"]
 
 
 def _node_glyph(category: str, x: float, y: float, color: str) -> list[str]:
@@ -322,6 +324,55 @@ def _render_link(link: LogicalLink, pos: dict[str, tuple[float, float]],
     return s, lbl, None
 
 
+def _render_annotations(project: Project) -> tuple[list[str], list[str]]:
+    """Dessin libre (texte / zone / flèche) — esprit draw.io, rendu par
+    le moteur : identique à l'écran et dans tous les exports.
+    Retourne (sous les nœuds, au-dessus de tout)."""
+    import math
+    under: list[str] = []
+    over: list[str] = []
+    for a in project.logical.annotations:
+        color = a.color or (C_TEXT_DIM if a.kind == "zone" else C_ACCENT)
+        gid = f'id="annot-{escape(a.id)}"'
+        if a.kind == "zone":
+            zx, zy = min(a.x, a.x2), min(a.y, a.y2)
+            zw, zh = max(abs(a.x2 - a.x), 24), max(abs(a.y2 - a.y), 24)
+            under.append(
+                f'<g {gid}><rect x="{zx:.0f}" y="{zy:.0f}" width="{zw:.0f}" '
+                f'height="{zh:.0f}" rx="8" fill="none" stroke="{color}" '
+                f'stroke-width="1.4" stroke-dasharray="7,5"/>'
+                + (f'<text x="{zx + 10:.0f}" y="{zy + 16:.0f}" '
+                   f'font-family="{FONT}" font-size="12" font-weight="bold" '
+                   f'fill="{color}">{escape(a.text)}</text>' if a.text else "")
+                + '</g>')
+        elif a.kind == "fleche":
+            ang = math.atan2(a.y2 - a.y, a.x2 - a.x)
+            hx, hy = a.x2, a.y2
+            p1 = (hx - 11 * math.cos(ang - 0.42), hy - 11 * math.sin(ang - 0.42))
+            p2 = (hx - 11 * math.cos(ang + 0.42), hy - 11 * math.sin(ang + 0.42))
+            over.append(
+                f'<g {gid}><line x1="{a.x:.0f}" y1="{a.y:.0f}" '
+                f'x2="{hx:.0f}" y2="{hy:.0f}" stroke="{color}" '
+                f'stroke-width="2"/>'
+                f'<path d="M {hx:.0f} {hy:.0f} L {p1[0]:.0f} {p1[1]:.0f} '
+                f'L {p2[0]:.0f} {p2[1]:.0f} Z" fill="{color}"/>'
+                + (f'<text x="{(a.x + hx) / 2:.0f}" '
+                   f'y="{(a.y + hy) / 2 - 8:.0f}" text-anchor="middle" '
+                   f'font-family="{FONT}" font-size="12" fill="{color}">'
+                   f'{escape(a.text)}</text>' if a.text else "")
+                + '</g>')
+        else:  # texte
+            tw = max(len(a.text) * 7.2, 20)
+            over.append(
+                f'<g {gid}><rect x="{a.x - 6:.0f}" y="{a.y - 15:.0f}" '
+                f'width="{tw + 12:.0f}" height="22" rx="4" fill="{C_BG}" '
+                f'fill-opacity="0.85"/>'
+                f'<text x="{a.x:.0f}" y="{a.y:.0f}" font-family="{FONT}" '
+                f'font-size="13" font-weight="bold" fill="{a.color or C_TEXT}">'
+                f'{escape(a.text)}</text></g>')
+    return under, over
+
+
 def render_logical_svg(project: Project, theme: str = "sombre") -> str:
     """Schéma logique complet du projet -> SVG."""
     _set_theme(theme)
@@ -332,6 +383,10 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
 
     max_x = max((x for x, _ in pos.values()), default=0) + NODE_W + MARGIN
     max_y = max((y for _, y in pos.values()), default=0) + NODE_H + MARGIN
+    # Le canvas englobe aussi le dessin libre.
+    for a in project.logical.annotations:
+        max_x = max(max_x, a.x + 40, a.x2 + 40)
+        max_y = max(max_y, a.y + 40, a.y2 + 40)
     # Un faisceau de liens parallèles (>= 3) envoie sa liste numérotée
     # SOUS la légende (nomenclature en pied de plan — pas de colonne
     # blanche réservée à droite).
@@ -352,6 +407,10 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
         f'<text x="{MARGIN}" y="28" font-size="18" font-weight="bold" '
         f'fill="{C_TEXT}">{escape(project.name)} — schéma logique</text>',
     ]
+
+    # Dessin libre : les zones utilisateur passent sous tout le reste.
+    annot_under, annot_over = _render_annotations(project)
+    s.extend(annot_under)
 
     # Zones de couche (conteneurs Lucid : bordure + titre, pas de fond) —
     # dessinées en premier, derrière tout.
@@ -458,6 +517,7 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
     # Libellés de zones puis étiquettes de liens par-dessus tout.
     s.extend(zone_lbls)
     s.extend(labels)
+    s.extend(annot_over)
 
     # Légende : VLANs puis types de liens, puis nomenclature des
     # faisceaux numérotés (pied de plan).

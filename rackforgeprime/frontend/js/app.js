@@ -1521,8 +1521,113 @@ async function renderLogical() {
   saveLocal();
 }
 
+/* ---- Dessin libre (Texte / Zone / Flèche) — esprit draw.io ---------- */
+let annotTool = null; // null | "texte" | "zone" | "fleche"
+
+function setAnnotTool(tool) {
+  annotTool = annotTool === tool ? null : tool;
+  document.querySelectorAll("[data-annot]").forEach((b) =>
+    b.classList.toggle("active", b.dataset.annot === annotTool));
+  const hints = {
+    texte: "Cliquez l'endroit du schéma où poser le texte",
+    zone: "Cliquez-glissez pour encadrer la zone",
+    fleche: "Cliquez-glissez du départ vers l'arrivée",
+  };
+  renderStatus(annotTool ? hints[annotTool] + " — Échap pour annuler" : "");
+}
+document.querySelectorAll("[data-annot]").forEach((b) =>
+  b.addEventListener("click", () => setAnnotTool(b.dataset.annot)));
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && annotTool) setAnnotTool(annotTool);
+});
+
+function svgPoint(svg, e) {
+  const pt = svg.createSVGPoint();
+  pt.x = e.clientX; pt.y = e.clientY;
+  const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+  return { x: Math.max(0, p.x), y: Math.max(0, p.y) };
+}
+
+function addAnnotation(a) {
+  project.logical.annotations = project.logical.annotations || [];
+  project.logical.annotations.push({
+    id: "an-" + Date.now().toString(36), x2: 0, y2: 0, text: "", color: "", ...a,
+  });
+  renderLogical();
+}
+
+function wireAnnotTools(svg) {
+  svg.addEventListener("pointerdown", (e) => {
+    if (!annotTool) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const start = svgPoint(svg, e);
+    if (annotTool === "texte") {
+      const text = prompt("Texte à poser :");
+      setAnnotTool(annotTool);
+      if (text) addAnnotation({ kind: "texte", x: start.x, y: start.y, text });
+      return;
+    }
+    /* zone / flèche : glisser avec aperçu en direct. */
+    const kind = annotTool;
+    const ns = "http://www.w3.org/2000/svg";
+    const ghost = document.createElementNS(ns, kind === "zone" ? "rect" : "line");
+    ghost.setAttribute("stroke", "#f97316");
+    ghost.setAttribute("stroke-width", "1.6");
+    ghost.setAttribute("stroke-dasharray", "6,4");
+    ghost.setAttribute("fill", "none");
+    svg.appendChild(ghost);
+    let cur = start;
+    const move = (ev) => {
+      cur = svgPoint(svg, ev);
+      if (kind === "zone") {
+        ghost.setAttribute("x", Math.min(start.x, cur.x));
+        ghost.setAttribute("y", Math.min(start.y, cur.y));
+        ghost.setAttribute("width", Math.abs(cur.x - start.x));
+        ghost.setAttribute("height", Math.abs(cur.y - start.y));
+      } else {
+        ghost.setAttribute("x1", start.x); ghost.setAttribute("y1", start.y);
+        ghost.setAttribute("x2", cur.x); ghost.setAttribute("y2", cur.y);
+      }
+    };
+    const up = () => {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+      ghost.remove();
+      setAnnotTool(kind);
+      if (Math.abs(cur.x - start.x) + Math.abs(cur.y - start.y) < 8) return;
+      const text = kind === "zone"
+        ? (prompt("Titre de la zone (optionnel) :") || "")
+        : (prompt("Étiquette de la flèche (optionnel) :") || "");
+      addAnnotation({ kind, x: start.x, y: start.y, x2: cur.x, y2: cur.y, text });
+    };
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+  }, true);
+}
+
 function wireLogical(svg) {
   if (!svg) return;
+  wireAnnotTools(svg);
+  /* Clic droit / édition du dessin libre. */
+  svg.querySelectorAll('g[id^="annot-"]').forEach((g) => {
+    const anId = g.id.slice("annot-".length);
+    g.addEventListener("contextmenu", (e) => {
+      const a = (project.logical.annotations || []).find((x) => x.id === anId);
+      if (!a) return;
+      _logicalMenu(e, a.text || { texte: "Texte", zone: "Zone", fleche: "Flèche" }[a.kind], [
+        ["Modifier le texte", () => {
+          const t = prompt("Texte :", a.text);
+          if (t !== null) { a.text = t; renderLogical(); }
+        }],
+        ["Supprimer", () => {
+          project.logical.annotations =
+            project.logical.annotations.filter((x) => x.id !== anId);
+          renderLogical();
+        }, "danger"],
+      ]);
+    });
+  });
   /* Drag des nœuds : delta appliqué en transform pendant le geste,
      position persistée dans project.logical.positions au relâcher. */
   svg.querySelectorAll('g[id^="lnode-"]').forEach((g) => {
@@ -1531,6 +1636,7 @@ function wireLogical(svg) {
     const ox = parseFloat(rect.getAttribute("x"));
     const oy = parseFloat(rect.getAttribute("y"));
     g.addEventListener("pointerdown", (e) => {
+      if (annotTool) return;
       e.preventDefault();
       const sx = e.clientX, sy = e.clientY;
       let dx = 0, dy = 0;
@@ -1552,14 +1658,91 @@ function wireLogical(svg) {
       document.addEventListener("pointerup", up);
     });
   });
-  /* Clic sur un lien : édition / suppression. */
+  /* Clic sur un lien : édition / suppression. Clic droit : menu. */
   svg.querySelectorAll('g[id^="link-"]').forEach((g) => {
-    const linkId = g.id.slice("link-".length);
+    const linkId = g.id.replace(/^link-(label-)?/, "");
     g.addEventListener("click", () => {
       const link = project.logical.links.find((l) => l.id === linkId);
       if (link) openLinkDialog(link);
     });
+    g.addEventListener("contextmenu", (e) => openLogicalLinkMenu(e, linkId));
   });
+  /* Clic droit sur un nœud : menu contextuel (comme la vue physique). */
+  svg.querySelectorAll('g[id^="lnode-"]').forEach((g) => {
+    const eqId = g.id.slice("lnode-".length);
+    g.addEventListener("contextmenu", (e) => openLogicalNodeMenu(e, eqId));
+  });
+  /* Double-clic sur un nœud : fiche de l'équipement. */
+  svg.querySelectorAll('g[id^="lnode-"]').forEach((g) => {
+    g.addEventListener("dblclick", () =>
+      openDeviceSheet(g.id.slice("lnode-".length)));
+  });
+}
+
+/* Menus contextuels de la vue logique — même moule que la vue physique
+   (id #item-menu réutilisé : fermeture et style déjà branchés). */
+function _logicalMenu(e, title, actions) {
+  e.preventDefault();
+  e.stopPropagation();
+  closeItemMenu();
+  const menu = document.createElement("div");
+  menu.id = "item-menu";
+  menu.style.position = "fixed";
+  menu.style.zIndex = "70";
+  menu.innerHTML = `<div class="menu-title">${esc(title)}</div>`;
+  for (const [label, fn, cls] of actions) {
+    const row = document.createElement("div");
+    row.className = "menu-item" + (cls ? " menu-" + cls : "");
+    row.textContent = label;
+    row.addEventListener("click", () => { closeItemMenu(); fn(); });
+    menu.appendChild(row);
+  }
+  document.body.appendChild(menu);
+  const pad = 6;
+  const r = menu.getBoundingClientRect();
+  menu.style.left = Math.max(pad, Math.min(e.clientX,
+    window.innerWidth - r.width - pad)) + "px";
+  menu.style.top = Math.max(pad, Math.min(e.clientY,
+    window.innerHeight - r.height - pad)) + "px";
+}
+
+function openLogicalNodeMenu(e, eqId) {
+  let found = null;
+  for (const rack of project.racks) {
+    const item = rack.items.find((i) => i.id === eqId);
+    if (item) { found = { rack, item }; break; }
+  }
+  if (!found) return;
+  const t = typesById[found.item.type_id];
+  const name = found.item.meta.hostname || `${t.vendor} ${t.model}`;
+  const nLinks = project.logical.links.filter((l) =>
+    l.from.equipment_id === eqId || l.to.equipment_id === eqId).length;
+  _logicalMenu(e, name, [
+    ["Fiche de l'équipement", () => openDeviceSheet(eqId)],
+    ["Voir dans la baie", () => { setView("physical"); selectItem(eqId); }],
+    ["Nouveau lien depuis ce nœud", () => openLinkDialog(null, { from: eqId })],
+    ["Réinitialiser la position", () => {
+      if (project.logical.positions) delete project.logical.positions[eqId];
+      renderLogical();
+    }],
+    [`Supprimer ses liens (${nLinks})`, () => {
+      project.logical.links = project.logical.links.filter((l) =>
+        l.from.equipment_id !== eqId && l.to.equipment_id !== eqId);
+      renderLogical();
+    }, "danger"],
+  ]);
+}
+
+function openLogicalLinkMenu(e, linkId) {
+  const link = project.logical.links.find((l) => l.id === linkId);
+  if (!link) return;
+  _logicalMenu(e, link.label || link.kind, [
+    ["Modifier le lien", () => openLinkDialog(link)],
+    ["Supprimer le lien", () => {
+      project.logical.links = project.logical.links.filter((l) => l !== link);
+      renderLogical();
+    }, "danger"],
+  ]);
 }
 
 /* ---- Modale lien ---- */

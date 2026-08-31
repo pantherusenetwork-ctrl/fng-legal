@@ -138,12 +138,28 @@ class Position(BaseModel):
     y: float = Field(allow_inf_nan=False)
 
 
+class Annotation(BaseModel):
+    """Dessin libre sur le schéma logique (esprit draw.io / Visio) :
+    texte posé, zone encadrée, flèche. Rendu par le backend — présent
+    dans TOUS les exports (SVG, PDF, PNG), pas un artefact d'écran."""
+    id: str
+    kind: Literal["texte", "zone", "fleche"]
+    x: float = Field(allow_inf_nan=False)
+    y: float = Field(allow_inf_nan=False)
+    # zone : coin opposé ; flèche : pointe d'arrivée.
+    x2: float = Field(default=0.0, allow_inf_nan=False)
+    y2: float = Field(default=0.0, allow_inf_nan=False)
+    text: str = ""
+    color: str = ""   # vide = couleur du thème au rendu
+
+
 class Logical(BaseModel):
     vlans: list[Vlan] = []
     links: list[LogicalLink] = []
     # Positions des nœuds posées à la main ; un équipement absent d'ici est
     # placé par l'auto-layout en couches (firewall en haut, serveurs en bas).
     positions: dict[str, Position] = {}
+    annotations: list[Annotation] = []
 
 
 class Project(BaseModel):
