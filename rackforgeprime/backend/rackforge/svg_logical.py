@@ -121,12 +121,16 @@ def _collect_nodes(project: Project, types: dict[str, EquipmentType]) -> list[di
             t = types.get(item.type_id)
             if t is None or t.category in ("blank", "cable-mgmt"):
                 continue  # les obturateurs n'existent pas logiquement
+            # Sous-titre sur DEUX lignes : localisation, puis adressage —
+            # une IP + VLAN sur la même ligne déborde de la carte.
+            sub2 = " · ".join(x for x in (
+                item.meta.mgmt_ip or "",
+                f"VLAN {item.meta.vlan}" if item.meta.vlan else "") if x)
             nodes.append({
                 "id": item.id,
                 "label": item.meta.hostname or f"{t.vendor} {t.model}",
-                "sub": f"{rack.name} · U{item.position_u}"
-                       + (f" · {item.meta.mgmt_ip}" if item.meta.mgmt_ip else "")
-                       + (f" · VLAN {item.meta.vlan}" if item.meta.vlan else ""),
+                "sub": f"{rack.name} · U{item.position_u}",
+                "sub2": sub2,
                 "category": t.category,
                 "color": t.color,
             })
@@ -152,6 +156,9 @@ def layout_nodes(project: Project, types: dict[str, EquipmentType]
     # Un WAN documenté (usage contenant « WAN ») réserve de la place en
     # tête pour le nuage Internet.
     top_extra = 62 if _wan_item(project) else 0
+    # Rangées compactées : une couche absente (pas de firewall…) ne
+    # laisse jamais de bande vide de 120 px dans le dessin.
+    row_of = {rank: i for i, rank in enumerate(sorted(layers))}
     for rank in sorted(layers):
         row = layers[rank]
         stagger = (rank % 2) * (NODE_W / 2 + 30)
@@ -163,7 +170,7 @@ def layout_nodes(project: Project, types: dict[str, EquipmentType]
             else:
                 pos[n["id"]] = (
                     x0 + i * (NODE_W + NODE_GAP),
-                    MARGIN + 26 + top_extra + rank * LAYER_GAP,
+                    MARGIN + 26 + top_extra + row_of[rank] * LAYER_GAP,
                 )
     return pos
 
@@ -201,7 +208,9 @@ def tw_side(link: LogicalLink) -> float:
     """Largeur estimée de l'étiquette complète d'un lien (px)."""
     label = link.label or link.kind
     ports = " · ".join(p for p in (link.from_.port, link.to.port) if p)
-    return max(len(label + (f"  ({ports})" if ports else "")) * 5.6, 30)
+    # 6.7 px par caractère : largeur réelle du mono 11 px (5.6 tronquait
+    # la fin des étiquettes sous les pastilles VLAN).
+    return max(len(label + (f"  ({ports})" if ports else "")) * 6.7, 30)
 
 
 def _render_link(link: LogicalLink, pos: dict[str, tuple[float, float]],
@@ -265,31 +274,38 @@ def _render_link(link: LogicalLink, pos: dict[str, tuple[float, float]],
                  color)
         return s, lbl, stack
     text = label + (f"  ({ports})" if ports else "")
-    tw = max(len(text) * 5.6, 30)
+    tw = max(len(text) * 6.7, 30)
+    # Pastilles VLAN EN LIGNE, à droite du texte : l'étiquette tient sur
+    # une seule rangée de 16 px et se glisse dans le couloir entre deux
+    # zones sans mordre leurs bordures ni leurs libellés.
+    ndots = len(link.vlans[:8])
+    dots_w = ndots * 12 + 6 if ndots else 0
+    full_w = tw + dots_w
+    if not same_layer:
+        my += 2  # centre le halo dans le couloir inter-zones
     # Anti-chevauchement : si une étiquette déjà posée est trop proche,
     # celle-ci descend d'un cran (jusqu'à trouver une place).
     if placed is not None:
         for _ in range(6):
-            if not any(abs(mx - px) < (tw + pw) / 2 + 8 and abs(my - py) < 16
+            if not any(abs(mx - px) < (full_w + pw) / 2 + 8 and abs(my - py) < 16
                        for px, py, pw in placed):
                 break
             my += 19
-        placed.append((mx, my, tw))
-    # Halo plein fond, sans contour et assez haut pour couvrir les
-    # pastilles VLAN : l'étiquette détoure proprement les bordures de
-    # zone qu'elle croise (pratique des plans d'ingénierie).
-    halo_h = 30 if link.vlans else 16
-    lbl.append(f'<rect x="{mx - tw / 2 - 6:.0f}" y="{my - 18:.0f}" '
-               f'width="{tw + 12:.0f}" height="{halo_h}" rx="4" '
+        placed.append((mx, my, full_w))
+    # Halo plein fond, sans contour : l'étiquette détoure proprement les
+    # bordures de zone qu'elle croise (pratique des plans d'ingénierie).
+    lbl.append(f'<rect x="{mx - full_w / 2 - 6:.0f}" y="{my - 18:.0f}" '
+               f'width="{full_w + 12:.0f}" height="16" rx="4" '
                f'fill="{C_BG}"/>')
     # Étiquette colorée comme le lien (convention Lucid : la couleur porte
     # la sémantique du flux, le texte la reprend).
-    lbl.append(f'<text x="{mx:.0f}" y="{my - 7:.0f}" text-anchor="middle" '
+    tx = mx - dots_w / 2
+    lbl.append(f'<text x="{tx:.0f}" y="{my - 7:.0f}" text-anchor="middle" '
                f'font-family="{FONT_MONO}" font-size="11" fill="{color}">'
                f'{escape(text)}</text>')
     for j, vid in enumerate(link.vlans[:8]):
-        lbl.append(f'<circle cx="{mx - len(link.vlans[:8]) * 6 + 6 + j * 12:.0f}" '
-                   f'cy="{my + 8:.0f}" r="4" '
+        lbl.append(f'<circle cx="{tx + tw / 2 + 10 + j * 12:.0f}" '
+                   f'cy="{my - 11:.0f}" r="4" '
                    f'fill="{vlan_colors.get(vid, "#64748b")}"/>')
     lbl.append('</g>')
     return s, lbl, None
@@ -311,7 +327,10 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
     for link in project.logical.links:
         pair = frozenset((link.from_.equipment_id, link.to.equipment_id))
         counts[pair] = counts.get(pair, 0) + 1
-    stack_w = 320 if any(v >= 3 for v in counts.values()) else 0
+    # Colonne dimensionnée sur le texte réel (jamais 320 px de vide).
+    stack_w = (min(320, 60 + max((tw_side(lk) for lk in project.logical.links),
+                                 default=0))
+               if any(v >= 3 for v in counts.values()) else 0)
     total_w = max(max_x + stack_w, 640)
     total_h = max_y + LEGEND_H + 12
 
@@ -349,8 +368,8 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
         ztxt = ZONE_LABELS.get(rank, "AUTRES")
         zlw = len(ztxt) * 8.2 + 12
         zone_lbls.append(f'<g id="zone-label-{rank}">'
-                         f'<rect x="{zx + 6:.0f}" y="{zy + 3:.0f}" '
-                         f'width="{zlw:.0f}" height="15" rx="3" '
+                         f'<rect x="{zx + 6:.0f}" y="{zy - 2:.0f}" '
+                         f'width="{zlw:.0f}" height="21" rx="3" '
                          f'fill="{C_BG}"/>'
                          f'<text x="{zx + 12:.0f}" y="{zy + 14:.0f}" '
                          f'font-family="{FONT}" font-size="11" '
@@ -424,11 +443,16 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
         s.extend(_node_glyph(n["category"], x + 8, y, n["color"]))
         # Libellé jamais tronqué en plein mot : ellipse au-delà de 26 car.
         lbl = n["label"] if len(n["label"]) <= 26 else n["label"][:25] + "…"
-        s.append(f'<text x="{x + 38:.0f}" y="{y + 24:.0f}" font-size="14" '
+        s.append(f'<text x="{x + 38:.0f}" y="{y + 22:.0f}" font-size="14" '
                  f'fill="{C_TEXT}">{escape(lbl)}</text>')
-        s.append(f'<text x="{x + 38:.0f}" y="{y + 40:.0f}" font-size="11" '
-                 f'font-family="{FONT_MONO}" fill="{C_TEXT_DIM}">'
-                 f'{escape(n["sub"])}</text>')
+        # Deux lignes de détail bornées à la carte (26 car. mono max).
+        for k, line in enumerate((n["sub"], n["sub2"])):
+            if not line:
+                continue
+            line = line if len(line) <= 26 else line[:25] + "…"
+            s.append(f'<text x="{x + 38:.0f}" y="{y + 37 + k * 14:.0f}" '
+                     f'font-size="11" font-family="{FONT_MONO}" '
+                     f'fill="{C_TEXT_DIM}">{escape(line)}</text>')
         s.append('</g>')
 
     # Libellés de zones puis étiquettes de liens par-dessus tout.
@@ -445,7 +469,7 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
         s.append(f'<text x="{lx + 14}" y="{ly + 24}" font-size="12" '
                  f'font-family="{FONT_MONO}" fill="{C_TEXT}">'
                  f'{v.vid} {escape(v.name)}</text>')
-        lx += 24 + len(f"{v.vid} {v.name}") * 6
+        lx += 26 + len(f"{v.vid} {v.name}") * 7.2
     lx = MARGIN
     for kind, (w, color, dash) in LINK_STYLES.items():
         dash_attr = f' stroke-dasharray="{dash}"' if dash else ""
