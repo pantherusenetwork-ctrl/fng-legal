@@ -211,6 +211,83 @@ def _bom_rows(project: Project) -> list[list[str]]:
     return rows
 
 
+# --- Planche d'étiquettes (TIA-606 : identifiants générés de la donnée) -----
+
+# Abréviations d'interfaces (convention IOS) : l'identifiant reste court
+# ET discriminant — Gi0-0-0 et Gi0-0-1 ne se confondent jamais.
+_PORT_ABBREV = [("TenGigabitEthernet", "Te"), ("GigabitEthernet", "Gi"),
+                ("FastEthernet", "Fa"), ("Ethernet", "Eth"), ("Port ", "P")]
+
+
+def _label_id(rack_name: str, u: int, port: str) -> str:
+    """Identifiant d'étiquette : BAIE-Uxx-PORT, généré — jamais retapé."""
+    rack = "".join(ch if ch.isalnum() else "-" for ch in rack_name.upper())
+    while "--" in rack:
+        rack = rack.replace("--", "-")
+    for long, court in _PORT_ABBREV:
+        if port.startswith(long):
+            port = court + port[len(long):]
+            break
+    port_c = "".join(ch if ch.isalnum() else "-" for ch in port)
+    return f"{rack.strip('-')}-U{u}-{port_c}"
+
+
+def render_labels_pdf(project: Project) -> bytes:
+    """Planche d'étiquettes A4 portrait à découper, une par ligne de
+    brassage renseignée. Toujours en clair : c'est fait pour l'imprimante.
+    """
+    from reportlab.lib.pagesizes import A4 as _A4
+    pal = _pdf_palette("clair")
+    page_w, page_h = _A4
+    rows = [r for r in patch_table(project, type_index(project))
+            if r["port"] and r["port"] != "—"]
+
+    # Grille : 3 colonnes × 12 lignes d'étiquettes ~64×22 mm.
+    cols_n, rows_n = 3, 12
+    margin = 24
+    lw = (page_w - 2 * margin) / cols_n
+    lh = (page_h - 2 * margin - 30) / rows_n
+    per_page = cols_n * rows_n
+
+    buf = io.BytesIO()
+    c = pdf_canvas.Canvas(buf, pagesize=_A4)
+    c.setTitle(f"{project.name} — étiquettes")
+    for page_start in range(0, max(len(rows), 1), per_page):
+        c.setFillColorRGB(*pal["text"])
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin, page_h - margin, f"{project.name} — étiquettes de brassage")
+        c.setFillColorRGB(*pal["dim"])
+        c.setFont("Helvetica", 7.5)
+        c.drawString(margin, page_h - margin - 11,
+                     "Schéma d'identification : BAIE-Uxx-PORT — généré depuis "
+                     "le projet (TIA-606 : ne jamais retaper un identifiant).")
+        for idx, r in enumerate(rows[page_start:page_start + per_page]):
+            cx = margin + (idx % cols_n) * lw
+            cy = page_h - margin - 30 - ((idx // cols_n) + 1) * lh
+            # Cadre de découpe en pointillés.
+            c.setStrokeColorRGB(*pal["frame"])
+            c.setDash(2, 2)
+            c.rect(cx + 2, cy + 2, lw - 4, lh - 4)
+            c.setDash()
+            c.setFillColorRGB(*pal["text"])
+            c.setFont("Courier-Bold", 10)
+            c.drawString(cx + 8, cy + lh - 16,
+                         _label_id(r["rack"], r["u"], r["port"])[:30])
+            c.setFillColorRGB(*pal["accent"])
+            c.setFont("Helvetica-Bold", 8)
+            c.drawString(cx + 8, cy + lh - 28, str(r["equipment"])[:34])
+            c.setFillColorRGB(*pal["dim"])
+            c.setFont("Helvetica", 7.5)
+            details = " · ".join(x for x in (
+                f"prise {r['outlet']}" if r["outlet"] else "",
+                f"VLAN {r['vlan']}" if r["vlan"] else "",
+                str(r["usage"] or "")) if x)
+            c.drawString(cx + 8, cy + lh - 39, details[:44])
+        c.showPage()
+    c.save()
+    return buf.getvalue()
+
+
 def render_project_dossier_pdf(project: Project, theme: str = "sombre",
                                rendu: str = "photos") -> bytes:
     """Dossier complet : élévation, vue logique, brassage, nomenclature.

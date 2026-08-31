@@ -1395,6 +1395,10 @@ $("#btn-export-dossier").addEventListener("click", () =>
   postForBlob("/api/export/pdf" + exportQuery("dossier"),
               currentProject().id + "-dossier.pdf"));
 
+$("#btn-export-labels").addEventListener("click", () =>
+  postForBlob("/api/export/etiquettes",
+              currentProject().id + "-etiquettes.pdf"));
+
 /* PNG : le SVG d'export rasterisé en local (à imprimer, scotcher sur la
  * baie — la demande NetBox n°1182 jamais servie). Échelle 2x. */
 $("#btn-export-png").addEventListener("click", async () => {
@@ -1994,8 +1998,9 @@ $("#btn-export-csv").addEventListener("click", () =>
 
 /* ---- Sauvegarde de secours (localStorage) ---- */
 function saveLocal() {
-  /* Le mode démo (?demo=1) n'écrase jamais le projet sauvegardé. */
-  if (!new URLSearchParams(location.search).has("demo")) {
+  /* Les modes ?demo=1 et ?projet=... n'écrasent jamais le projet local. */
+  const qs = new URLSearchParams(location.search);
+  if (!qs.has("demo") && !qs.get("projet")) {
     try { localStorage.setItem("rackforgeprime.project", JSON.stringify(project)); }
     catch { /* stockage plein ou bloqué : non bloquant */ }
   }
@@ -2116,7 +2121,16 @@ function demoProject() {
     C = THEMES[theme];
     document.body.dataset.theme = theme;
   }
-  project = qs.has("demo") ? demoProject() : (loadLocal() || newProject());
+  /* ?projet=<nom> charge un projet sauvegardé (captures, liens directs). */
+  if (qs.get("projet")) {
+    try {
+      const res = await fetch("/api/projects/" +
+                              encodeURIComponent(qs.get("projet")));
+      project = res.ok ? await res.json() : null;
+    } catch { project = null; }
+  }
+  if (!project)
+    project = qs.has("demo") ? demoProject() : (loadLocal() || newProject());
   if (!project.equipment_types) project.equipment_types = [];
   if (!project.logical) project.logical = { vlans: [], links: [], positions: {} };
   document.body.dataset.view = viewMode;

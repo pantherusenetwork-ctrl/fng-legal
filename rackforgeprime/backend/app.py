@@ -23,7 +23,9 @@ from rackforge.catalog_packs import merged_catalog
 from rackforge.importers import import_netbox_yaml, parse_datasheet_pdf
 from rackforge.models import (Project, patch_table, patch_table_csv,
                               rack_stats, type_index)
-from rackforge.pdf_export import render_project_dossier_pdf, render_project_pdf
+from rackforge.pdf_export import (render_labels_pdf,
+                                  render_project_dossier_pdf,
+                                  render_project_pdf)
 from rackforge.svg_export import render_project_svg
 from rackforge.svg_logical import render_logical_svg
 
@@ -145,6 +147,18 @@ def export_pdf(payload: dict, view: str = "physical",
         content=pdf, media_type="application/pdf",
         headers={"Content-Disposition":
                  f'attachment; filename="{project.id}{suffix}.pdf"'},
+    )
+
+
+@app.post("/api/export/etiquettes")
+def export_labels(payload: dict) -> Response:
+    """Planche d'étiquettes de brassage (PDF A4, identifiants TIA-606)."""
+    project = _parse_project(payload)
+    pdf = render_labels_pdf(project)
+    return Response(
+        content=pdf, media_type="application/pdf",
+        headers={"Content-Disposition":
+                 f'attachment; filename="{project.id}-etiquettes.pdf"'},
     )
 
 
