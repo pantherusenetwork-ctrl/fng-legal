@@ -46,6 +46,24 @@ PALETTES: dict[str, dict[str, str]] = {
         "decor_stroke": "#c9ced4", "ring": "#b8bec7", "lcd": "#fdf3ec",
         "band": "#1c2126",
     },
+    "pastel": {
+        "bg": "#f8f4ee", "frame": "#fdfaf6", "rail": "#ece3d8",
+        "hole": "#d6cabc", "slot": "#f4ede4", "slot_line": "#e7ddd1",
+        "text": "#3d3833", "dim": "#8a8177", "face": "#fffdf9",
+        "accent": "#f0823c", "face_stroke": "#e0d5c8", "pill": "#cfc4b5",
+        "port_fill": "#fffdf9", "decor_fill": "#f2eadf",
+        "decor_stroke": "#d8ccbd", "ring": "#c4b8a8", "lcd": "#fcefe2",
+        "band": "#3d3833",
+    },
+    "nuit": {
+        "bg": "#04060a", "frame": "#0a0d13", "rail": "#141925",
+        "hole": "#060810", "slot": "#070a10", "slot_line": "#10141d",
+        "text": "#dde3ec", "dim": "#59637a", "face": "#0d1118",
+        "accent": "#ff7a1a", "face_stroke": "#1a2231", "pill": "#243048",
+        "port_fill": "#03050a", "decor_fill": "#0a0e15",
+        "decor_stroke": "#1a2231", "ring": "#2b3650", "lcd": "#071c26",
+        "band": "#04060b",
+    },
 }
 
 

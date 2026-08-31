@@ -33,8 +33,29 @@ const THEMES = {
     decorFill: "#eef0f3", decorStroke: "#c9ced4", ring: "#b8bec7",
     lcd: "#fdf3ec", band: "#1c2126",
   },
+  pastel: {
+    frame: "#fdfaf6", rail: "#ece3d8", hole: "#d6cabc", slot: "#f4ede4",
+    slotLine: "#e7ddd1", text: "#3d3833", dim: "#8a8177", face: "#fffdf9",
+    accent: "#f0823c", danger: "#d95c5c",
+    faceStroke: "#e0d5c8", pill: "#cfc4b5", portFill: "#fffdf9",
+    decorFill: "#f2eadf", decorStroke: "#d8ccbd", ring: "#c4b8a8",
+    lcd: "#fcefe2", band: "#3d3833",
+  },
+  nuit: {
+    frame: "#0a0d13", rail: "#141925", hole: "#060810", slot: "#070a10",
+    slotLine: "#10141d", text: "#dde3ec", dim: "#59637a", face: "#0d1118",
+    accent: "#ff7a1a", danger: "#ff6b6b",
+    faceStroke: "#1a2231", pill: "#243048", portFill: "#03050a",
+    decorFill: "#0a0e15", decorStroke: "#1a2231", ring: "#2b3650",
+    lcd: "#071c26", band: "#04060b",
+  },
 };
-let theme = localStorage.getItem("rfp-theme") === "clair" ? "clair" : "sombre";
+/* Ordre du cycle du bouton thème. */
+const THEME_ORDER = ["sombre", "clair", "pastel", "nuit"];
+const THEME_LABELS = { sombre: "Sombre", clair: "Clair",
+                       pastel: "Pastel", nuit: "Nuit" };
+let theme = THEMES[localStorage.getItem("rfp-theme")]
+  ? localStorage.getItem("rfp-theme") : "sombre";
 let C = THEMES[theme];
 /* Le script est chargé en fin de <body> : on peut poser le thème tout de
    suite, avant le premier rendu (pas de flash). */
@@ -1851,8 +1872,11 @@ document.addEventListener("pointerdown", (e) => {
 $("#btn-search").addEventListener("click", openSearch);
 
 $("#btn-theme").addEventListener("click", () => {
-  theme = theme === "clair" ? "sombre" : "clair";
+  const i = THEME_ORDER.indexOf(theme);
+  theme = THEME_ORDER[(i + 1) % THEME_ORDER.length];
   localStorage.setItem("rfp-theme", theme);
+  $("#btn-theme").title = `Design : ${THEME_LABELS[theme]} — cliquez pour changer`;
+  renderStatus(`Design : ${THEME_LABELS[theme]}`);
   applyTheme();
 });
 

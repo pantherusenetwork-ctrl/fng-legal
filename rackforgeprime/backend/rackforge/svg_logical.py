@@ -54,6 +54,10 @@ LPALETTES = {
                "text": "#cbd5e1", "dim": "#64748b"},
     "clair": {"bg": "#ffffff", "node": "#f7f8f9", "line": "#d3d8de",
               "text": "#1c2126", "dim": "#6b7480"},
+    "pastel": {"bg": "#f8f4ee", "node": "#fffdf9", "line": "#e0d5c8",
+               "text": "#3d3833", "dim": "#8a8177"},
+    "nuit": {"bg": "#04060a", "node": "#0d1118", "line": "#1a2231",
+             "text": "#dde3ec", "dim": "#59637a"},
 }
 # Palette active du rendu en cours (posée par render_logical_svg — module
 # mono-thread côté serveur, même modèle que le reste du fichier).
