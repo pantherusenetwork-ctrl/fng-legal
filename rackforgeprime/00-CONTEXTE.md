@@ -48,7 +48,7 @@ clic droit partout), et combler la mécanique d'éditeur généraliste.
 fonctions comparées)** — acquis : le métier réseau bat déjà les deux
 (brassage généré, trace de câble, validation 422, livrables DAT/TIA-606,
 146 types/135 photos). Manques par priorité :
-1. **Zoom / pan du canvas** (importance haute, effort moyen) — le n°1
+1. ~~Zoom / pan du canvas~~ ✅ FAIT le 31/08 au soir (Ctrl+molette, boutons, pan)
 2. **Multi-sélection + déplacement groupé** (haute, moyen)
 3. **Copier/coller clavier** Ctrl+C/V, Suppr, flèches (moyenne, petit)
 4. **Connecteurs éditables** (waypoints/ancrages) (haute, gros)
