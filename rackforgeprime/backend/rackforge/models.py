@@ -162,6 +162,12 @@ class Logical(BaseModel):
     annotations: list[Annotation] = []
 
 
+class Diagram(BaseModel):
+    """Page de diagramme libre (esprit Visio/draw.io) : uniquement du
+    dessin — texte, zones, flèches, lignes, ellipses."""
+    annotations: list[Annotation] = []
+
+
 class Revision(BaseModel):
     """Ligne du suivi des révisions du DAT (pratique doc d'ingénierie :
     indice A, B, C… + date + objet de la modification)."""
@@ -179,9 +185,10 @@ class Project(BaseModel):
     # Types custom locaux au projet (imports d'images, datasheets…).
     equipment_types: list[EquipmentType] = []
     logical: Logical = Logical()
-    # Suivi documentaire : indice courant + historique (cartouche + page
-    # « Suivi des révisions » du dossier).
-    revision: str = "A"
+    diagram: Diagram = Diagram()
+    # Version du projet (V1, V2…) + historique (cartouche + page
+    # « Suivi des versions » du dossier).
+    revision: str = "1"
     revisions: list[Revision] = []
 
     @field_validator("schema_version")

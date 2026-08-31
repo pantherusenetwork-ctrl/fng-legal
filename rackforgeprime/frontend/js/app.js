@@ -1004,26 +1004,28 @@ function openRackMenu(e, rack) {
     closeRackMenu();
     renderAll();
   });
-  menu.querySelector(".rk-empty").addEventListener("click", () => {
+  menu.querySelector(".rk-empty").addEventListener("click", async () => {
     if (!rack.items.length) { msg.textContent = "La baie est déjà vide."; return; }
-    if (!confirm(`Vider « ${rack.name} » ? Ses ${rack.items.length} équipements, `
-      + "leurs liens et leur brassage seront retirés du projet.")) return;
+    closeRackMenu();
+    if (!await askConfirm(`Vider « ${rack.name} » ?`,
+      `Ses ${rack.items.length} équipements, leurs liens et leur brassage `
+      + "seront retirés du projet (Ctrl+Z pour annuler).")) return;
     _purgeRackRefs(rack);
     rack.items = [];
-    closeRackMenu();
     renderAll();
   });
-  menu.querySelector(".rk-delete").addEventListener("click", () => {
+  menu.querySelector(".rk-delete").addEventListener("click", async () => {
     if (project.racks.length <= 1) {
       msg.textContent = "Le projet garde au moins une baie (videz-la plutôt).";
       return;
     }
     const n = rack.items.length;
-    if (n && !confirm(`Supprimer « ${rack.name} » et ses ${n} équipements ? `
-      + "Leurs liens et leur brassage partent avec (Ctrl+Z pour annuler).")) return;
+    closeRackMenu();
+    if (n && !await askConfirm(`Supprimer « ${rack.name} » ?`,
+      `Ses ${n} équipements, leurs liens et leur brassage partent avec `
+      + "(Ctrl+Z pour annuler).")) return;
     _purgeRackRefs(rack);
     project.racks = project.racks.filter((r2) => r2 !== rack);
-    closeRackMenu();
     renderAll();
   });
   menu.querySelector('input[name="name"]').focus();
@@ -1198,12 +1200,13 @@ document.addEventListener("keydown", (e) => {
 
 function updateRevisionBadge() {
   const b = $("#btn-revision");
-  if (b) b.textContent = "Ind. " + (project.revision || "A");
+  if (b) b.textContent = "V" + projectVersion();
 }
 
 function renderAll() {
   updateRevisionBadge();
   if (viewMode === "logical") { renderLogical(); return; }
+  if (viewMode === "diagram") { renderDiagram(); return; }
   const canvas = $("#canvas");
   canvas.innerHTML = "";
   for (const rack of project.racks) canvas.appendChild(renderRackSVG(rack));
@@ -1528,10 +1531,13 @@ async function postForBlob(url, filename) {
 
 /* Les exports suivent la vue active ET le thème affiché : ce que tu
  * vois est ce que tu livres. */
-function viewSuffix() { return viewMode === "logical" ? "-logique" : ""; }
+function viewSuffix() {
+  return { logical: "-logique", diagram: "-diagramme" }[viewMode] || "";
+}
 function exportQuery(view) {
   const q = new URLSearchParams();
-  q.set("view", view || (viewMode === "logical" ? "logical" : "physical"));
+  q.set("view", view ||
+    ({ logical: "logical", diagram: "diagram" }[viewMode] || "physical"));
   q.set("theme", theme);
   q.set("rendu", renderMode);
   return "?" + q.toString();
@@ -1644,32 +1650,57 @@ async function renderLogical() {
   saveLocal();
 }
 
-/* ---- Suivi des révisions du DAT (indice A -> B -> C…) --------------- */
-function nextIndice(cur) {
-  /* A..Z puis AA, AB… (convention bureaux d'études). */
-  let s = (cur || "A").toUpperCase(), i = s.length - 1;
-  const arr = s.split("");
-  while (i >= 0) {
-    if (arr[i] !== "Z") { arr[i] = String.fromCharCode(arr[i].charCodeAt(0) + 1); break; }
-    arr[i] = "A"; i -= 1;
-  }
-  return (i < 0 ? "A" : "") + arr.join("");
+/* ---- Boîte de saisie interne (remplace prompt/confirm natifs, absents
+   de certains environnements : webview, navigateurs pilotés) ---------- */
+function _ask(title, sub, initial, withInput) {
+  return new Promise((resolve) => {
+    const d = $("#ask-dialog"), form = $("#ask-form"), inp = $("#ask-input");
+    $("#ask-title").textContent = title;
+    $("#ask-sub").textContent = sub || "";
+    $("#ask-sub").hidden = !sub;
+    inp.hidden = !withInput;
+    inp.value = initial || "";
+    const done = (v) => {
+      form.removeEventListener("submit", onOk);
+      $("#ask-cancel").removeEventListener("click", onCancel);
+      d.removeEventListener("cancel", onCancel);
+      d.close();
+      resolve(v);
+    };
+    const onOk = (e) => { e.preventDefault(); done(withInput ? inp.value : true); };
+    const onCancel = (e) => { if (e) e.preventDefault(); done(null); };
+    form.addEventListener("submit", onOk);
+    $("#ask-cancel").addEventListener("click", onCancel);
+    d.addEventListener("cancel", onCancel);
+    d.showModal();
+    if (withInput) { inp.focus(); inp.select(); }
+  });
 }
-$("#btn-revision").addEventListener("click", () => {
-  const objet = prompt(
-    `Indice courant : ${project.revision || "A"}\n` +
-    "Objet de la NOUVELLE révision (ce qui a changé) :");
+const askText = (title, sub, initial) => _ask(title, sub, initial, true);
+const askConfirm = (title, sub) => _ask(title, sub, "", false);
+
+/* ---- Version du PROJET (V1 -> V2 -> V3…) — on sait où on en est ----- */
+function projectVersion() {
+  /* Migration : un ancien indice lettre (A, B…) redevient un numéro. */
+  const r = String(project.revision || "1");
+  if (/^\d+$/.test(r)) return parseInt(r, 10);
+  return r.toUpperCase().charCodeAt(0) - 64; // A=1, B=2…
+}
+$("#btn-revision").addEventListener("click", async () => {
+  const cur = projectVersion();
+  const objet = await askText(`Passer le projet en V${cur + 1}`,
+    `Le projet est en V${cur}. Qu'est-ce qui change dans cette nouvelle version ?`);
   if (!objet) return;
   project.revisions = project.revisions || [];
   if (!project.revisions.length)
-    project.revisions.push({ indice: project.revision || "A",
+    project.revisions.push({ indice: "V" + cur,
       date: new Date().toLocaleDateString("fr-FR"), objet: "Version initiale" });
-  project.revision = nextIndice(project.revision || "A");
-  project.revisions.push({ indice: project.revision,
+  project.revision = String(cur + 1);
+  project.revisions.push({ indice: "V" + (cur + 1),
     date: new Date().toLocaleDateString("fr-FR"), objet });
   updateRevisionBadge();
   saveLocal();
-  renderStatus(`Révision ${project.revision} figée — visible dans le dossier DAT`);
+  renderStatus(`Projet passé en V${cur + 1} — historique dans le dossier DAT`);
 });
 
 /* ---- Fond du plan : 5 options, mémorisé, cyclé depuis le bandeau ---- */
@@ -1771,12 +1802,28 @@ function svgPoint(svg, e) {
   };
 }
 
-function addAnnotation(a) {
+/* Le dessin libre vit dans la vue logique OU dans l'onglet Diagramme :
+   même moteur, deux collections. */
+function annotList() {
+  if (viewMode === "diagram") {
+    project.diagram = project.diagram || { annotations: [] };
+    project.diagram.annotations = project.diagram.annotations || [];
+    return project.diagram.annotations;
+  }
   project.logical.annotations = project.logical.annotations || [];
-  project.logical.annotations.push({
+  return project.logical.annotations;
+}
+
+function renderAnnotView() {
+  if (viewMode === "diagram") renderDiagram();
+  else renderLogical();
+}
+
+function addAnnotation(a) {
+  annotList().push({
     id: "an-" + Date.now().toString(36), x2: 0, y2: 0, text: "", color: "", ...a,
   });
-  renderLogical();
+  renderAnnotView();
 }
 
 function wireAnnotTools(svg) {
@@ -1786,9 +1833,10 @@ function wireAnnotTools(svg) {
     e.stopPropagation();
     const start = svgPoint(svg, e);
     if (annotTool === "texte") {
-      const text = prompt("Texte à poser :");
       setAnnotTool(annotTool);
-      if (text) addAnnotation({ kind: "texte", x: start.x, y: start.y, text });
+      askText("Texte à poser").then((text) => {
+        if (text) addAnnotation({ kind: "texte", x: start.x, y: start.y, text });
+      });
       return;
     }
     /* zone / ellipse / flèche / ligne : glisser avec aperçu en direct. */
@@ -1826,39 +1874,70 @@ function wireAnnotTools(svg) {
       ghost.remove();
       setAnnotTool(kind);
       if (Math.abs(cur.x - start.x) + Math.abs(cur.y - start.y) < 8) return;
-      const text = (kind === "zone" || kind === "ellipse")
-        ? (prompt("Titre (optionnel) :") || "")
-        : (prompt("Étiquette (optionnel) :") || "");
-      addAnnotation({ kind, x: start.x, y: start.y, x2: cur.x, y2: cur.y, text });
+      const q = (kind === "zone" || kind === "ellipse")
+        ? "Titre (optionnel)" : "Étiquette (optionnel)";
+      askText(q).then((text) => {
+        if (text === null) return;  // Annuler = pas de forme
+        addAnnotation({ kind, x: start.x, y: start.y,
+                        x2: cur.x, y2: cur.y, text: text || "" });
+      });
     };
     document.addEventListener("pointermove", move);
     document.addEventListener("pointerup", up);
   }, true);
 }
 
-function wireLogical(svg) {
-  if (!svg) return;
-  wireAnnotTools(svg);
-  /* Clic droit / édition du dessin libre. */
+function wireAnnotationMenus(svg) {
+  /* Clic droit / édition du dessin libre (vue logique ET diagramme). */
   svg.querySelectorAll('g[id^="annot-"]').forEach((g) => {
     const anId = g.id.slice("annot-".length);
     g.addEventListener("contextmenu", (e) => {
-      const a = (project.logical.annotations || []).find((x) => x.id === anId);
+      const list = annotList();
+      const a = list.find((x) => x.id === anId);
       if (!a) return;
       _logicalMenu(e, a.text || { texte: "Texte", zone: "Zone", fleche: "Flèche",
                                   ligne: "Ligne", ellipse: "Ellipse" }[a.kind], [
-        ["Modifier le texte", () => {
-          const t = prompt("Texte :", a.text);
-          if (t !== null) { a.text = t; renderLogical(); }
+        ["Modifier le texte", async () => {
+          const t = await askText("Texte", "", a.text);
+          if (t !== null) { a.text = t; renderAnnotView(); }
         }],
         ["Supprimer", () => {
-          project.logical.annotations =
-            project.logical.annotations.filter((x) => x.id !== anId);
-          renderLogical();
+          const kept = list.filter((x) => x.id !== anId);
+          if (viewMode === "diagram") project.diagram.annotations = kept;
+          else project.logical.annotations = kept;
+          renderAnnotView();
         }, "danger"],
       ]);
     });
   });
+}
+
+/* Onglet Diagramme — page de dessin libre (esprit Visio/draw.io). */
+async function renderDiagram() {
+  const res = await fetch("/api/export/svg?view=diagram&theme=" + theme, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(currentProject()),
+  });
+  const canvas = $("#canvas");
+  if (!res.ok) {
+    canvas.innerHTML = "";
+    renderStatus('<span class="stat-err">Projet invalide — diagramme indisponible</span>');
+    return;
+  }
+  canvas.innerHTML = await res.text();
+  const svg = canvas.querySelector("svg");
+  if (svg) {
+    wireAnnotTools(svg);
+    wireAnnotationMenus(svg);
+  }
+  renderStatus();
+  saveLocal();
+}
+
+function wireLogical(svg) {
+  if (!svg) return;
+  wireAnnotTools(svg);
+  wireAnnotationMenus(svg);
   /* Drag des nœuds : delta appliqué en transform pendant le geste,
      position persistée dans project.logical.positions au relâcher. */
   svg.querySelectorAll('g[id^="lnode-"]').forEach((g) => {
@@ -2145,11 +2224,13 @@ function setView(mode) {
   document.body.dataset.view = mode;
   $("#btn-view-physical").classList.toggle("active", mode === "physical");
   $("#btn-view-logical").classList.toggle("active", mode === "logical");
+  $("#btn-view-diagram").classList.toggle("active", mode === "diagram");
   closeInspector();
   renderAll();
 }
 $("#btn-view-physical").addEventListener("click", () => setView("physical"));
 $("#btn-view-logical").addEventListener("click", () => setView("logical"));
+$("#btn-view-diagram").addEventListener("click", () => setView("diagram"));
 
 /* =====================================================================
  * Imports de modèles — YAML NetBox, PDF datasheet, image/SVG custom.
@@ -2582,14 +2663,15 @@ function demoProject() {
     project = qs.has("demo") ? demoProject() : (loadLocal() || newProject());
   if (!project.equipment_types) project.equipment_types = [];
   if (!project.logical) project.logical = { vlans: [], links: [], positions: {} };
+  if (!project.diagram) project.diagram = { annotations: [] };
   document.body.dataset.view = viewMode;
   refreshTypes();
   renderPalette("");
   $("#palette-filter").addEventListener("input",
     (e) => renderPalette(e.target.value));
   $("#project-name").value = project.name;
-  /* ?view=logical ouvre directement la vue logique (lien partageable). */
-  if (qs.get("view") === "logical") setView("logical");
+  /* ?view=logical|diagram ouvre directement la vue voulue. */
+  if (["logical", "diagram"].includes(qs.get("view"))) setView(qs.get("view"));
   else renderAll();
   renderStatus("Prêt");
 })();

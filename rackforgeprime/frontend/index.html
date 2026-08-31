@@ -8,20 +8,35 @@
   <link rel="stylesheet" href="/static/css/app.css">
 </head>
 <body>
+  <!-- Boîte de saisie interne — prompt()/confirm() natifs interdits :
+       absents de certains environnements (webview, navigateurs pilotés). -->
+  <dialog id="ask-dialog">
+    <form id="ask-form">
+      <h2 id="ask-title"></h2>
+      <p id="ask-sub" class="dialog-hint"></p>
+      <input id="ask-input" autocomplete="off">
+      <div class="ask-actions">
+        <button type="submit" class="primary" id="ask-ok">OK</button>
+        <button type="button" id="ask-cancel">Annuler</button>
+      </div>
+    </form>
+  </dialog>
+
   <!-- Barre supérieure : identité + actions globales -->
   <header id="topbar">
     <div id="brand">
       <img class="brand-logo" src="/static/assets/icon.svg" alt="">
       RackForge<span class="brand-accent">Prime</span>
-      <span id="brand-version" title="Version de l'application">v1.0.0</span>
+      <span id="brand-version" title="Version de l'application">v1.1.0</span>
     </div>
     <input id="project-name" type="text" value="Nouveau projet" title="Nom du projet"
            aria-label="Nom du projet">
     <button id="btn-revision"
-            title="Indice de révision du dossier — cliquez pour figer une nouvelle révision (A → B → C…), l'historique part dans le DAT">Ind. A</button>
-    <nav id="view-toggle" title="Vue physique (baies) ou logique (VLANs, liens)">
+            title="Version du projet — cliquez pour passer à la version suivante (V1 → V2…), l'historique part dans le dossier DAT">V1</button>
+    <nav id="view-toggle" title="Vue physique (baies), logique (VLANs, liens) ou diagramme libre">
       <button id="btn-view-physical" class="active">Physique</button>
       <button id="btn-view-logical">Logique</button>
+      <button id="btn-view-diagram">Diagramme</button>
     </nav>
     <div id="topbar-actions">
       <span class="tb-group" aria-label="Édition">

@@ -324,14 +324,14 @@ def _render_link(link: LogicalLink, pos: dict[str, tuple[float, float]],
     return s, lbl, None
 
 
-def _render_annotations(project: Project) -> tuple[list[str], list[str]]:
+def _render_annotations(annotations) -> tuple[list[str], list[str]]:
     """Dessin libre (texte / zone / flèche) — esprit draw.io, rendu par
     le moteur : identique à l'écran et dans tous les exports.
     Retourne (sous les nœuds, au-dessus de tout)."""
     import math
     under: list[str] = []
     over: list[str] = []
-    for a in project.logical.annotations:
+    for a in annotations:
         color = a.color or (C_TEXT_DIM if a.kind == "zone" else C_ACCENT)
         gid = f'id="annot-{escape(a.id)}"'
         if a.kind == "zone":
@@ -391,6 +391,34 @@ def _render_annotations(project: Project) -> tuple[list[str], list[str]]:
     return under, over
 
 
+def render_diagram_svg(project: Project, theme: str = "sombre") -> str:
+    """Page de diagramme libre (esprit Visio) : uniquement le dessin de
+    l'utilisateur — même moteur, mêmes exports que le reste."""
+    _set_theme(theme)
+    annots = project.diagram.annotations
+    max_x = max([a.x + 60 for a in annots] + [a.x2 + 60 for a in annots] + [900])
+    max_y = max([a.y + 60 for a in annots] + [a.y2 + 60 for a in annots] + [560])
+    s: list[str] = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{max_x:.0f}" '
+        f'height="{max_y:.0f}" viewBox="0 0 {max_x:.0f} {max_y:.0f}" '
+        f'font-family="{FONT}">',
+        f'<rect x="0" y="0" width="{max_x:.0f}" height="{max_y:.0f}" '
+        f'fill="{C_BG}"/>',
+        f'<text x="{MARGIN}" y="28" font-size="18" font-weight="bold" '
+        f'fill="{C_TEXT}">{escape(project.name)} — diagramme</text>',
+    ]
+    if not annots:
+        s.append(f'<text x="{max_x / 2:.0f}" y="{max_y / 2:.0f}" '
+                 f'text-anchor="middle" font-family="{FONT}" font-size="14" '
+                 f'fill="{C_TEXT_DIM}">Page blanche — dessinez avec Texte, '
+                 f'Zone, Flèche, Ligne ou Ellipse</text>')
+    under, over = _render_annotations(annots)
+    s.extend(under)
+    s.extend(over)
+    s.append('</svg>')
+    return "\n".join(s)
+
+
 def render_logical_svg(project: Project, theme: str = "sombre") -> str:
     """Schéma logique complet du projet -> SVG."""
     _set_theme(theme)
@@ -427,7 +455,7 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
     ]
 
     # Dessin libre : les zones utilisateur passent sous tout le reste.
-    annot_under, annot_over = _render_annotations(project)
+    annot_under, annot_over = _render_annotations(project.logical.annotations)
     s.extend(annot_under)
 
     # Zones de couche (conteneurs Lucid : bordure + titre, pas de fond) —

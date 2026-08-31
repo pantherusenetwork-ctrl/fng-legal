@@ -29,7 +29,7 @@ from rackforge.pdf_export import (render_labels_pdf,
                                   render_project_dossier_pdf,
                                   render_project_pdf)
 from rackforge.svg_export import render_project_svg
-from rackforge.svg_logical import render_logical_svg
+from rackforge.svg_logical import render_diagram_svg, render_logical_svg
 
 # Packagé (PyInstaller) : le frontend est embarqué sous sys._MEIPASS.
 if getattr(sys, "frozen", False):
@@ -39,7 +39,7 @@ else:
 
 # Version de l'application — à mettre à jour en même temps que le badge
 # affiché dans l'UI (frontend/index.html, #brand-version).
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 app = FastAPI(title="RackForgePrime", version=VERSION, docs_url="/api/docs")
 
@@ -134,14 +134,20 @@ async def import_datasheet(file: UploadFile = File(...)) -> dict:
 # --- Exports (le JSON reste la source de vérité) ----------------------------
 
 @app.post("/api/export/svg")
-def export_svg(payload: dict, view: Literal["physical", "logical"] = "physical",
+def export_svg(payload: dict,
+               view: Literal["physical", "logical", "diagram"] = "physical",
                theme: Theme = "sombre", rendu: Rendu = "photos") -> Response:
-    """``view=physical`` : élévation ; ``view=logical`` : VLANs/liens.
+    """``view=physical`` : élévation ; ``logical`` : VLANs/liens ;
+    ``diagram`` : page de dessin libre.
     ``theme`` : sombre/clair/kaki/nuit. ``rendu`` : photos ou dessin."""
     project = _parse_project(payload)
-    svg = (render_logical_svg(project, theme=theme) if view == "logical"
-           else render_project_svg(project, theme=theme, rendu=rendu))
-    suffix = "-logique" if view == "logical" else ""
+    if view == "logical":
+        svg = render_logical_svg(project, theme=theme)
+    elif view == "diagram":
+        svg = render_diagram_svg(project, theme=theme)
+    else:
+        svg = render_project_svg(project, theme=theme, rendu=rendu)
+    suffix = {"logical": "-logique", "diagram": "-diagramme"}.get(view, "")
     return Response(
         content=svg, media_type="image/svg+xml",
         headers={"Content-Disposition":
@@ -151,10 +157,11 @@ def export_svg(payload: dict, view: Literal["physical", "logical"] = "physical",
 
 @app.post("/api/export/pdf")
 def export_pdf(payload: dict,
-               view: Literal["physical", "logical", "dossier"] = "physical",
+               view: Literal["physical", "logical", "diagram",
+                             "dossier"] = "physical",
                theme: Theme = "sombre", rendu: Rendu = "photos") -> Response:
-    """``view`` : physical, logical, ou ``dossier`` (livrable DAT complet :
-    élévation + logique + brassage + nomenclature, cadre et cartouche).
+    """``view`` : physical, logical, diagram, ou ``dossier`` (livrable DAT
+    complet : élévation + logique + brassage + nomenclature, cartouche).
     ``theme`` : sombre/clair/kaki/nuit. ``rendu`` : photos ou dessin."""
     project = _parse_project(payload)
     if view == "dossier":
@@ -162,7 +169,7 @@ def export_pdf(payload: dict,
         suffix = "-dossier"
     else:
         pdf = render_project_pdf(project, view=view, theme=theme, rendu=rendu)
-        suffix = "-logique" if view == "logical" else ""
+        suffix = {"logical": "-logique", "diagram": "-diagramme"}.get(view, "")
     return Response(
         content=pdf, media_type="application/pdf",
         headers={"Content-Disposition":

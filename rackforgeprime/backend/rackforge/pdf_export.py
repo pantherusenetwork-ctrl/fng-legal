@@ -17,7 +17,7 @@ from svglib.svglib import svg2rlg
 
 from .models import Project, patch_table, type_index
 from .svg_export import render_project_svg
-from .svg_logical import render_logical_svg
+from .svg_logical import render_diagram_svg, render_logical_svg
 
 # Palettes du dossier par thème (sombre = écran, clair = impression DAT).
 _PDF_PALETTES = {
@@ -70,8 +70,12 @@ def render_project_pdf(project: Project, view: str = "physical",
     ``view`` : « physical » (élévation de baies) ou « logical » (VLANs/liens).
     ``theme`` : « sombre » (écran) ou « clair » (impression).
     """
-    svg = (render_logical_svg(project, theme=theme) if view == "logical"
-           else render_project_svg(project, theme=theme, rendu=rendu))
+    if view == "logical":
+        svg = render_logical_svg(project, theme=theme)
+    elif view == "diagram":
+        svg = render_diagram_svg(project, theme=theme)
+    else:
+        svg = render_project_svg(project, theme=theme, rendu=rendu)
     drawing = svg2rlg(io.StringIO(svg))
     if drawing is None:  # SVG illisible : bug de génération, pas de l'utilisateur
         raise RuntimeError("Conversion SVG -> PDF impossible (SVG invalide)")
@@ -104,6 +108,14 @@ def render_project_pdf(project: Project, view: str = "physical",
 # « document d'ingénierie », c'est le cadre, le cartouche auto-rempli depuis
 # les métadonnées, et la pagination élévation + logique + tableaux dans un
 # seul PDF. Aucun champ n'est saisi deux fois : tout vient du JSON du projet.
+
+def _fmt_version(revision: str) -> str:
+    """« 2 » -> V2 ; migration : un ancien indice lettre A/B -> V1/V2."""
+    r = str(revision or "1")
+    if r.isdigit():
+        return "V" + r
+    return "V" + str(ord(r.upper()[0]) - 64)
+
 
 def _page_frame(c, page_w: float, page_h: float, project: Project,
                 section: str, page_no: int, total: int,
@@ -138,7 +150,7 @@ def _page_frame(c, page_w: float, page_h: float, project: Project,
     labels = [("Projet", project.name, True), ("Section", section, False),
               ("Généré le", date.today().strftime("%d/%m/%Y"), False),
               ("Source", f"{project.id}.json", False),
-              ("Ind.", project.revision or "A", True),
+              ("Ver.", _fmt_version(project.revision), True),
               ("Page", f"{page_no} / {total}", False)]
     for (label, value, accent), x, x_next in zip(labels, cols, cols[1:]):
         cell(x, x_next, label, value, accent)
@@ -357,12 +369,13 @@ def render_project_dossier_pdf(project: Project, theme: str = "sombre",
     # Page « Suivi des révisions » en tête (convention DAT : on sait
     # toujours quel indice on lit et ce qui a changé).
     if has_revs:
-        _page_frame(c, page_w, page_h, project, "Suivi des révisions",
+        _page_frame(c, page_w, page_h, project, "Suivi des versions",
                     page_no, total, pal)
         _draw_table_page(
             c, page_w, page_h,
-            f"Suivi des révisions — indice courant : {project.revision}",
-            ["Indice", "Date", "Objet de la révision"],
+            f"Suivi des versions du projet — version courante : "
+            f"{_fmt_version(project.revision)}",
+            ["Version", "Date", "Ce qui a changé"],
             [8, 12, 80],
             [[rv.indice, rv.date, rv.objet] for rv in project.revisions],
             pal)
