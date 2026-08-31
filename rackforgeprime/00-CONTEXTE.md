@@ -17,6 +17,11 @@ métier réseau 9,0 · esthétique 9,0 (13 notations, de 5,8 à 9,0).
 Exports : SVG, PDF (dossier avec cartouche + page logique portrait),
 PNG, CSV, étiquettes TIA-606, draw.io.
 
+**Campagne de test 6 agents (31/08 soir) : 194 tests.** Aucun 500 sur
+l'API, exports tous valides, UI sans erreur JS, exe Bureau opérationnel.
+Tout ce qui a été trouvé (1 majeur NaN, 1 majeur palette, 4 mineurs) a
+été corrigé le soir même ; exe redeployé à 18h06.
+
 ## 🌉 Pont d'Hemingway — prochaine étape exacte
 
 **Vue plan d'étage** : le 31/08 Panther a montré 2 captures d'un outil
