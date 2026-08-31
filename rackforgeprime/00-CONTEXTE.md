@@ -58,12 +58,27 @@ fonctions comparées)** — acquis : le métier réseau bat déjà les deux
 
 ## 🌉 Pont d'Hemingway — prochaine étape exacte
 
-**Vue plan d'étage** : le 31/08 Panther a montré 2 captures d'un outil
-type Patchdocs (plan d'étage avec équipements posés dans les pièces,
-liaisons dessinées, couverture des AP en pointillés orange, panneau
-Floor Settings avec opacité/contraste du plan). C'est le prochain gros
-chantier qu'il veut. À concevoir : import d'une image de plan (PNG/JPG),
-pose d'équipements dessus, liaisons vers la baie.
+**Vue plan d'étage + navigation hiérarchique** : le 31/08 Panther a
+montré 2 captures d'un outil type Patchdocs (équipements posés sur le
+plan, liaisons, couverture AP, réglages opacité/contraste du plan) puis
+précisé le parcours voulu : **on clique la VILLE → le BÂTIMENT → la
+SALLE (ex. « OLYMPE ») → les baies avec leur nom**. C'est le prochain
+gros chantier. À concevoir : hiérarchie site/bâtiment/salle dans le
+projet, import d'une image de plan (PNG/JPG), pose d'équipements dessus.
+
+**Projet « salle-olympe »** (dans les 2 workspaces) : reproduction des
+5 baies photographiées par Panther le 31/08 — A6KVC (coffret mural 12U),
+ATLAS (brassage + 2 FortiGate HA), PROMETHEE (opérateurs : SEWAN, CCR,
+2 Livebox BTIP, tiroirs optiques), CHRONOS (voix AudioCodes, UCOPIA,
+5 ProLiant), TITAN (2 Proxmox, Synology, OXO, FTTO). 18 types custom
+embarqués dans le projet pour les modèles hors catalogue ; tout ce qui
+est illisible sur les photos porte [à vérifier]. Sert de projet de
+démonstration réaliste ET de base au chantier plan d'étage (la salle
+s'appelle OLYMPE).
+
+**U libres** : idée de Panther à implémenter — motif discret dans les
+U vides (suivant le fond choisi : ruche/points/grille), version très
+atténuée, débrayable, sobre dans les exports.
 
 Autres attentes notées :
 - Faces avant photoréalistes style Lucidchart (il a montré la baie Dell
