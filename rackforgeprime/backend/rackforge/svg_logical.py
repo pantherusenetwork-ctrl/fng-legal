@@ -20,12 +20,18 @@ from xml.sax.saxutils import escape
 from .models import EquipmentType, LogicalLink, Project, type_index
 
 # --- Géométrie --------------------------------------------------------------
-NODE_W = 170
+NODE_W = 190
 NODE_H = 56
-LAYER_GAP = 110      # espace vertical entre couches
+LAYER_GAP = 120      # espace vertical entre couches (zones comprises)
 NODE_GAP = 40        # espace horizontal entre nœuds d'une couche
 MARGIN = 40
 LEGEND_H = 70
+
+# Zones par couche — la lecture DAT (conteneurs Lucid : bordure + titre).
+ZONE_LABELS = {
+    0: "SÉCURITÉ — PARE-FEU", 1: "ROUTAGE", 2: "CŒUR / DISTRIBUTION",
+    3: "BRASSAGE", 4: "SERVEURS", 5: "ÉNERGIE & AUTRES",
+}
 
 # Ordre des couches (rang d'auto-layout) — lecture DAT du haut vers le bas.
 LAYER_RANK = {
@@ -135,14 +141,18 @@ def layout_nodes(project: Project, types: dict[str, EquipmentType]
     manual = project.logical.positions
     for rank in sorted(layers):
         row = layers[rank]
+        # Décalage horizontal alterné par couche : les colonnes des couches
+        # successives ne s'alignent plus, un lien qui traverse une couche
+        # ne passe plus AU TRAVERS de ses nœuds.
+        stagger = (rank % 2) * (NODE_W / 2 + 30)
         for i, n in enumerate(row):
             if n["id"] in manual:
                 p = manual[n["id"]]
                 pos[n["id"]] = (p.x, p.y)
             else:
                 pos[n["id"]] = (
-                    MARGIN + i * (NODE_W + NODE_GAP),
-                    MARGIN + 30 + rank * LAYER_GAP,
+                    MARGIN + 26 + stagger + i * (NODE_W + NODE_GAP),
+                    MARGIN + 40 + rank * LAYER_GAP,
                 )
     return pos
 
@@ -196,6 +206,10 @@ def _render_link(link: LogicalLink, pos: dict[str, tuple[float, float]],
     if same_layer:
         # L'entre-deux est trop étroit : étiquette au-dessus des nœuds.
         my = min(a[1], b[1]) - 2
+    elif abs(y2 - y1) > LAYER_GAP * 1.2:
+        # Lien qui traverse plusieurs couches : étiquette près du départ,
+        # sur le segment vertical — jamais sur une couche intermédiaire.
+        mx, my = x1, min(y1, y2) + 42
     label = link.label or link.kind
     ports = " · ".join(p for p in (link.from_.port, link.to.port) if p)
     text = label + (f"  ({ports})" if ports else "")
@@ -239,6 +253,30 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
         f'fill="{C_TEXT}">{escape(project.name)} — schéma logique</text>',
     ]
 
+    # Zones de couche (conteneurs Lucid : bordure + titre, pas de fond) —
+    # dessinées en premier, derrière tout.
+    ranks: dict[int, list[str]] = {}
+    cat_by_id = {n["id"]: n["category"] for n in nodes}
+    for nid, (x, y) in pos.items():
+        rank = LAYER_RANK.get(cat_by_id.get(nid, "other"), 5)
+        ranks.setdefault(rank, []).append(nid)
+    for rank, ids in sorted(ranks.items()):
+        xs = [pos[i][0] for i in ids]
+        ys = [pos[i][1] for i in ids]
+        zx, zy = min(xs) - 16, min(ys) - 24
+        zw = max(xs) + NODE_W + 16 - zx
+        zh = max(ys) + NODE_H + 12 - zy
+        s.append(f'<g id="zone-{rank}">')
+        s.append(f'<rect x="{zx:.0f}" y="{zy:.0f}" width="{zw:.0f}" '
+                 f'height="{zh:.0f}" rx="10" fill="none" '
+                 f'stroke="{C_LINE}" stroke-width="1" '
+                 f'stroke-dasharray="5,4"/>')
+        s.append(f'<text x="{zx + 12:.0f}" y="{zy + 14:.0f}" '
+                 f'font-family="{FONT}" font-size="9" letter-spacing="1.5" '
+                 f'fill="{C_TEXT_DIM}">'
+                 f'{escape(ZONE_LABELS.get(rank, "AUTRES"))}</text>')
+        s.append('</g>')
+
     # Traits des liens d'abord (sous les nœuds) ; étiquettes gardées pour
     # la fin (au-dessus de tout).
     labels: list[str] = []
@@ -257,8 +295,10 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
         s.append(f'<rect x="{x:.0f}" y="{y:.0f}" width="4" height="{NODE_H}" '
                  f'rx="2" fill="{n["color"]}"/>')
         s.extend(_node_glyph(n["category"], x + 8, y, n["color"]))
+        # Libellé jamais tronqué en plein mot : ellipse au-delà de 26 car.
+        lbl = n["label"] if len(n["label"]) <= 26 else n["label"][:25] + "…"
         s.append(f'<text x="{x + 38:.0f}" y="{y + 24:.0f}" font-size="12" '
-                 f'fill="{C_TEXT}">{escape(n["label"][:22])}</text>')
+                 f'fill="{C_TEXT}">{escape(lbl)}</text>')
         s.append(f'<text x="{x + 38:.0f}" y="{y + 40:.0f}" font-size="9" '
                  f'font-family="{FONT_MONO}" fill="{C_TEXT_DIM}">'
                  f'{escape(n["sub"])}</text>')
