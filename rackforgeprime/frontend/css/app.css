@@ -276,3 +276,52 @@ g.rack-item.conn-lit { opacity: 1; }
 #item-menu .menu-item:hover { background: rgba(34, 211, 238, .10); }
 #item-menu .menu-danger { color: #f87171; }
 #item-menu .menu-danger:hover { background: rgba(248, 113, 113, .10); }
+
+/* =====================================================================
+   Theme clair « blanc / gris / orange » — le meilleur de A (chaleur),
+   B (traits fins) et C (densite technique), avec transparence (verre).
+   Bascule via l icone theme du topbar (body[data-theme=clair]).
+   ===================================================================== */
+body[data-theme="clair"] {
+  --bg: #eef0f3;
+  --panel: rgba(255, 255, 255, .78);
+  --panel-2: #f3f4f6;
+  --frame: #ffffff;
+  --line: #d9dde3;
+  --text: #1c2126;
+  --text-dim: #6b7480;
+  --accent: #ea580c;
+  --danger: #dc2626;
+}
+body[data-theme="clair"] #view-toggle button.active { color: #ffffff; }
+body[data-theme="clair"] .palette-item { background: #ffffff; box-shadow: 0 1px 2px rgba(28,33,38,.06); }
+body[data-theme="clair"] #canvas-wrap {
+  background-image: radial-gradient(#dfe3e8 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* Transparence / effet verre — les surfaces qui flottent au-dessus du
+   contenu (popovers, menus, bulles) sont translucides et floutees,
+   dans les deux themes. */
+#hover-tip, #slot-popover, #item-menu {
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+}
+body[data-theme="clair"] #hover-tip,
+body[data-theme="clair"] #slot-popover,
+body[data-theme="clair"] #item-menu {
+  background: rgba(255, 255, 255, .72);
+  border-color: rgba(28, 33, 38, .12);
+  box-shadow: 0 12px 32px rgba(28, 33, 38, .18);
+}
+body:not([data-theme="clair"]) #hover-tip,
+body:not([data-theme="clair"]) #slot-popover,
+body:not([data-theme="clair"]) #item-menu {
+  background: rgba(19, 24, 38, .72);
+}
+#topbar, #statusbar { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+#palette, #inspector { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+
+/* Bouton theme : icone seule */
+#btn-theme { display: flex; align-items: center; padding: 6px 9px; }
+#btn-theme svg { display: block; }

@@ -13,12 +13,32 @@
 const U_PX = 22, RACK_W = 440, RAIL_W = 26, FRAME_PAD = 14,
       HEADER_H = 40, FOOTER_H = 30;
 
-/* ---- Palette de la DA (miroir de svg_export.py) ---- */
-const C = {
-  frame: "#1b2230", rail: "#2a3446", hole: "#0e1420", slot: "#0e131d",
-  slotLine: "#1a2130", text: "#cbd5e1", dim: "#64748b", face: "#1a1f2b",
-  accent: "#22d3ee", danger: "#f87171",
+/* ---- Palettes de dessin SVG par thème ----
+ * « sombre » est le miroir de svg_export.py ; « clair » est la DA
+ * blanc/gris/orange (meilleur de PATCHBOX/Lucid/Visio). */
+const THEMES = {
+  sombre: {
+    frame: "#1b2230", rail: "#2a3446", hole: "#0e1420", slot: "#0e131d",
+    slotLine: "#1a2130", text: "#cbd5e1", dim: "#64748b", face: "#1a1f2b",
+    accent: "#22d3ee", danger: "#f87171",
+    faceStroke: "#2c3547", pill: "#33405a", portFill: "#0a0e16",
+    decorFill: "#10151f", decorStroke: "#2c3547", ring: "#3a465c",
+    lcd: "#0a2027",
+  },
+  clair: {
+    frame: "#ffffff", rail: "#e2e6ea", hole: "#c6ccd4", slot: "#f3f4f6",
+    slotLine: "#e2e5e9", text: "#1c2126", dim: "#6b7480", face: "#ffffff",
+    accent: "#ea580c", danger: "#dc2626",
+    faceStroke: "#d3d8de", pill: "#c9ced4", portFill: "#ffffff",
+    decorFill: "#eef0f3", decorStroke: "#c9ced4", ring: "#b8bec7",
+    lcd: "#fdf3ec",
+  },
 };
+let theme = localStorage.getItem("rfp-theme") === "clair" ? "clair" : "sombre";
+let C = THEMES[theme];
+/* Le script est chargé en fin de <body> : on peut poser le thème tout de
+   suite, avant le premier rendu (pas de flash). */
+document.body.dataset.theme = theme;
 
 /* Libellés français des catégories (ordre d'affichage de la palette). */
 const CATEGORY_LABELS = {
@@ -255,7 +275,7 @@ function drawFaceplate(g, t, x, y, label, selected, item) {
   /* Corps plat teinté par rôle — style PATCHBOX/Lucid (miroir Python). */
   g.appendChild(svgEl("rect", {
     x, y: y + 1, width: RACK_W, height: h - 2, rx: 3, fill: C.face,
-    stroke: selected ? C.accent : "#2c3547", "stroke-width": selected ? 1.6 : 1,
+    stroke: selected ? C.accent : C.faceStroke, "stroke-width": selected ? 1.6 : 1,
   }));
   g.appendChild(svgEl("rect", {
     x, y: y + 1, width: RACK_W, height: h - 2, rx: 3,
@@ -269,7 +289,7 @@ function drawFaceplate(g, t, x, y, label, selected, item) {
   /* Pastille de hauteur U. */
   g.appendChild(svgEl("rect", {
     x: x + RACK_W - 34, y: yc - 7, width: 26, height: 14, rx: 7,
-    fill: "none", stroke: "#33405a", "stroke-width": 1,
+    fill: "none", stroke: C.pill, "stroke-width": 1,
   }));
   g.appendChild(svgEl("text", {
     x: x + RACK_W - 21, y: yc + 3, "text-anchor": "middle",
@@ -303,7 +323,7 @@ function drawPortBanks(g, t, item, x, y, w, h) {
     const py = y0 + r * (ph + 3);
     g.appendChild(svgEl("rect", {
       x: px, y: py, width: pw, height: ph, rx: 1,
-      fill: "#0a0e16", stroke: color, "stroke-width": 0.7,
+      fill: C.portFill, stroke: color, "stroke-width": 0.7,
     }));
     g.appendChild(svgEl("rect", {
       x: px + 2, y: py + ph - 1.6, width: 3, height: 1.6,
@@ -330,7 +350,7 @@ function drawCategoryDecor(g, t, x, y, w, h) {
       const bx = x0 + i * (bw + gap);
       g.appendChild(svgEl("rect", {
         x: bx, y: y + 4, width: bw, height: h - 8, rx: 1,
-        fill: "#10151f", stroke: "#2c3547", "stroke-width": 0.7,
+        fill: C.decorFill, stroke: C.decorStroke, "stroke-width": 0.7,
       }));
       g.appendChild(svgEl("circle", {
         cx: bx + bw / 2, cy: y + 7, r: 1.3, fill: t.color,
@@ -339,18 +359,18 @@ function drawCategoryDecor(g, t, x, y, w, h) {
   } else if (t.category === "ups") {
     g.appendChild(svgEl("rect", {
       x: x + w - 200, y: y + h / 2 - 8, width: 30, height: 16, rx: 2,
-      fill: "#0a2027", stroke: t.color, "stroke-width": 0.8,
+      fill: C.lcd, stroke: t.color, "stroke-width": 0.8,
     }));
     for (let i = 0; i < 24; i++)
       g.appendChild(svgEl("rect", {
         x: x + w - 155 + i * 5, y: y + h / 2 - 6, width: 2, height: 12,
-        rx: 1, fill: "#10151f",
+        rx: 1, fill: C.decorFill,
       }));
   } else if (t.category === "cable-mgmt") {
     for (let i = 0; i < 4; i++)
       g.appendChild(svgEl("rect", {
         x: x + 200 + i * 50, y: y + 3, width: 30, height: h - 6, rx: 4,
-        fill: "none", stroke: "#3a465c", "stroke-width": 2,
+        fill: "none", stroke: C.ring, "stroke-width": 2,
       }));
   }
 }
@@ -362,7 +382,7 @@ function renderRackSVG(rack) {
   svg.dataset.rackId = rack.id;
 
   svg.appendChild(svgEl("rect", { x: 0, y: 0, width: w, height: h, rx: 6,
-    fill: C.frame, stroke: "#2c3547", "stroke-width": 1.5 }));
+    fill: C.frame, stroke: C.faceStroke, "stroke-width": 1.5 }));
   svg.appendChild(svgEl("text", { x: w / 2, y: 24, "text-anchor": "middle",
     "font-size": 15, "font-weight": "bold", fill: C.text }, rack.name));
 
@@ -1252,6 +1272,18 @@ $("#replace-image-input").addEventListener("change", async (e) => {
 });
 
 /* ---- Baies ---- */
+/* Bascule de design sombre / clair (l'icône soleil du topbar). */
+function applyTheme() {
+  document.body.dataset.theme = theme;
+  C = THEMES[theme];
+  renderAll();
+}
+$("#btn-theme").addEventListener("click", () => {
+  theme = theme === "clair" ? "sombre" : "clair";
+  localStorage.setItem("rfp-theme", theme);
+  applyTheme();
+});
+
 $("#btn-toggle-u").addEventListener("click", () => {
   showUNumbers = !showUNumbers;
   localStorage.setItem("rfp-show-u", showUNumbers ? "1" : "0");
