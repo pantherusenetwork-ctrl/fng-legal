@@ -279,15 +279,31 @@ function itemTipHTML(t, item) {
     rows.map(([k, v]) => `<div class="tip-row"><span>${k}</span>${esc(v)}</div>`).join("");
 }
 
+/* Cartouche de nom À CÔTÉ de l'équipement (style Patchdocs) — miroir
+   de _name_plate() côté Python : rien d'écrit sur le matériel. */
+const LABEL_W = 118;
+function drawNamePlate(g, label, x, y, h) {
+  const txt = label.length <= 17 ? label : label.slice(0, 16) + "…";
+  g.appendChild(svgEl("rect", {
+    x: x + 4, y: y + 2, width: LABEL_W - 6, height: h - 4, rx: 3, fill: C.band,
+  }));
+  g.appendChild(svgEl("text", {
+    x: x + 12, y: y + h / 2 + 3.5, "font-size": 9.5, "font-weight": "bold",
+    fill: "#f1f5f9", "font-family": "system-ui, sans-serif",
+  }, txt));
+}
+
 /* Faceplate placeholder — même dessin que _faceplate_placeholder() côté Python. */
 function drawFaceplate(g, t, x, y, label, selected, item) {
   const h = t.u_height * U_PX;
+  const lw = label ? LABEL_W : 0;
   if (t.faceplate_image && renderMode !== "dessin") {
-    /* Image officielle : proportions respectées (jamais étirée), centrée
-       sur le fond de façade — même règle que l'export Python. */
+    /* Image aux proportions respectées, nom dans le cartouche à côté —
+       même règle que l'export Python. */
     g.appendChild(svgEl("rect", { x, y: y + 1, width: RACK_W, height: h - 2, fill: C.face }));
+    if (label) drawNamePlate(g, label, x, y, h);
     const img = svgEl("image", {
-      x, y: y + 1, width: RACK_W, height: h - 2,
+      x: x + lw, y: y + 1, width: RACK_W - lw, height: h - 2,
       preserveAspectRatio: "xMidYMid meet", href: t.faceplate_image,
     });
     g.appendChild(img);
@@ -304,17 +320,6 @@ function drawFaceplate(g, t, x, y, label, selected, item) {
       stroke: C.faceStroke, "stroke-width": 1,
     }));
     g.appendChild(svgEl("rect", { x, y: y + 1, width: 4, height: h - 2, fill: t.color }));
-    if (label) {
-      const bw = Math.min(label.length * 6.2 + 14, RACK_W - 60);
-      g.appendChild(svgEl("rect", {
-        x: x + 6, y: y + h - 15, width: bw, height: 12, rx: 2,
-        fill: C.band, "fill-opacity": 0.78,
-      }));
-      g.appendChild(svgEl("text", {
-        x: x + 12, y: y + h - 6, "font-size": 9, fill: "#f1f5f9",
-        "font-family": "system-ui, sans-serif",
-      }, label));
-    }
     g.appendChild(svgEl("rect", {
       x: x + RACK_W - 34, y: y + h / 2 - 7, width: 26, height: 14, rx: 7,
       fill: C.face, "fill-opacity": 0.85, stroke: C.pill, "stroke-width": 1,
@@ -339,25 +344,12 @@ function drawFaceplate(g, t, x, y, label, selected, item) {
     fill: t.color, "fill-opacity": 0.07,
   }));
   g.appendChild(svgEl("rect", { x, y: y + 1, width: 4, height: h - 2, fill: t.color }));
-  /* Serveur / onduleur / passe-câbles : la silhouette prime sur les
-     quelques ports de management (miroir Python). */
+  /* Cartouche de nom à côté, décor dans la zone restante (miroir Python). */
+  if (label) drawNamePlate(g, label, x, y, h);
   if (["server", "ups", "cable-mgmt"].includes(t.category))
-    drawCategoryDecor(g, t, x, y, RACK_W, h);
+    drawCategoryDecor(g, t, x + lw, y, RACK_W - lw, h);
   else if ((t.ports || []).length)
-    drawPortBanks(g, t, item, x, y, RACK_W, h);
-  /* Libellé sur plaquette sombre en bas à gauche (même langage que les
-     photos) : le texte ne se réécrit jamais sur le matériel. */
-  if (label) {
-    const bw = Math.min(label.length * 6.2 + 14, RACK_W - 60);
-    g.appendChild(svgEl("rect", {
-      x: x + 6, y: y + h - 15, width: bw, height: 12, rx: 2,
-      fill: C.band, "fill-opacity": 0.85,
-    }));
-    g.appendChild(svgEl("text", {
-      x: x + 12, y: y + h - 6, "font-size": 9, fill: "#f1f5f9",
-      "font-family": "system-ui, sans-serif",
-    }, label));
-  }
+    drawPortBanks(g, t, item, x + lw, y, RACK_W - lw, h);
   /* Pastille de hauteur U. */
   g.appendChild(svgEl("rect", {
     x: x + RACK_W - 34, y: yc - 7, width: 26, height: 14, rx: 7,

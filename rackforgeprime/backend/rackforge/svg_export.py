@@ -173,6 +173,23 @@ def _u_pill(t: EquipmentType, x: int, yc: float, w: int,
     ]
 
 
+# Cartouche de nom À CÔTÉ de l'équipement (style Patchdocs) : le texte ne
+# se pose jamais sur le matériel.
+_LABEL_W = 118
+
+
+def _name_plate(label: str, x: float, y: float, ih: float,
+                color: str, p: dict) -> list[str]:
+    txt = label if len(label) <= 17 else label[:16] + "…"
+    return [
+        f'<rect x="{x + 4}" y="{y + 2}" width="{_LABEL_W - 6}" '
+        f'height="{ih - 4}" rx="3" fill="{p["band"]}"/>',
+        f'<text x="{x + 12}" y="{y + ih / 2 + 3.5:.1f}" '
+        f'font-family="{FONT}" font-size="9.5" font-weight="bold" '
+        f'fill="#f1f5f9">{escape(txt)}</text>',
+    ]
+
+
 def _faceplate_placeholder(t: EquipmentType, x: int, y: int, w: int,
                            label: str, p: dict[str, str]) -> list[str]:
     """Placeholder fidèle à l'échelle U quand pas d'image officielle.
@@ -197,22 +214,15 @@ def _faceplate_placeholder(t: EquipmentType, x: int, y: int, w: int,
     for ex in (x - RAIL_W + 6, x + w + RAIL_W - 12):
         s.append(f'<circle cx="{ex + 3}" cy="{yc:.1f}" r="2.5" '
                  f'fill="{p["hole"]}"/>')
-    # Serveur / onduleur / passe-câbles : la silhouette prime sur les
-    # quelques ports de management — c'est elle qu'on reconnaît en baie.
-    if t.category in ("server", "ups", "cable-mgmt"):
-        s.extend(_category_decor(t, x, y, w, h, p))
-    elif t.ports:
-        s.extend(_port_banks(len(t.ports), t.color, x, y, w, h, p))
-    # Libellé sur PLAQUETTE sombre en bas à gauche — même langage que les
-    # photos officielles : le texte ne se réécrit jamais sur le matériel.
+    # Cartouche de nom À CÔTÉ, décor de l'équipement dans la zone
+    # restante : rien d'écrit sur le matériel.
+    lw = _LABEL_W if label else 0
     if label:
-        bw = min(len(label) * 6.2 + 14, w - 60)
-        s.append(f'<rect x="{x + 6}" y="{y + h - 15}" width="{bw:.0f}" '
-                 f'height="12" rx="2" fill="{p["band"]}" '
-                 f'fill-opacity="0.85"/>')
-        s.append(f'<text x="{x + 12}" y="{y + h - 6}" '
-                 f'font-family="{FONT}" font-size="9" fill="#f1f5f9">'
-                 f'{escape(label)}</text>')
+        s.extend(_name_plate(label, x, y, h, t.color, p))
+    if t.category in ("server", "ups", "cable-mgmt"):
+        s.extend(_category_decor(t, x + lw, y, w - lw, h, p))
+    elif t.ports:
+        s.extend(_port_banks(len(t.ports), t.color, x + lw, y, w - lw, h, p))
     s.extend(_u_pill(t, x, yc, w, p))
     return s
 
@@ -280,15 +290,18 @@ def render_rack(rack: Rack, types: dict[str, EquipmentType],
             s.append(f'<g transform="translate({inner_x},{y})">'
                      f'{t.faceplate_svg}</g>')
         elif t.faceplate_image and rendu != "dessin":
-            # Image officielle (PNG/JPEG en data URI) aux PROPORTIONS
-            # RESPECTÉES (jamais étirée — une façade déformée fait cheap),
-            # centrée sur le fond de façade — puis le MÊME cadre que les
-            # dessins : liseré de rôle, bandeau hostname, pastille U.
+            # Image officielle aux PROPORTIONS RESPECTÉES, et le NOM dans
+            # un CARTOUCHE À CÔTÉ (style Patchdocs) : plus jamais
+            # d'écriture posée sur l'équipement.
             ih = t.u_height * U_PX
+            lw = _LABEL_W if label else 0
             s.append(f'<rect x="{inner_x}" y="{y + 1}" width="{RACK_W}" '
                      f'height="{ih - 2}" fill="{p["face"]}"/>')
-            s.append(f'<image x="{inner_x}" y="{y + 1}" width="{RACK_W}" '
-                     f'height="{ih - 2}" preserveAspectRatio="xMidYMid meet" '
+            if label:
+                s.extend(_name_plate(label, inner_x, y, ih, t.color, p))
+            s.append(f'<image x="{inner_x + lw}" y="{y + 1}" '
+                     f'width="{RACK_W - lw}" height="{ih - 2}" '
+                     f'preserveAspectRatio="xMidYMid meet" '
                      f'href="{t.faceplate_image}" '
                      f'xlink:href="{t.faceplate_image}"/>')
             s.append(f'<rect x="{inner_x}" y="{y + 1}" width="{RACK_W}" '
@@ -296,14 +309,6 @@ def render_rack(rack: Rack, types: dict[str, EquipmentType],
                      f'stroke="{p["face_stroke"]}" stroke-width="1"/>')
             s.append(f'<rect x="{inner_x}" y="{y + 1}" width="4" '
                      f'height="{ih - 2}" fill="{t.color}"/>')
-            if label:
-                bw = min(len(label) * 6.2 + 14, RACK_W - 60)
-                s.append(f'<rect x="{inner_x + 6}" y="{y + ih - 15}" '
-                         f'width="{bw:.0f}" height="12" rx="2" '
-                         f'fill="{p["band"]}" fill-opacity="0.78"/>')
-                s.append(f'<text x="{inner_x + 12}" y="{y + ih - 6}" '
-                         f'font-family="{FONT}" font-size="9" '
-                         f'fill="#f1f5f9">{escape(label)}</text>')
             s.extend(_u_pill(t, inner_x, y + ih / 2, RACK_W, p))
         else:
             s.extend(_faceplate_placeholder(t, inner_x, y, RACK_W, label, p))
