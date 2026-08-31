@@ -629,7 +629,14 @@ function openDeviceSheet(itemId) {
         cell.title = port.name;
         cell.addEventListener("mousemove", (e) => showTip(portTipHTML(t, item, port), e));
         cell.addEventListener("mouseleave", hideTip);
-        cell.addEventListener("click", () => openPortEditor(item, port));
+        cell.addEventListener("click", () => {
+          /* Mode câblage actif : ce clic est le port d'ARRIVÉE. */
+          if (cableFrom && cableFrom.itemId !== item.id) {
+            finishCabling(item, port);
+            return;
+          }
+          openPortEditor(item, port);
+        });
         grid.appendChild(cell);
       }
     }
@@ -653,6 +660,47 @@ function openDeviceSheet(itemId) {
 
   $("#device-dialog").showModal();
 }
+
+/* ---- Câblage libre port-à-port : clic port -> type de câble -> clic
+   port d'arrivée (dans la fiche d'un autre équipement) -> lien créé. */
+let cableFrom = null; // {itemId, port, media}
+
+const CABLE_TYPES = [
+  ["Cuivre cat6a", "cuivre-cat6a"], ["Cuivre cat6", "cuivre-cat6"],
+  ["Fibre OM4 (multimode)", "fibre-om4"], ["Fibre OS2 (monomode)", "fibre-os2"],
+  ["DAC / Twinax", "dac"], ["Autre", ""],
+];
+
+function startCabling(e, item, port) {
+  /* La modale passe au-dessus de tout : on la ferme AVANT le menu. */
+  $("#device-dialog").close();
+  _logicalMenu(e, `Câble depuis ${port.name}`, CABLE_TYPES.map(
+    ([label, media]) => [label, () => {
+      cableFrom = { itemId: item.id, port: port.name, media };
+      renderStatus(`Câblage ${label} depuis ` +
+        `${item.meta.hostname || item.id} · ${port.name} — double-cliquez ` +
+        "l'équipement d'arrivée puis cliquez son port (Échap pour annuler)");
+    }]));
+}
+
+function finishCabling(item, port) {
+  const cf = cableFrom;
+  cableFrom = null;
+  $("#device-dialog").close();
+  openLinkDialog(null, { from: cf.itemId, to: item.id });
+  const f = $("#link-form");
+  f.elements.from_port.value = cf.port;
+  f.elements.to_port.value = port.name;
+  f.elements.media.value = cf.media;
+  renderStatus("");
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && cableFrom) {
+    cableFrom = null;
+    renderStatus("Câblage annulé");
+  }
+});
 
 let editingPort = null;
 function openPortEditor(item, port) {
@@ -686,6 +734,10 @@ $("#device-port-form").addEventListener("submit", (e) => {
   pu.etat = f.elements.etat.value;
   renderAll();
   openDeviceSheet(deviceItemId);
+});
+$("#dpf-cable").addEventListener("click", (e) => {
+  if (!editingPort) return;
+  startCabling(e, editingPort.item, editingPort.port);
 });
 $("#dpf-clear").addEventListener("click", () => {
   if (!editingPort) return;
@@ -1144,7 +1196,13 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeSlotPopover();
 });
 
+function updateRevisionBadge() {
+  const b = $("#btn-revision");
+  if (b) b.textContent = "Ind. " + (project.revision || "A");
+}
+
 function renderAll() {
+  updateRevisionBadge();
   if (viewMode === "logical") { renderLogical(); return; }
   const canvas = $("#canvas");
   canvas.innerHTML = "";
@@ -1240,6 +1298,9 @@ function renderPalette(filter) {
  * Drag-and-drop — pointer events + fantôme snappé au U
  * =================================================================== */
 
+let _lastClickItem = null;
+let _lastClickAt = 0;
+
 function startPaletteDrag(e, type) {
   e.preventDefault();
   drag = { type, itemId: null, fromRackId: null };
@@ -1318,8 +1379,21 @@ document.addEventListener("pointerup", (e) => {
     return;
   }
 
-  /* Simple clic sur un item posé (pas de mouvement) = ouverture inspecteur. */
-  if (d.itemId && !d.moved) { selectItem(d.itemId); return; }
+  /* Simple clic sur un item posé (pas de mouvement) = inspecteur.
+     Deux clics rapprochés = fiche équipement — détection manuelle : le
+     re-rendu de la sélection détruit l'élément, l'événement dblclick
+     natif ne peut jamais aboutir. */
+  if (d.itemId && !d.moved) {
+    if (_lastClickItem === d.itemId && Date.now() - _lastClickAt < 450) {
+      _lastClickItem = null;
+      openDeviceSheet(d.itemId);
+    } else {
+      _lastClickItem = d.itemId;
+      _lastClickAt = Date.now();
+      selectItem(d.itemId);
+    }
+    return;
+  }
 
   if (!hit) { renderAll(); return; }
   const { rack, u } = hit;
@@ -1569,6 +1643,34 @@ async function renderLogical() {
   renderStatus();
   saveLocal();
 }
+
+/* ---- Suivi des révisions du DAT (indice A -> B -> C…) --------------- */
+function nextIndice(cur) {
+  /* A..Z puis AA, AB… (convention bureaux d'études). */
+  let s = (cur || "A").toUpperCase(), i = s.length - 1;
+  const arr = s.split("");
+  while (i >= 0) {
+    if (arr[i] !== "Z") { arr[i] = String.fromCharCode(arr[i].charCodeAt(0) + 1); break; }
+    arr[i] = "A"; i -= 1;
+  }
+  return (i < 0 ? "A" : "") + arr.join("");
+}
+$("#btn-revision").addEventListener("click", () => {
+  const objet = prompt(
+    `Indice courant : ${project.revision || "A"}\n` +
+    "Objet de la NOUVELLE révision (ce qui a changé) :");
+  if (!objet) return;
+  project.revisions = project.revisions || [];
+  if (!project.revisions.length)
+    project.revisions.push({ indice: project.revision || "A",
+      date: new Date().toLocaleDateString("fr-FR"), objet: "Version initiale" });
+  project.revision = nextIndice(project.revision || "A");
+  project.revisions.push({ indice: project.revision,
+    date: new Date().toLocaleDateString("fr-FR"), objet });
+  updateRevisionBadge();
+  saveLocal();
+  renderStatus(`Révision ${project.revision} figée — visible dans le dossier DAT`);
+});
 
 /* ---- Fond du plan : 5 options, mémorisé, cyclé depuis le bandeau ---- */
 const CANVAS_BGS = ["points", "carreaux", "ruche", "lignes", "uni"];

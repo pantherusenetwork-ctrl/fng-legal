@@ -162,6 +162,14 @@ class Logical(BaseModel):
     annotations: list[Annotation] = []
 
 
+class Revision(BaseModel):
+    """Ligne du suivi des révisions du DAT (pratique doc d'ingénierie :
+    indice A, B, C… + date + objet de la modification)."""
+    indice: str
+    date: str = ""
+    objet: str = ""
+
+
 class Project(BaseModel):
     schema_version: int = SCHEMA_VERSION
     id: str
@@ -171,6 +179,10 @@ class Project(BaseModel):
     # Types custom locaux au projet (imports d'images, datasheets…).
     equipment_types: list[EquipmentType] = []
     logical: Logical = Logical()
+    # Suivi documentaire : indice courant + historique (cartouche + page
+    # « Suivi des révisions » du dossier).
+    revision: str = "A"
+    revisions: list[Revision] = []
 
     @field_validator("schema_version")
     @classmethod

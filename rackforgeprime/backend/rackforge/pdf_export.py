@@ -117,8 +117,8 @@ def _page_frame(c, page_w: float, page_h: float, project: Project,
     # Bandeau cartouche sur toute la largeur, en bas du cadre.
     y0 = _MARGIN
     c.rect(_MARGIN, y0, page_w - 2 * _MARGIN, _CARTOUCHE_H)
-    cols = [_MARGIN, page_w * 0.38, page_w * 0.56, page_w * 0.68,
-            page_w - _MARGIN - 76, page_w - _MARGIN]
+    cols = [_MARGIN, page_w * 0.36, page_w * 0.54, page_w * 0.66,
+            page_w - _MARGIN - 130, page_w - _MARGIN - 76, page_w - _MARGIN]
     for x in cols[1:-1]:
         c.line(x, y0, x, y0 + _CARTOUCHE_H)
 
@@ -138,6 +138,7 @@ def _page_frame(c, page_w: float, page_h: float, project: Project,
     labels = [("Projet", project.name, True), ("Section", section, False),
               ("Généré le", date.today().strftime("%d/%m/%Y"), False),
               ("Source", f"{project.id}.json", False),
+              ("Ind.", project.revision or "A", True),
               ("Page", f"{page_no} / {total}", False)]
     for (label, value, accent), x, x_next in zip(labels, cols, cols[1:]):
         cell(x, x_next, label, value, accent)
@@ -344,13 +345,29 @@ def render_project_dossier_pdf(project: Project, theme: str = "sombre",
                   for r in patch_table(project, type_index(project))]
     patch_pages = _paginate(patch_rows)
     bom_pages = _paginate(_bom_rows(project))
-    total = 2 + len(patch_pages) + len(bom_pages)
+    has_revs = bool(project.revisions)
+    total = 2 + len(patch_pages) + len(bom_pages) + (1 if has_revs else 0)
 
     buf = io.BytesIO()
     c = pdf_canvas.Canvas(buf, pagesize=landscape(A4))
     c.setTitle(f"{project.name} — dossier")
     c.setAuthor("RackForgePrime")
     page_no = 1
+
+    # Page « Suivi des révisions » en tête (convention DAT : on sait
+    # toujours quel indice on lit et ce qui a changé).
+    if has_revs:
+        _page_frame(c, page_w, page_h, project, "Suivi des révisions",
+                    page_no, total, pal)
+        _draw_table_page(
+            c, page_w, page_h,
+            f"Suivi des révisions — indice courant : {project.revision}",
+            ["Indice", "Date", "Objet de la révision"],
+            [8, 12, 80],
+            [[rv.indice, rv.date, rv.objet] for rv in project.revisions],
+            pal)
+        c.showPage()
+        page_no += 1
 
     _page_frame(c, page_w, page_h, project, "Élévation physique",
                 page_no, total, pal)

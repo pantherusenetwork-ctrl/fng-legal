@@ -17,6 +17,8 @@
     </div>
     <input id="project-name" type="text" value="Nouveau projet" title="Nom du projet"
            aria-label="Nom du projet">
+    <button id="btn-revision"
+            title="Indice de révision du dossier — cliquez pour figer une nouvelle révision (A → B → C…), l'historique part dans le DAT">Ind. A</button>
     <nav id="view-toggle" title="Vue physique (baies) ou logique (VLANs, liens)">
       <button id="btn-view-physical" class="active">Physique</button>
       <button id="btn-view-logical">Logique</button>
@@ -234,6 +236,7 @@
       </div>
       <div class="dpf-actions">
         <button type="submit">Enregistrer</button>
+        <button type="button" id="dpf-cable" title="Choisissez le type de câble puis cliquez le port d'arrivée sur un autre équipement">Câbler depuis ce port…</button>
         <button type="button" id="dpf-trace">Tracer ce câble</button>
         <button type="button" id="dpf-clear" class="danger">Vider le port</button>
       </div>
