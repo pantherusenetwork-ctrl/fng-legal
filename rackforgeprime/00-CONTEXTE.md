@@ -13,7 +13,7 @@ métier réseau 9,0 · esthétique 9,0 (13 notations, de 5,8 à 9,0).
 47 tests pytest verts. Exe recompilé et déployé le 31/08 à 16h30
 (anciens conservés `-ancien-2026-08-30.exe` / `-ancien-2026-08-31.exe`).
 
-4 thèmes : Sombre, Clair, Pastel (lavande) et Nuit (noir pur).
+4 thèmes : Sombre, Clair, Kaki (olive foncé, accent ambre) et Nuit (noir pur). Version affichée : v1.0.0 (badge UI + app.py VERSION, à bumper ensemble).
 Exports : SVG, PDF (dossier avec cartouche + page logique portrait),
 PNG, CSV, étiquettes TIA-606, draw.io.
 
