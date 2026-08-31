@@ -1,47 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-  <!-- Icône RackForgePrime v2 — hache-marteau de forge orageuse
-       (inspiration libre, dessin original) : tête massive, manche court,
-       double éclair orange de la DA. -->
-  <rect x="8" y="8" width="240" height="240" rx="52" fill="#0b0e14"/>
-  <rect x="8" y="8" width="240" height="240" rx="52" fill="none"
-        stroke="#1b2230" stroke-width="6"/>
-
-  <!-- Éclair principal (derrière l'arme) -->
-  <polygon points="188,20 122,102 154,102 88,214 186,96 148,96 216,20"
-           fill="#f97316"/>
-  <polygon points="180,32 130,96 160,96 108,182 176,90 142,90 200,32"
-           fill="#ffd0a8" fill-opacity="0.6"/>
-  <!-- Petit éclair secondaire -->
-  <polygon points="70,52 48,92 64,92 40,136 78,88 62,88 88,52"
-           fill="#f97316" fill-opacity="0.8"/>
-
-  <!-- Manche court vertical, bois sombre strié -->
-  <rect x="117" y="112" width="22" height="112" rx="10" fill="#3d2f22"/>
-  <rect x="117" y="132" width="22" height="7" fill="#2a2016"/>
-  <rect x="117" y="152" width="22" height="7" fill="#2a2016"/>
-  <rect x="117" y="172" width="22" height="7" fill="#2a2016"/>
-  <rect x="117" y="196" width="22" height="10" fill="#6b5137"/>
-  <!-- Pommeau -->
-  <rect x="113" y="214" width="30" height="14" rx="6" fill="#252a35"/>
-
-  <!-- TÊTE -->
-  <!-- Gorge centrale (fixation) -->
-  <rect x="110" y="58" width="36" height="66" rx="6" fill="#5a6474"/>
-  <rect x="110" y="58" width="36" height="10" rx="4" fill="#7b8798"/>
-
-  <!-- Lame large (gauche) : arc tranchant -->
-  <path d="M112 60 L52 40 Q22 92 52 144 L112 122 Z" fill="#cdd6e0"/>
-  <path d="M52 40 Q22 92 52 144 L66 138 Q42 92 66 46 Z" fill="#eef3f8"/>
-  <path d="M112 60 L92 66 L92 118 L112 122 Z" fill="#aab6c4"/>
-
-  <!-- Contre-masse (droite) : bloc marteau biseauté -->
-  <path d="M144 62 L206 52 L214 70 L214 104 L206 122 L144 120 Z" fill="#8d99a8"/>
-  <path d="M206 52 L214 70 L214 104 L206 122 L198 118 L198 56 Z" fill="#aab6c4"/>
-  <rect x="144" y="84" width="54" height="8" fill="#5a6474"/>
-
-  <!-- Rivets -->
-  <circle cx="128" cy="74" r="5" fill="#252a35"/>
-  <circle cx="128" cy="106" r="5" fill="#252a35"/>
-  <!-- Filet orange sur la gorge : signature DA -->
-  <rect x="124" y="88" width="8" height="8" fill="#f97316"/>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="#14181f"/>
+  <rect x="56" y="40" width="144" height="176" rx="16" fill="none"
+        stroke="#3a4352" stroke-width="10"/>
+  <rect x="78" y="66" width="100" height="24" rx="6" fill="#ffffff"/>
+  <rect x="78" y="166" width="100" height="24" rx="6" fill="#ffffff"/>
+  <polygon points="142,104 106,140 126,140 108,158 152,120 132,120 152,104"
+           fill="#ea580c"/>
+  <rect x="78" y="100" width="100" height="62" rx="6" fill="none"
+        stroke="#ea580c" stroke-width="7"/>
 </svg>
