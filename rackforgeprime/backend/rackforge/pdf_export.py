@@ -282,7 +282,15 @@ def render_labels_pdf(project: Project) -> bytes:
                 f"prise {r['outlet']}" if r["outlet"] else "",
                 f"VLAN {r['vlan']}" if r["vlan"] else "",
                 str(r["usage"] or "")) if x)
-            c.drawString(cx + 8, cy + lh - 39, details[:44])
+            # Deux lignes plutôt qu'un texte coupé : une étiquette
+            # imprimée doit se lire en entier.
+            if len(details) <= 44:
+                c.drawString(cx + 8, cy + lh - 39, details)
+            else:
+                coupe = details.rfind(" ", 0, 44)
+                coupe = coupe if coupe > 20 else 44
+                c.drawString(cx + 8, cy + lh - 39, details[:coupe])
+                c.drawString(cx + 8, cy + lh - 48, details[coupe:].strip()[:44])
         c.showPage()
     c.save()
     return buf.getvalue()

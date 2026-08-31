@@ -746,6 +746,7 @@ $("#dpf-trace").addEventListener("click", () => {
  * =================================================================== */
 
 const TIPS = [
+  "Astuce : double-cliquez un équipement — sa fiche (ports, VLANs, trace de câble).",
   "Astuce : clic droit sur un équipement — dupliquer, connecter, supprimer.",
   "Astuce : cliquez un U libre pour ajouter sans glisser.",
   "Astuce : survolez un port pour voir VLAN, prise et usage.",
