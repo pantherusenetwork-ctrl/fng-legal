@@ -87,8 +87,16 @@ Autres attentes notées :
 - Micro-frictions résiduelles du juge v13 (non bloquantes) : pastille
   n°3 légèrement détachée de son arête, faisceau SW↔PP dense, réserve
   blanche à droite de la page logique portrait.
-- Backlog : matrice de flux générée, vue arrière des baies, appariement
+- Backlog : matrice de flux générée, **vue arrière des baies (redemandée
+  le 31/08 soir — « intéressante mais on se concentre »)**, appariement
   en masse panneau↔switch, budget PoE cumulé, export VSDX, OCR datasheets.
+- Fait 31/08 tard : câblage port-à-port (bouton « Câbler depuis ce
+  port… » dans l'éditeur de port → menu type de câble → clic port
+  d'arrivée → lien pré-rempli), suivi des révisions DAT (Project.revision
+  + revisions[], badge « Ind. X » cliquable à côté du nom du projet,
+  cellule Ind. au cartouche + page « Suivi des révisions » en tête du
+  dossier), double-clic-fiche réparé (le re-rendu de sélection tuait le
+  dblclick natif — détection manuelle 450 ms).
 
 ## Pièges connus
 
