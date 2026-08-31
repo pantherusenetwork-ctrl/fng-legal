@@ -23,7 +23,7 @@ from rackforge.catalog_packs import merged_catalog
 from rackforge.importers import import_netbox_yaml, parse_datasheet_pdf
 from rackforge.models import (Project, patch_table, patch_table_csv,
                               rack_stats, type_index)
-from rackforge.pdf_export import render_project_pdf
+from rackforge.pdf_export import render_project_dossier_pdf, render_project_pdf
 from rackforge.svg_export import render_project_svg
 from rackforge.svg_logical import render_logical_svg
 
@@ -128,9 +128,15 @@ def export_svg(payload: dict, view: str = "physical") -> Response:
 
 @app.post("/api/export/pdf")
 def export_pdf(payload: dict, view: str = "physical") -> Response:
+    """``view`` : physical, logical, ou ``dossier`` (livrable DAT complet :
+    élévation + logique + brassage + nomenclature, cadre et cartouche)."""
     project = _parse_project(payload)
-    pdf = render_project_pdf(project, view=view)
-    suffix = "-logique" if view == "logical" else ""
+    if view == "dossier":
+        pdf = render_project_dossier_pdf(project)
+        suffix = "-dossier"
+    else:
+        pdf = render_project_pdf(project, view=view)
+        suffix = "-logique" if view == "logical" else ""
     return Response(
         content=pdf, media_type="application/pdf",
         headers={"Content-Disposition":

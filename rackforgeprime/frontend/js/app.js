@@ -768,6 +768,9 @@ $("#btn-export-svg").addEventListener("click", () =>
 $("#btn-export-pdf").addEventListener("click", () =>
   postForBlob("/api/export/pdf" + viewQuery(),
               currentProject().id + viewSuffix() + ".pdf"));
+$("#btn-export-dossier").addEventListener("click", () =>
+  postForBlob("/api/export/pdf?view=dossier",
+              currentProject().id + "-dossier.pdf"));
 $("#btn-export-json").addEventListener("click", () => {
   const blob = new Blob([JSON.stringify(currentProject(), null, 2)],
                        { type: "application/json" });
