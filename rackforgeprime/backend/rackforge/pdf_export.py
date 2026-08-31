@@ -155,10 +155,9 @@ def _draw_table_page(c, page_w: float, page_h: float, title: str,
     """Une page de tableau (les lignes DOIVENT tenir : paginé par l'appelant)."""
     x, y, w, _h = _content_zone(page_w, page_h)
     line_h = 18
-    # Bloc titre + tableau centré verticalement quand il est court —
-    # fini les pages remplies au tiers.
-    block = 60 + len(rows) * line_h
-    top = min(page_h - _MARGIN - 30, y + (_h + block) / 2)
+    # Aligné en haut de page, comme une page de rapport — le lecteur
+    # attaque le tableau sans chercher.
+    top = page_h - _MARGIN - 30
     c.setFillColorRGB(*pal["accent"])
     c.setFont("Helvetica-Bold", 15)
     c.drawString(x, top, title)
@@ -224,6 +223,15 @@ def _bom_rows(project: Project) -> list[list[str]]:
 # ET discriminant — Gi0-0-0 et Gi0-0-1 ne se confondent jamais.
 _PORT_ABBREV = [("TenGigabitEthernet", "Te"), ("GigabitEthernet", "Gi"),
                 ("FastEthernet", "Fa"), ("Ethernet", "Eth"), ("Port ", "P")]
+
+
+def _abbrev_port(port: str) -> str:
+    """Abréviation IOS d'un nom de port (Gi0/0/0 reste discriminant là
+    où « GigabitEtherne… » tronqué ne l'est pas)."""
+    for long, court in _PORT_ABBREV:
+        if port.startswith(long):
+            return court + port[len(long):]
+    return port
 
 
 def _label_id(rack_name: str, u: int, port: str) -> str:
@@ -313,8 +321,9 @@ def render_project_dossier_pdf(project: Project, theme: str = "sombre",
     """
     pal = _pdf_palette(theme)
     page_w, page_h = landscape(A4)
-    patch_rows = [[r["rack"], f"U{r['u']}", r["equipment"], r["port"],
-                   r["outlet"], r["vlan"], r["usage"], r["etat"]]
+    patch_rows = [[r["rack"], f"U{r['u']}", r["equipment"],
+                   _abbrev_port(r["port"]), r["outlet"], r["vlan"],
+                   r["usage"], r["etat"]]
                   for r in patch_table(project, type_index(project))]
     patch_pages = _paginate(patch_rows)
     bom_pages = _paginate(_bom_rows(project))
