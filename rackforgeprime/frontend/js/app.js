@@ -549,6 +549,7 @@ function openDeviceSheet(itemId) {
   const t = typesById[item.type_id];
   deviceItemId = itemId;
   $("#device-port-form").hidden = true;
+  $("#device-trace").hidden = true;
 
   $("#device-title").textContent = item.meta.hostname || `${t.vendor} ${t.model}`;
   $("#device-sub").textContent =
@@ -622,6 +623,7 @@ function openDeviceSheet(itemId) {
 let editingPort = null;
 function openPortEditor(item, port) {
   editingPort = { item, port };
+  $("#device-trace").hidden = true;
   const f = $("#device-port-form");
   const pu = portUsageOf(item, port.name) || {};
   $("#dpf-title").textContent = `${port.name} — ${port.type}`;
@@ -660,6 +662,84 @@ $("#dpf-clear").addEventListener("click", () => {
   openDeviceSheet(deviceItemId);
 });
 $("#btn-close-device").addEventListener("click", () => $("#device-dialog").close());
+
+/* =====================================================================
+ * Trace de câble de bout en bout — le « enfin ! » du terrain : suivre
+ * une liaison à travers liens et panneaux, avec baie · U · port · prise
+ * à chaque saut. Un panneau de brassage est traversé (pass-through).
+ * =================================================================== */
+
+function traceFrom(itemId, portName) {
+  const hops = [];
+  const visited = new Set();
+  let cur = { itemId, port: portName };
+  const hopInfo = (id, port) => {
+    const f = findItem(id);
+    if (!f) return null;
+    const t = typesById[f.item.type_id];
+    const pu = portUsageOf(f.item, port);
+    return {
+      itemId: id, port,
+      label: f.item.meta.hostname || `${t.vendor} ${t.model}`,
+      lieu: `${f.rack.name} · U${f.item.position_u}`,
+      outlet: pu?.outlet || "",
+      panel: t.category === "patch-panel",
+    };
+  };
+  hops.push({ noeud: hopInfo(cur.itemId, cur.port), lien: null });
+  for (let step = 0; step < 32; step++) {
+    const link = (project.logical?.links || []).find((l) => {
+      if (visited.has(l.id)) return false;
+      return (l.from.equipment_id === cur.itemId && l.from.port === cur.port) ||
+             (l.to.equipment_id === cur.itemId && l.to.port === cur.port);
+    });
+    if (!link) break;
+    visited.add(link.id);
+    const other = link.from.equipment_id === cur.itemId ? link.to : link.from;
+    const info = hopInfo(other.equipment_id, other.port);
+    if (!info) break;
+    hops.push({ noeud: info, lien: link });
+    /* Panneau : on ressort de l'autre face sur le même port et on
+       continue ; sinon l'équipement est un terminus. */
+    cur = { itemId: other.equipment_id, port: other.port };
+    if (!info.panel) break;
+  }
+  return hops;
+}
+
+function showTrace(itemId, portName) {
+  const hops = traceFrom(itemId, portName);
+  const box = $("#device-trace");
+  if (hops.length < 2) {
+    box.innerHTML = '<div class="dialog-hint">Aucun lien ne part de ce port — ' +
+      "créez-en un (vue Logique, ou « Démarrer une connexion »).</div>";
+    box.hidden = false;
+    return;
+  }
+  box.innerHTML = '<div class="trace-title">Trace du câble</div>' +
+    hops.map((h, i) => {
+      const badge = h.lien
+        ? `<span class="trace-link">${esc(h.lien.label || h.lien.kind)}` +
+          (h.lien.media ? ` · ${esc(h.lien.media)}` : "") + "</span>"
+        : "";
+      return (i ? `<div class="trace-arrow">↓ ${badge}</div>` : "") +
+        `<div class="trace-hop${h.noeud.panel ? " trace-panel" : ""}">` +
+        `<b>${esc(h.noeud.label)}</b> · ${esc(h.noeud.port)}` +
+        `<span class="trace-lieu">${esc(h.noeud.lieu)}` +
+        (h.noeud.outlet ? ` · prise ${esc(h.noeud.outlet)}` : "") + "</span></div>";
+    }).join("");
+  box.hidden = false;
+  /* La chaîne s'illumine dans la baie pendant quelques secondes. */
+  const ids = new Set(hops.map((h) => h.noeud.itemId));
+  for (const g of document.querySelectorAll("g.rack-item"))
+    g.classList.add(ids.has(g.dataset.itemId) ? "conn-lit" : "conn-dim");
+  setTimeout(clearHighlight, 6000);
+}
+
+$("#dpf-trace").addEventListener("click", () => {
+  if (editingPort)
+    showTrace(deviceItemId, editingPort.port.name);
+});
 
 /* =====================================================================
  * Astuces rotatives (barre d'état) — les gestes qui ne se voient pas
