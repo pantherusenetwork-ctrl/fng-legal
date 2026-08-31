@@ -342,10 +342,15 @@ def render_project_dossier_pdf(project: Project, theme: str = "sombre",
     c.showPage()
     page_no += 1
 
-    _page_frame(c, page_w, page_h, project, "Architecture logique",
+    # Page logique en PORTRAIT (pratique DAT : l'orientation suit le
+    # dessin) — un schéma en colonne remplit une page verticale.
+    c.setPageSize(A4)
+    _page_frame(c, page_h, page_w, project, "Architecture logique",
                 page_no, total, pal)
-    _draw_svg_page(c, render_logical_svg(project, theme=theme), page_w, page_h)
+    _draw_svg_page(c, render_logical_svg(project, theme=theme),
+                   page_h, page_w)
     c.showPage()
+    c.setPageSize(landscape(A4))
     page_no += 1
 
     for chunk in patch_pages:
