@@ -401,6 +401,9 @@ function renderRackSVG(rack) {
     drawFaceplate(g, t, innerX, y, label, item.id === selectedItemId, item);
     /* Clic = inspection ; pointerdown long = déplacement (géré globalement). */
     g.addEventListener("pointerdown", (e) => startItemDrag(e, rack, item));
+    /* Survol = surlignage des équipements connectés (esprit PATCHBOX). */
+    g.addEventListener("mouseenter", () => { if (!drag) highlightConnections(item.id); });
+    g.addEventListener("mouseleave", clearHighlight);
     svg.appendChild(g);
   }
 
@@ -624,6 +627,14 @@ document.addEventListener("pointerup", (e) => {
   document.body.style.cursor = "";
   const hit = hitTest(e);
   const d = drag; drag = null;
+
+  /* Mode câblage : le clic d'arrivée crée le lien (dialogue pré-rempli). */
+  if (connectFrom && d.itemId && !d.moved && d.itemId !== connectFrom) {
+    const from = connectFrom;
+    cancelConnection();
+    openLinkDialog(null, { from, to: d.itemId });
+    return;
+  }
 
   /* Simple clic sur un item posé (pas de mouvement) = ouverture inspecteur. */
   if (d.itemId && !d.moved) { selectItem(d.itemId); return; }
@@ -880,7 +891,7 @@ function equipmentOptions() {
   return opts;
 }
 
-function openLinkDialog(link) {
+function openLinkDialog(link, prefill) {
   editingLink = link || null;
   const f = $("#link-form");
   const opts = equipmentOptions();
@@ -894,9 +905,11 @@ function openLinkDialog(link) {
   }
   $("#link-dialog-title").textContent = link ? "Modifier le lien" : "Nouveau lien";
   $("#btn-link-delete").hidden = !link;
-  f.elements.from_eq.value = link ? link.from.equipment_id : opts[0].id;
+  f.elements.from_eq.value = link ? link.from.equipment_id
+    : (prefill?.from || opts[0].id);
   f.elements.from_port.value = link ? link.from.port : "";
-  f.elements.to_eq.value = link ? link.to.equipment_id : (opts[1] || opts[0]).id;
+  f.elements.to_eq.value = link ? link.to.equipment_id
+    : (prefill?.to || (opts[1] || opts[0]).id);
   f.elements.to_port.value = link ? link.to.port : "";
   f.elements.kind.value = link ? link.kind : "trunk";
   f.elements.vlans.value = link ? (link.vlans || []).join(", ") : "";
@@ -931,6 +944,58 @@ $("#link-form").addEventListener("submit", (e) => {
 });
 
 $("#btn-add-link").addEventListener("click", () => openLinkDialog(null));
+
+/* ---- Câblage en 2 clics (esprit PATCHBOX : départ → arrivée) ---- */
+
+let connectFrom = null; // id de l'équipement de départ, null = mode inactif
+
+$("#btn-start-connection").addEventListener("click", () => {
+  if (!selectedItemId) return;
+  connectFrom = selectedItemId;
+  const found = findItem(connectFrom);
+  const name = found?.item.meta.hostname
+    || typesById[found?.item.type_id]?.model || connectFrom;
+  renderStatus(`<span class="stat-accent">Connexion depuis ${name} — ` +
+               `cliquez l'équipement d'arrivée (Échap pour annuler)</span>`);
+  document.body.classList.add("connecting");
+});
+
+function cancelConnection() {
+  if (!connectFrom) return;
+  connectFrom = null;
+  document.body.classList.remove("connecting");
+  renderStatus();
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") cancelConnection();
+});
+
+/* ---- Surlignage des connexions au survol (vue physique) ---- */
+
+function linkedIds(itemId) {
+  const ids = new Set();
+  for (const l of (project?.logical?.links || [])) {
+    if (l.from.equipment_id === itemId) ids.add(l.to.equipment_id);
+    if (l.to.equipment_id === itemId) ids.add(l.from.equipment_id);
+  }
+  return ids;
+}
+
+function highlightConnections(itemId) {
+  const peers = linkedIds(itemId);
+  if (!peers.size) return; // pas de lien : ne rien atténuer
+  for (const g of document.querySelectorAll("g.rack-item")) {
+    const id = g.dataset.itemId;
+    if (id !== itemId && !peers.has(id)) g.classList.add("conn-dim");
+    else g.classList.add("conn-lit");
+  }
+}
+
+function clearHighlight() {
+  for (const g of document.querySelectorAll("g.rack-item"))
+    g.classList.remove("conn-dim", "conn-lit");
+}
 
 /* ---- Modale VLANs ---- */
 
