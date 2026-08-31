@@ -22,6 +22,15 @@ l'API, exports tous valides, UI sans erreur JS, exe Bureau opérationnel.
 Tout ce qui a été trouvé (1 majeur NaN, 1 majeur palette, 4 mineurs) a
 été corrigé le soir même ; exe redeployé à 18h06.
 
+**2e campagne 6 agents (31/08, ~21h) : 237 tests** sur les fonctions et
+les images constructeurs — app saine, 83/91 types avec image officielle,
+0 ratio aberrant. 4 correctifs mineurs commités (MIME sniffé, WAN borné,
+422 lisibles, commentaire CSS) — ⚠️ **pas encore dans l'exe déployé** :
+recompiler au prochain redémarrage de l'app (elle tournait pendant le
+correctif, fichier verrouillé). Reste au backlog images : 7 images
+> 500 Ko à optimiser, 3 vrais trous constructeur (fortigate-600e,
+poweredge-r650, smart-ups-3000).
+
 ## 🌉 Pont d'Hemingway — prochaine étape exacte
 
 **Vue plan d'étage** : le 31/08 Panther a montré 2 captures d'un outil
