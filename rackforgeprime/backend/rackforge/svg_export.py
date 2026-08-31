@@ -35,6 +35,7 @@ PALETTES: dict[str, dict[str, str]] = {
         "accent": "#f97316", "face_stroke": "#2c3547", "pill": "#33405a",
         "port_fill": "#0a0e16", "decor_fill": "#10151f",
         "decor_stroke": "#2c3547", "ring": "#3a465c", "lcd": "#0a2027",
+        "band": "#0b0e14",
     },
     "clair": {
         "bg": "#ffffff", "frame": "#f4f5f6", "rail": "#e2e6ea",
@@ -43,6 +44,7 @@ PALETTES: dict[str, dict[str, str]] = {
         "accent": "#ea580c", "face_stroke": "#d3d8de", "pill": "#c9ced4",
         "port_fill": "#ffffff", "decor_fill": "#eef0f3",
         "decor_stroke": "#c9ced4", "ring": "#b8bec7", "lcd": "#fdf3ec",
+        "band": "#1c2126",
     },
 }
 
@@ -273,7 +275,7 @@ def render_rack(rack: Rack, types: dict[str, EquipmentType],
                 bw = min(len(label) * 6.2 + 14, RACK_W - 60)
                 s.append(f'<rect x="{inner_x + 6}" y="{y + ih - 15}" '
                          f'width="{bw:.0f}" height="12" rx="2" '
-                         f'fill="#0b0e14" fill-opacity="0.78"/>')
+                         f'fill="{p["band"]}" fill-opacity="0.78"/>')
                 s.append(f'<text x="{inner_x + 12}" y="{y + ih - 6}" '
                          f'font-family="{FONT}" font-size="9" '
                          f'fill="#f1f5f9">{escape(label)}</text>')

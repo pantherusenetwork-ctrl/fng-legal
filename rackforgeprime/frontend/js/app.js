@@ -23,7 +23,7 @@ const THEMES = {
     accent: "#f97316", danger: "#f87171",
     faceStroke: "#2c3547", pill: "#33405a", portFill: "#0a0e16",
     decorFill: "#10151f", decorStroke: "#2c3547", ring: "#3a465c",
-    lcd: "#0a2027",
+    lcd: "#0a2027", band: "#0b0e14",
   },
   clair: {
     frame: "#ffffff", rail: "#e2e6ea", hole: "#c6ccd4", slot: "#f3f4f6",
@@ -31,7 +31,7 @@ const THEMES = {
     accent: "#ea580c", danger: "#dc2626",
     faceStroke: "#d3d8de", pill: "#c9ced4", portFill: "#ffffff",
     decorFill: "#eef0f3", decorStroke: "#c9ced4", ring: "#b8bec7",
-    lcd: "#fdf3ec",
+    lcd: "#fdf3ec", band: "#1c2126",
   },
 };
 let theme = localStorage.getItem("rfp-theme") === "clair" ? "clair" : "sombre";
@@ -284,7 +284,7 @@ function drawFaceplate(g, t, x, y, label, selected, item) {
       const bw = Math.min(label.length * 6.2 + 14, RACK_W - 60);
       g.appendChild(svgEl("rect", {
         x: x + 6, y: y + h - 15, width: bw, height: 12, rx: 2,
-        fill: "rgba(11,14,20,.78)",
+        fill: C.band, "fill-opacity": 0.78,
       }));
       g.appendChild(svgEl("text", {
         x: x + 12, y: y + h - 6, "font-size": 9, fill: "#f1f5f9",
