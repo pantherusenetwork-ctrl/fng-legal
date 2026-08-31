@@ -124,6 +124,14 @@ def main() -> None:
         log = open(ws / "rackforge.log", "a", encoding="utf-8", buffering=1)
         sys.stdout = sys.stdout or log
         sys.stderr = sys.stderr or log
+    else:
+        # Console cp1252 (cmd, PowerShell) : la flèche « → » du message de
+        # démarrage tuerait le process en UnicodeEncodeError.
+        for stream in (sys.stdout, sys.stderr):
+            try:
+                stream.reconfigure(errors="replace")
+            except (AttributeError, ValueError):
+                pass
 
     # Import APRÈS ensure_workspace (l'env RACKFORGE_PROJECTS_DIR est posé).
     import uvicorn
