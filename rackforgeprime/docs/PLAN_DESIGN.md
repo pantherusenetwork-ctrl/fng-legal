@@ -41,3 +41,25 @@
 ## Validation
 Re-notation par le même jury de 3 agents après **chaque** chantier, sur
 pièces regénérées (captures + PDF). Itérer jusqu'à ≥ 8 partout.
+
+---
+
+## Bilan du 31/08/2026 (13 notations d agents au total)
+
+| Lentille | Départ | Final | Objectif |
+|---|---|---|---|
+| Prise en main | 7,5 | **8,75** | ✅ atteint |
+| Métier réseau | 6,3 | **8,25** | ✅ atteint |
+| Esthétique | 5,8 | **7,63** | 🔶 reste 0,4 |
+
+Derniers reproches esthétique (v5) et pistes retenues :
+1. Mélange photo/dessin dans la baie → proposer un réglage « rendu :
+   photos officielles / tout en dessin » par projet (un seul langage).
+2. Pages tableaux du PDF à 60 % de blanc → fusionner brassage + BOM
+   sur une page quand ils sont courts.
+3. Canvas vide à droite d une baie unique → bouton fantôme « + Baie »
+   en place de la future baie.
+
+Idées métier notées au passage : taux de charge onduleur calculé
+(capacité catalogue vs charge totale), liens d alimentation vers la
+zone ÉNERGIE.
