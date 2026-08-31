@@ -38,7 +38,7 @@ _PDF_PALETTES = {
         "row_line": (0.91, 0.92, 0.93),
     },
     "pastel": {
-        "bg": (0.973, 0.957, 0.933),   # #f8f4ee
+        "bg": (0.949, 0.937, 0.969),   # #f2eff7
         "frame": (0.878, 0.835, 0.784),  # #e0d5c8
         "text": (0.239, 0.220, 0.200),   # #3d3833
         "dim": (0.541, 0.506, 0.467),    # #8a8177
@@ -46,7 +46,7 @@ _PDF_PALETTES = {
         "row_line": (0.925, 0.898, 0.855),
     },
     "nuit": {
-        "bg": (0.016, 0.024, 0.039),   # #04060a
+        "bg": (0.0, 0.0, 0.0),         # #000000
         "frame": (0.102, 0.133, 0.192),  # #1a2231
         "text": (0.867, 0.890, 0.925),   # #dde3ec
         "dim": (0.349, 0.388, 0.478),    # #59637a
@@ -376,7 +376,7 @@ def render_project_dossier_pdf(project: Project, theme: str = "sombre",
             c, page_w, page_h, "Tableau de brassage — généré, jamais dessiné",
             ["Baie", "U", "Équipement", "Port", "Prise murale", "VLAN",
              "Usage", "État"],
-            [10, 6, 22, 11, 13, 8, 20, 9], chunk, pal)
+            [10, 5, 17, 9, 12, 9, 29, 7], chunk, pal)
         c.showPage()
         page_no += 1
 

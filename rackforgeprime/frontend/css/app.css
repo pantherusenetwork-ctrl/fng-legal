@@ -612,20 +612,20 @@ body:not([data-theme="clair"]):not([data-theme="pastel"]) #canvas svg image {
 
 /* ===== Theme PASTEL — creme chaleureux, accents adoucis ===== */
 body[data-theme="pastel"] {
-  --bg: #f6f1ea;
+  --bg: #f0edf6;
   --panel: rgba(255, 253, 249, .82);
-  --panel-2: #f4ede4;
-  --frame: #fdfaf6;
-  --line: #e0d5c8;
-  --text: #3d3833;
-  --text-dim: #8a8177;
+  --panel-2: #ece7f4;
+  --frame: #fbfafe;
+  --line: #d6cde6;
+  --text: #37324a;
+  --text-dim: #7d7694;
   --accent: #f0823c;
   --danger: #d95c5c;
 }
 body[data-theme="pastel"] #view-toggle button.active { color: #ffffff; }
-body[data-theme="pastel"] .palette-item { background: #fffdf9; box-shadow: 0 1px 2px rgba(61,56,51,.06); }
+body[data-theme="pastel"] .palette-item { background: #fdfcff; box-shadow: 0 1px 2px rgba(61,56,51,.06); }
 body[data-theme="pastel"] #canvas-wrap {
-  background-image: radial-gradient(#e3d8ca 1px, transparent 1px);
+  background-image: radial-gradient(#d5cbe4 1px, transparent 1px);
   background-size: 22px 22px;
 }
 body[data-theme="pastel"] #hover-tip, body[data-theme="pastel"] #slot-popover,
@@ -636,11 +636,11 @@ body[data-theme="pastel"] .dropdown-menu, body[data-theme="pastel"] #search-over
 
 /* ===== Theme NUIT — noir profond, orange vif (salle machine) ===== */
 body[data-theme="nuit"] {
-  --bg: #04060a;
+  --bg: #000000;
   --panel: rgba(9, 12, 18, .82);
-  --panel-2: #0b0f16;
-  --frame: #0a0d13;
-  --line: #1a2231;
+  --panel-2: #0d0d11;
+  --frame: #0b0b0e;
+  --line: #20202a;
   --text: #dde3ec;
   --text-dim: #59637a;
   --accent: #ff7a1a;

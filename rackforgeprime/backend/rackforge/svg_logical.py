@@ -54,9 +54,9 @@ LPALETTES = {
                "text": "#cbd5e1", "dim": "#64748b"},
     "clair": {"bg": "#ffffff", "node": "#f7f8f9", "line": "#d3d8de",
               "text": "#1c2126", "dim": "#6b7480"},
-    "pastel": {"bg": "#f8f4ee", "node": "#fffdf9", "line": "#e0d5c8",
-               "text": "#3d3833", "dim": "#8a8177"},
-    "nuit": {"bg": "#04060a", "node": "#0d1118", "line": "#1a2231",
+    "pastel": {"bg": "#f2eff7", "node": "#fdfcff", "line": "#d6cde6",
+               "text": "#37324a", "dim": "#7d7694"},
+    "nuit": {"bg": "#000000", "node": "#0d0d11", "line": "#20202a",
              "text": "#dde3ec", "dim": "#59637a"},
 }
 # Palette active du rendu en cours (posée par render_logical_svg — module
@@ -151,7 +151,7 @@ def layout_nodes(project: Project, types: dict[str, EquipmentType]
     max_w = max(row_w.values(), default=NODE_W)
     # Un WAN documenté (usage contenant « WAN ») réserve de la place en
     # tête pour le nuage Internet.
-    top_extra = 78 if _wan_item(project) else 0
+    top_extra = 62 if _wan_item(project) else 0
     for rank in sorted(layers):
         row = layers[rank]
         stagger = (rank % 2) * (NODE_W / 2 + 30)
@@ -252,7 +252,9 @@ def _render_link(link: LogicalLink, pos: dict[str, tuple[float, float]],
         # Faisceau de liens parallèles : pastille numérotée sur chaque
         # fil, le détail part dans une liste déportée (pratique des
         # plans d'ingénierie — le couloir reste lisible).
-        my += -10 + 20 * (idx % 2)
+        # Deux rangées de pastilles, remontées pour ne jamais toucher la
+        # bordure de zone du dessous.
+        my += -18 + 18 * (idx % 2)
         lbl.append(f'<circle cx="{mx:.0f}" cy="{my:.0f}" r="7.5" '
                    f'fill="{C_BG}" stroke="{color}" stroke-width="1.3"/>')
         lbl.append(f'<text x="{mx:.0f}" y="{my + 3:.0f}" text-anchor="middle" '
@@ -307,7 +309,7 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
         counts[pair] = counts.get(pair, 0) + 1
     stack_w = 320 if any(v >= 3 for v in counts.values()) else 0
     total_w = max(max_x + stack_w, 640)
-    total_h = max_y + LEGEND_H + 40
+    total_h = max_y + LEGEND_H + 12
 
     s: list[str] = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{total_w}" '
