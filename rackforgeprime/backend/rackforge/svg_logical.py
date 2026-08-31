@@ -132,46 +132,73 @@ def layout_nodes(project: Project, types: dict[str, EquipmentType]
 
 
 def _elbow(x1: float, y1: float, x2: float, y2: float) -> str:
-    """Chemin orthogonal (coude à mi-hauteur) — convention Visio/Lucid."""
+    """Chemin orthogonal à coude mi-hauteur, coins arrondis (rayon Lucid)."""
     if abs(y1 - y2) < 4:
         return f"M {x1:.0f} {y1:.0f} L {x2:.0f} {y2:.0f}"
     my = (y1 + y2) / 2
-    return (f"M {x1:.0f} {y1:.0f} L {x1:.0f} {my:.0f} "
-            f"L {x2:.0f} {my:.0f} L {x2:.0f} {y2:.0f}")
+    if abs(x1 - x2) < 4:
+        return f"M {x1:.0f} {y1:.0f} L {x2:.0f} {y2:.0f}"
+    # Rayon borné par la place disponible sur chaque segment.
+    r = min(8.0, abs(x2 - x1) / 2, abs(my - y1), abs(y2 - my))
+    sy = 1 if my > y1 else -1      # sens vertical du 1er segment
+    sx = 1 if x2 > x1 else -1      # sens horizontal du segment médian
+    return (f"M {x1:.0f} {y1:.0f} "
+            f"L {x1:.0f} {my - sy * r:.1f} "
+            f"Q {x1:.0f} {my:.0f} {x1 + sx * r:.1f} {my:.0f} "
+            f"L {x2 - sx * r:.1f} {my:.0f} "
+            f"Q {x2:.0f} {my:.0f} {x2:.0f} {my + sy * r:.1f} "
+            f"L {x2:.0f} {y2:.0f}")
 
 
 def _render_link(link: LogicalLink, pos: dict[str, tuple[float, float]],
-                 vlan_colors: dict[int, str]) -> list[str]:
+                 vlan_colors: dict[int, str]) -> tuple[list[str], list[str]]:
+    """(trait, étiquette) — le trait passe SOUS les nœuds, l'étiquette
+    au-dessus de tout (sinon les nœuds la recouvrent)."""
     a, b = pos.get(link.from_.equipment_id), pos.get(link.to.equipment_id)
     if a is None or b is None:
-        return []  # extrémité inconnue : lien ignoré au dessin
-    # Ancres : bas du nœud du haut -> haut du nœud du bas.
+        return [], []  # extrémité inconnue : lien ignoré au dessin
     (ax, ay), (bx, by) = a, b
-    x1, y1 = ax + NODE_W / 2, ay + (NODE_H if ay <= by else 0)
-    x2, y2 = bx + NODE_W / 2, by + (NODE_H if by < ay else 0)
+    same_layer = abs(ay - by) < NODE_H / 2
+    if same_layer:
+        # Même couche : bord à bord (jamais derrière les nœuds).
+        left, right = (a, b) if ax <= bx else (b, a)
+        x1, y1 = left[0] + NODE_W, left[1] + NODE_H / 2
+        x2, y2 = right[0], right[1] + NODE_H / 2
+    else:
+        # Couches différentes : bas du nœud du haut -> haut du nœud du bas.
+        x1, y1 = ax + NODE_W / 2, ay + (NODE_H if ay <= by else 0)
+        x2, y2 = bx + NODE_W / 2, by + (NODE_H if by < ay else 0)
     width, color, dash = LINK_STYLES.get(link.kind, LINK_STYLES["other"])
     s = [f'<g id="link-{escape(link.id)}">']
     dash_attr = f' stroke-dasharray="{dash}"' if dash else ""
     s.append(f'<path d="{_elbow(x1, y1, x2, y2)}" fill="none" '
              f'stroke="{color}" stroke-width="{width}"{dash_attr}/>')
-    # Étiquette + ports + pastilles VLAN au point médian.
+    s.append('</g>')
+    # Étiquette + ports + pastilles VLAN au point médian, dans un groupe
+    # séparé rendu APRÈS les nœuds.
     mx, my = (x1 + x2) / 2, (y1 + y2) / 2
+    if same_layer:
+        # L'entre-deux est trop étroit : étiquette au-dessus des nœuds.
+        my = min(a[1], b[1]) - 2
     label = link.label or link.kind
     ports = " · ".join(p for p in (link.from_.port, link.to.port) if p)
     text = label + (f"  ({ports})" if ports else "")
     tw = max(len(text) * 5.4, 30)
-    s.append(f'<rect x="{mx - tw / 2 - 4:.0f}" y="{my - 17:.0f}" '
-             f'width="{tw + 8:.0f}" height="14" rx="3" fill="{C_BG}" '
-             f'stroke="{C_LINE}" stroke-width="0.5"/>')
-    s.append(f'<text x="{mx:.0f}" y="{my - 7:.0f}" text-anchor="middle" '
-             f'font-family="{FONT_MONO}" font-size="9" fill="{C_TEXT}">'
-             f'{escape(text)}</text>')
+    lbl = [f'<g id="link-label-{escape(link.id)}">']
+    lbl.append(f'<rect x="{mx - tw / 2 - 4:.0f}" y="{my - 17:.0f}" '
+               f'width="{tw + 8:.0f}" height="14" rx="3" fill="{C_BG}" '
+               f'stroke="{C_LINE}" stroke-width="0.5"/>')
+    # Étiquette colorée comme le lien (convention Lucid : la couleur porte
+    # la sémantique du flux, le texte la reprend).
+    lbl.append(f'<text x="{mx:.0f}" y="{my - 7:.0f}" text-anchor="middle" '
+               f'font-family="{FONT_MONO}" font-size="9" fill="{color}">'
+               f'{escape(text)}</text>')
     for j, vid in enumerate(link.vlans[:8]):
-        s.append(f'<circle cx="{mx - len(link.vlans[:8]) * 6 + 6 + j * 12:.0f}" '
-                 f'cy="{my + 8:.0f}" r="4" '
-                 f'fill="{vlan_colors.get(vid, "#64748b")}"/>')
-    s.append('</g>')
-    return s
+        lbl.append(f'<circle cx="{mx - len(link.vlans[:8]) * 6 + 6 + j * 12:.0f}" '
+                   f'cy="{my + 8:.0f}" r="4" '
+                   f'fill="{vlan_colors.get(vid, "#64748b")}"/>')
+    lbl.append('</g>')
+    return s, lbl
 
 
 def render_logical_svg(project: Project) -> str:
@@ -195,9 +222,13 @@ def render_logical_svg(project: Project) -> str:
         f'fill="{C_TEXT}">{escape(project.name)} — schéma logique</text>',
     ]
 
-    # Liens d'abord (sous les nœuds).
+    # Traits des liens d'abord (sous les nœuds) ; étiquettes gardées pour
+    # la fin (au-dessus de tout).
+    labels: list[str] = []
     for link in project.logical.links:
-        s.extend(_render_link(link, pos, vlan_colors))
+        line, lbl = _render_link(link, pos, vlan_colors)
+        s.extend(line)
+        labels.extend(lbl)
 
     # Nœuds.
     for n in nodes:
@@ -215,6 +246,9 @@ def render_logical_svg(project: Project) -> str:
                  f'font-family="{FONT_MONO}" fill="{C_TEXT_DIM}">'
                  f'{escape(n["sub"])}</text>')
         s.append('</g>')
+
+    # Étiquettes de liens par-dessus les nœuds.
+    s.extend(labels)
 
     # Légende : VLANs puis types de liens.
     ly = total_h - LEGEND_H
