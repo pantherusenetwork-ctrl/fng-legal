@@ -37,6 +37,25 @@ gitignoré : ces images ne vivent QUE sur disque — les inclure dans
 toute sauvegarde. Restent 2 trous sans source NetBox (fortigate-600e,
 poweredge-r650) et 11 modèles à ~700 px sans meilleure source connue.
 
+## Principe directeur (Panther, 31/08 soir)
+
+**« On doit avoir des options, avoir le choix, la liberté »** — et être
+« aussi complet que Visio ou draw.io mais en qualité supérieure ».
+Traduction : jamais d'action bloquée sans raison (suppression, options au
+clic droit partout), et combler la mécanique d'éditeur généraliste.
+
+**Feuille de route complétude (2 analystes Visio + draw.io, 31/08, ~55
+fonctions comparées)** — acquis : le métier réseau bat déjà les deux
+(brassage généré, trace de câble, validation 422, livrables DAT/TIA-606,
+146 types/135 photos). Manques par priorité :
+1. **Zoom / pan du canvas** (importance haute, effort moyen) — le n°1
+2. **Multi-sélection + déplacement groupé** (haute, moyen)
+3. **Copier/coller clavier** Ctrl+C/V, Suppr, flèches (moyenne, petit)
+4. **Connecteurs éditables** (waypoints/ancrages) (haute, gros)
+5. **Export VSDX** (haute, moyen — format d'échange entreprise)
+6. Multi-pages libres, calques, groupes/verrouillage (moyenne, gros)
+7. Impression à l'échelle, styles à l'objet, texte riche (moyenne)
+
 ## 🌉 Pont d'Hemingway — prochaine étape exacte
 
 **Vue plan d'étage** : le 31/08 Panther a montré 2 captures d'un outil
