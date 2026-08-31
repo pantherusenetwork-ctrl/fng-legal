@@ -38,7 +38,7 @@ PALETTES: dict[str, dict[str, str]] = {
         "band": "#0b0e14",
     },
     "clair": {
-        "bg": "#ffffff", "frame": "#f4f5f6", "rail": "#e2e6ea",
+        "bg": "#ffffff", "frame": "#ffffff", "rail": "#e2e6ea",
         "hole": "#c6ccd4", "slot": "#f3f4f6", "slot_line": "#e2e5e9",
         "text": "#1c2126", "dim": "#6b7480", "face": "#ffffff",
         "accent": "#ea580c", "face_stroke": "#d3d8de", "pill": "#c9ced4",

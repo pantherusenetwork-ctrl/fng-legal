@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
@@ -37,6 +38,11 @@ else:
     FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
 app = FastAPI(title="RackForgePrime", version="0.1.0", docs_url="/api/docs")
+
+# Un thème ou un rendu inconnu est refusé (422) au lieu d'être rabattu en
+# silence sur le défaut — l'appelant sait tout de suite qu'il s'est trompé.
+Theme = Literal["sombre", "clair", "pastel", "nuit"]
+Rendu = Literal["photos", "dessin"]
 
 
 def _parse_project(payload: dict) -> Project:
@@ -116,10 +122,10 @@ async def import_datasheet(file: UploadFile = File(...)) -> dict:
 # --- Exports (le JSON reste la source de vérité) ----------------------------
 
 @app.post("/api/export/svg")
-def export_svg(payload: dict, view: str = "physical",
-               theme: str = "sombre", rendu: str = "photos") -> Response:
+def export_svg(payload: dict, view: Literal["physical", "logical"] = "physical",
+               theme: Theme = "sombre", rendu: Rendu = "photos") -> Response:
     """``view=physical`` : élévation ; ``view=logical`` : VLANs/liens.
-    ``theme`` : sombre/clair. ``rendu`` : photos ou dessin (élévation)."""
+    ``theme`` : sombre/clair/pastel/nuit. ``rendu`` : photos ou dessin."""
     project = _parse_project(payload)
     svg = (render_logical_svg(project, theme=theme) if view == "logical"
            else render_project_svg(project, theme=theme, rendu=rendu))
@@ -132,11 +138,12 @@ def export_svg(payload: dict, view: str = "physical",
 
 
 @app.post("/api/export/pdf")
-def export_pdf(payload: dict, view: str = "physical",
-               theme: str = "sombre", rendu: str = "photos") -> Response:
+def export_pdf(payload: dict,
+               view: Literal["physical", "logical", "dossier"] = "physical",
+               theme: Theme = "sombre", rendu: Rendu = "photos") -> Response:
     """``view`` : physical, logical, ou ``dossier`` (livrable DAT complet :
     élévation + logique + brassage + nomenclature, cadre et cartouche).
-    ``theme`` : sombre/clair. ``rendu`` : photos ou dessin."""
+    ``theme`` : sombre/clair/pastel/nuit. ``rendu`` : photos ou dessin."""
     project = _parse_project(payload)
     if view == "dossier":
         pdf = render_project_dossier_pdf(project, theme=theme, rendu=rendu)

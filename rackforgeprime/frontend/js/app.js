@@ -458,6 +458,10 @@ function renderRackSVG(rack) {
   titleG.appendChild(pencil);
   titleG.addEventListener("click", (e) => openRackMenu(e, rack));
   svg.appendChild(titleG);
+  /* Localisation (salle, adresse) sous le nom — comme à l'export. */
+  if (rack.location)
+    svg.appendChild(svgEl("text", { x: w / 2, y: 37, "text-anchor": "middle",
+      "font-size": 10.5, fill: C.dim }, rack.location));
 
   const zoneY = HEADER_H + FRAME_PAD, zoneH = rack.u_height * U_PX;
   svg.appendChild(svgEl("rect", { x: innerX, y: zoneY, width: RACK_W, height: zoneH, fill: C.slot }));
@@ -538,7 +542,7 @@ function renderRackSVG(rack) {
   /* Stats de la baie. */
   const st = rackStats(rack);
   svg.appendChild(svgEl("text", { x: w / 2, y: h - FOOTER_H / 2, "text-anchor": "middle",
-    "font-size": 10, fill: C.accent, "font-family": "monospace" },
+    "font-size": 11, fill: C.accent, "font-family": "monospace" },
     `${st.used}U occupés · ${st.free}U libres · ${st.power} W`));
 
   return svg;
@@ -2166,6 +2170,8 @@ function demoProject() {
   $("#palette-filter").addEventListener("input",
     (e) => renderPalette(e.target.value));
   $("#project-name").value = project.name;
-  renderAll();
+  /* ?view=logical ouvre directement la vue logique (lien partageable). */
+  if (qs.get("view") === "logical") setView("logical");
+  else renderAll();
   renderStatus("Prêt");
 })();

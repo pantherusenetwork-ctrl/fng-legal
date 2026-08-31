@@ -129,9 +129,13 @@ class LogicalLink(BaseModel):
 
 
 class Position(BaseModel):
-    """Position d'un nœud sur le schéma logique (px, grille libre)."""
-    x: float
-    y: float
+    """Position d'un nœud sur le schéma logique (px, grille libre).
+
+    NaN/Infinity refusés : json.loads les accepte, et une seule valeur
+    non finie fait planter la conversion svglib de l'export PDF.
+    """
+    x: float = Field(allow_inf_nan=False)
+    y: float = Field(allow_inf_nan=False)
 
 
 class Logical(BaseModel):

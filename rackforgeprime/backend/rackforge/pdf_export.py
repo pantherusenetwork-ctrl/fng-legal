@@ -23,7 +23,7 @@ from .svg_logical import render_logical_svg
 _PDF_PALETTES = {
     "sombre": {
         "bg": (0.043, 0.055, 0.078),   # #0b0e14
-        "frame": (0.16, 0.20, 0.29),   # #2a3446
+        "frame": (0.165, 0.204, 0.275),  # #2a3446
         "text": (0.80, 0.84, 0.88),    # #cbd5e1
         "dim": (0.39, 0.45, 0.55),     # #64748b
         "accent": (0.976, 0.451, 0.086),  # #f97316
