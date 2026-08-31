@@ -469,8 +469,10 @@ function renderRackSVG(rack) {
     /* Survol = surlignage des équipements connectés (esprit PATCHBOX). */
     g.addEventListener("mouseenter", () => { if (!drag) highlightConnections(item.id); });
     g.addEventListener("mouseleave", clearHighlight);
-    /* Clic droit = menu contextuel (dupliquer, connecter, supprimer). */
+    /* Clic droit = menu contextuel ; double-clic = fiche de l'équipement
+       (ports, VLANs, état de chaque interface — esprit Aruba Central). */
     g.addEventListener("contextmenu", (e) => openItemMenu(e, rack, item));
+    g.addEventListener("dblclick", () => openDeviceSheet(item.id));
     /* Bouton « ⋯ » visible au survol : le menu sans connaître le clic
        droit (affordance). */
     const t2 = typesById[item.type_id];
@@ -513,6 +515,127 @@ function renderRackSVG(rack) {
 
   return svg;
 }
+
+/* =====================================================================
+ * Fiche équipement (vue type Aruba Central) : tuiles + grille de ports
+ * =================================================================== */
+
+let deviceItemId = null; // équipement affiché dans la fiche
+
+function portUsageOf(item, portName) {
+  return (item.meta.port_usage || []).find((p) => p.port === portName);
+}
+
+function openDeviceSheet(itemId) {
+  const found = findItem(itemId);
+  if (!found) return;
+  const { rack, item } = found;
+  const t = typesById[item.type_id];
+  deviceItemId = itemId;
+  $("#device-port-form").hidden = true;
+
+  $("#device-title").textContent = item.meta.hostname || `${t.vendor} ${t.model}`;
+  $("#device-sub").textContent =
+    `${t.vendor} ${t.model} · ${t.u_height}U · ${rack.name} U${item.position_u}` +
+    (item.meta.serial ? ` · S/N ${item.meta.serial}` : "");
+
+  const ports = t.ports || [];
+  const used = ports.filter((p) => portUsageOf(item, p.name)).length;
+  const tiles = [
+    ["Ports totaux", ports.length],
+    ["Brassés", used],
+    ["Libres", ports.length - used],
+    ["Consommation", `${t.power_w} W`],
+  ];
+  $("#device-tiles").innerHTML = tiles.map(([k, v]) =>
+    `<div class="tile"><div class="tile-k">${k}</div>` +
+    `<div class="tile-v">${v}</div></div>`).join("");
+
+  /* Grille façon switch réel : impairs en haut, pairs en bas. */
+  const grid = $("#device-grid");
+  grid.innerHTML = "";
+  if (!ports.length) {
+    grid.innerHTML = '<div class="dialog-hint">Cet équipement n\'expose pas de ports.</div>';
+  } else {
+    const cols = Math.ceil(ports.length / 2);
+    grid.style.gridTemplateColumns = `repeat(${cols}, 30px)`;
+    for (let c = 0; c < cols; c++) {
+      for (let r = 0; r < 2; r++) {
+        const i = c * 2 + r;
+        const port = ports[i];
+        const cell = document.createElement("div");
+        cell.className = "dp-cell";
+        if (!port) { grid.appendChild(cell); continue; }
+        const pu = portUsageOf(item, port.name);
+        cell.classList.add(pu ? "p-used" : "p-free");
+        cell.innerHTML = `<span class="dp-num">${i + 1}</span>`;
+        cell.title = port.name;
+        cell.addEventListener("mousemove", (e) => showTip(portTipHTML(t, item, port), e));
+        cell.addEventListener("mouseleave", hideTip);
+        cell.addEventListener("click", () => openPortEditor(item, port));
+        grid.appendChild(cell);
+      }
+    }
+  }
+
+  /* VLANs vus sur cet équipement. */
+  const vlans = new Set();
+  if (item.meta.vlan) vlans.add(item.meta.vlan);
+  for (const pu of item.meta.port_usage || []) if (pu.vlan) vlans.add(pu.vlan);
+  const vlanNames = { };
+  for (const v of project.logical?.vlans || []) vlanNames[String(v.vid)] = v;
+  $("#device-vlans").innerHTML = vlans.size
+    ? "VLANs : " + [...vlans].map((v) => {
+        const known = vlanNames[String(v)];
+        const color = known?.color || "#8b95a3";
+        const name = known ? ` ${esc(known.name)}` : "";
+        return `<span class="vlan-chip"><span class="role-dot" ` +
+               `style="background:${color}"></span>${esc(v)}${name}</span>`;
+      }).join(" ")
+    : '<span class="dialog-hint">Aucun VLAN renseigné sur cet équipement.</span>';
+
+  $("#device-dialog").showModal();
+}
+
+let editingPort = null;
+function openPortEditor(item, port) {
+  editingPort = { item, port };
+  const f = $("#device-port-form");
+  const pu = portUsageOf(item, port.name) || {};
+  $("#dpf-title").textContent = `${port.name} — ${port.type}`;
+  f.elements.outlet.value = pu.outlet || "";
+  f.elements.vlan.value = pu.vlan || "";
+  f.elements.usage.value = pu.usage || "";
+  f.hidden = false;
+  f.elements.outlet.focus();
+}
+
+$("#device-port-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (!editingPort) return;
+  const { item, port } = editingPort;
+  const f = e.target;
+  let pu = portUsageOf(item, port.name);
+  if (!pu) {
+    pu = { port: port.name, outlet: "", vlan: "", usage: "" };
+    item.meta.port_usage = item.meta.port_usage || [];
+    item.meta.port_usage.push(pu);
+  }
+  pu.outlet = f.elements.outlet.value.trim();
+  pu.vlan = f.elements.vlan.value.trim();
+  pu.usage = f.elements.usage.value.trim();
+  renderAll();
+  openDeviceSheet(deviceItemId);
+});
+$("#dpf-clear").addEventListener("click", () => {
+  if (!editingPort) return;
+  const { item, port } = editingPort;
+  item.meta.port_usage =
+    (item.meta.port_usage || []).filter((p) => p.port !== port.name);
+  renderAll();
+  openDeviceSheet(deviceItemId);
+});
+$("#btn-close-device").addEventListener("click", () => $("#device-dialog").close());
 
 /* =====================================================================
  * Astuces rotatives (barre d'état) — les gestes qui ne se voient pas
@@ -724,6 +847,7 @@ function openItemMenu(e, rack, item) {
   menu.style.zIndex = "70";
   menu.innerHTML = `<div class="menu-title">${esc(name)}</div>`;
   const actions = [
+    ["Fiche de l'équipement", () => openDeviceSheet(item.id)],
     ["Dupliquer", () => duplicateItem(rack, item)],
     ["Démarrer une connexion", () => {
       selectItem(item.id);

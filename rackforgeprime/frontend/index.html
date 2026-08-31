@@ -150,6 +150,39 @@
     <span id="tip-text" title="Astuce — clic pour passer à la suivante"></span>
   </footer>
 
+  <!-- Fiche équipement (vue type Aruba Central : tuiles + grille de ports) -->
+  <dialog id="device-dialog">
+    <div id="device-head">
+      <div>
+        <h2 id="device-title">Équipement</h2>
+        <div id="device-sub" class="dialog-hint"></div>
+      </div>
+      <button id="btn-close-device">Fermer</button>
+    </div>
+    <div id="device-tiles"><!-- tuiles générées --></div>
+    <div id="device-grid-wrap">
+      <div id="device-grid"><!-- grille de ports générée --></div>
+      <div id="device-legend">
+        <span><span class="lg lg-used"></span>Brassé</span>
+        <span><span class="lg lg-free"></span>Libre</span>
+        <span class="dialog-hint">Survolez un port pour sa config — cliquez pour l'éditer.</span>
+      </div>
+    </div>
+    <form id="device-port-form" hidden>
+      <div id="dpf-title"></div>
+      <div class="dpf-fields">
+        <label>Prise murale <input name="outlet" autocomplete="off"></label>
+        <label>VLAN <input name="vlan" autocomplete="off"></label>
+        <label>Usage <input name="usage" autocomplete="off"></label>
+      </div>
+      <div class="dpf-actions">
+        <button type="submit">Enregistrer</button>
+        <button type="button" id="dpf-clear" class="danger">Vider le port</button>
+      </div>
+    </form>
+    <div id="device-vlans"></div>
+  </dialog>
+
   <!-- Modale tableau de brassage -->
   <dialog id="patch-dialog">
     <h2>Tableau de brassage</h2>
