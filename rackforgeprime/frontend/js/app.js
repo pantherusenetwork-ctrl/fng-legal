@@ -383,8 +383,12 @@ function renderRackSVG(rack) {
 
   svg.appendChild(svgEl("rect", { x: 0, y: 0, width: w, height: h, rx: 6,
     fill: C.frame, stroke: C.faceStroke, "stroke-width": 1.5 }));
-  svg.appendChild(svgEl("text", { x: w / 2, y: 24, "text-anchor": "middle",
-    "font-size": 15, "font-weight": "bold", fill: C.text }, rack.name));
+  const title = svgEl("text", { x: w / 2, y: 24, "text-anchor": "middle",
+    "font-size": 15, "font-weight": "bold", fill: C.text,
+    style: "cursor: pointer;" }, rack.name);
+  /* Clic sur le nom = édition de la baie (nom, hauteur 6-60U, localisation). */
+  title.addEventListener("click", (e) => openRackMenu(e, rack));
+  svg.appendChild(title);
 
   const zoneY = HEADER_H + FRAME_PAD, zoneH = rack.u_height * U_PX;
   svg.appendChild(svgEl("rect", { x: innerX, y: zoneY, width: RACK_W, height: zoneH, fill: C.slot }));
@@ -451,6 +455,72 @@ function renderRackSVG(rack) {
 
   return svg;
 }
+
+/* =====================================================================
+ * Édition de baie (clic sur son nom) : nom, hauteur, localisation
+ * =================================================================== */
+
+function closeRackMenu() {
+  document.getElementById("rack-menu")?.remove();
+}
+
+function openRackMenu(e, rack) {
+  e.stopPropagation();
+  closeRackMenu();
+  closeItemMenu();
+  closeSlotPopover();
+  const maxUsed = Math.max(0, ...rack.items.map((i) =>
+    i.position_u + (typesById[i.type_id]?.u_height || 1) - 1));
+  const menu = document.createElement("div");
+  menu.id = "rack-menu";
+  menu.style.position = "fixed";
+  menu.style.zIndex = "70";
+  menu.innerHTML =
+    '<div class="menu-title">Baie</div>' +
+    '<label class="rk-field">Nom<input name="name" value="' + esc(rack.name) + '"></label>' +
+    '<label class="rk-field">Hauteur (U)<input name="u" type="number" min="6" max="60" value="' + rack.u_height + '"></label>' +
+    '<label class="rk-field">Localisation<input name="loc" value="' + esc(rack.location || "") + '"></label>' +
+    '<div class="rk-actions"><button class="rk-apply">Appliquer</button>' +
+    '<button class="rk-delete menu-danger">Supprimer</button></div>' +
+    '<div class="rk-msg"></div>';
+  document.body.appendChild(menu);
+  const pad = 6;
+  const r = menu.getBoundingClientRect();
+  menu.style.left = Math.max(pad, Math.min(e.clientX - r.width / 2,
+    window.innerWidth - r.width - pad)) + "px";
+  menu.style.top = Math.max(pad, Math.min(e.clientY + 10,
+    window.innerHeight - r.height - pad)) + "px";
+  const msg = menu.querySelector(".rk-msg");
+  menu.querySelector(".rk-apply").addEventListener("click", () => {
+    const u = parseInt(menu.querySelector('input[name="u"]').value, 10);
+    if (!(u >= 6 && u <= 60)) { msg.textContent = "Hauteur entre 6 et 60 U."; return; }
+    if (u < maxUsed) {
+      msg.textContent = `Impossible : un équipement occupe le U${maxUsed}.`;
+      return;
+    }
+    rack.name = menu.querySelector('input[name="name"]').value.trim() || rack.name;
+    rack.u_height = u;
+    rack.location = menu.querySelector('input[name="loc"]').value.trim();
+    closeRackMenu();
+    renderAll();
+  });
+  menu.querySelector(".rk-delete").addEventListener("click", () => {
+    if (rack.items.length) { msg.textContent = "Videz la baie avant de la supprimer."; return; }
+    if (project.racks.length <= 1) { msg.textContent = "Le projet garde au moins une baie."; return; }
+    project.racks = project.racks.filter((r2) => r2 !== rack);
+    closeRackMenu();
+    renderAll();
+  });
+  menu.querySelector('input[name="name"]').focus();
+}
+
+document.addEventListener("pointerdown", (e) => {
+  const menu = document.getElementById("rack-menu");
+  if (menu && !menu.contains(e.target)) closeRackMenu();
+}, true);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeRackMenu();
+});
 
 /* =====================================================================
  * Menu contextuel d'équipement (clic droit) : dupliquer, connecter, supprimer
