@@ -1262,7 +1262,7 @@ function hitTest(e) {
     if (e.clientX < r.left || e.clientX > r.right ||
         e.clientY < r.top || e.clientY > r.bottom) continue;
     const rack = project.racks.find((rk) => rk.id === svg.dataset.rackId);
-    const y = e.clientY - r.top;
+    const y = (e.clientY - r.top) / canvasZoom;  // écran -> px logiques
     const zoneY = HEADER_H + FRAME_PAD;
     if (y < zoneY || y > zoneY + rack.u_height * U_PX) return null;
     return { svg, rack, u: yToU(rack, y, drag.type.u_height) };
@@ -1584,6 +1584,59 @@ $("#btn-canvas-bg").addEventListener("click", () => {
   renderStatus("Fond du plan : " + CANVAS_BG_LABELS[canvasBg]);
 });
 
+/* ---- Zoom / pan du plan — Ctrl+molette, boutons, glisser le fond ----
+   CSS zoom (Chromium) : la mise en page ET les rectangles clients sont
+   mis à l'échelle — chaque calcul écran->logique divise par canvasZoom. */
+let canvasZoom = 1;
+
+function setCanvasZoom(z, cx, cy) {
+  const wrap = $("#canvas-wrap");
+  z = Math.min(3, Math.max(0.25, Math.round(z * 100) / 100));
+  if (z === canvasZoom) return;
+  const r = wrap.getBoundingClientRect();
+  const px = (cx ?? r.left + r.width / 2) - r.left;
+  const py = (cy ?? r.top + r.height / 2) - r.top;
+  /* Le point sous le curseur reste sous le curseur. */
+  const lx = (wrap.scrollLeft + px) / canvasZoom;
+  const ly = (wrap.scrollTop + py) / canvasZoom;
+  canvasZoom = z;
+  $("#canvas").style.zoom = canvasZoom;
+  $("#btn-zoom-reset").textContent = Math.round(canvasZoom * 100) + " %";
+  wrap.scrollLeft = lx * canvasZoom - px;
+  wrap.scrollTop = ly * canvasZoom - py;
+}
+$("#btn-zoom-in").addEventListener("click", () => setCanvasZoom(canvasZoom * 1.2));
+$("#btn-zoom-out").addEventListener("click", () => setCanvasZoom(canvasZoom / 1.2));
+$("#btn-zoom-reset").addEventListener("click", () => setCanvasZoom(1));
+$("#canvas-wrap").addEventListener("wheel", (e) => {
+  if (!e.ctrlKey) return;  // molette seule = défilement normal
+  e.preventDefault();
+  setCanvasZoom(canvasZoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12),
+                e.clientX, e.clientY);
+}, { passive: false });
+
+/* Pan : glisser le fond vide (ou bouton du milieu n'importe où). */
+$("#canvas-wrap").addEventListener("pointerdown", (e) => {
+  const wrap = $("#canvas-wrap");
+  const onBg = e.target === wrap || e.target.id === "canvas";
+  if (annotTool || drag) return;
+  if (e.button !== 1 && !onBg) return;
+  e.preventDefault();
+  const sx = e.clientX + wrap.scrollLeft, sy = e.clientY + wrap.scrollTop;
+  document.body.style.cursor = "grabbing";
+  const move = (ev) => {
+    wrap.scrollLeft = sx - ev.clientX;
+    wrap.scrollTop = sy - ev.clientY;
+  };
+  const up = () => {
+    document.body.style.cursor = "";
+    document.removeEventListener("pointermove", move);
+    document.removeEventListener("pointerup", up);
+  };
+  document.addEventListener("pointermove", move);
+  document.addEventListener("pointerup", up);
+});
+
 /* ---- Dessin libre (Texte / Zone / Flèche) — esprit draw.io ---------- */
 let annotTool = null; // null | "texte" | "zone" | "fleche"
 
@@ -1605,10 +1658,13 @@ document.addEventListener("keydown", (e) => {
 });
 
 function svgPoint(svg, e) {
-  const pt = svg.createSVGPoint();
-  pt.x = e.clientX; pt.y = e.clientY;
-  const p = pt.matrixTransform(svg.getScreenCTM().inverse());
-  return { x: Math.max(0, p.x), y: Math.max(0, p.y) };
+  /* Rect + division par le zoom (le SVG logique est 1:1 avec son viewBox
+     — plus fiable que getScreenCTM sous CSS zoom). */
+  const r = svg.getBoundingClientRect();
+  return {
+    x: Math.max(0, (e.clientX - r.left) / canvasZoom),
+    y: Math.max(0, (e.clientY - r.top) / canvasZoom),
+  };
 }
 
 function addAnnotation(a) {
@@ -1704,7 +1760,8 @@ function wireLogical(svg) {
       const sx = e.clientX, sy = e.clientY;
       let dx = 0, dy = 0;
       const move = (ev) => {
-        dx = ev.clientX - sx; dy = ev.clientY - sy;
+        dx = (ev.clientX - sx) / canvasZoom;
+        dy = (ev.clientY - sy) / canvasZoom;
         g.setAttribute("transform", `translate(${dx},${dy})`);
       };
       const up = () => {
