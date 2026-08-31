@@ -27,9 +27,15 @@ les images constructeurs — app saine, 83/91 types avec image officielle,
 0 ratio aberrant. 4 correctifs mineurs commités (MIME sniffé, WAN borné,
 422 lisibles, commentaire CSS) — ⚠️ **pas encore dans l'exe déployé** :
 recompiler au prochain redémarrage de l'app (elle tournait pendant le
-correctif, fichier verrouillé). Reste au backlog images : 7 images
-> 500 Ko à optimiser, 3 vrais trous constructeur (fortigate-600e,
-poweredge-r650, smart-ups-3000).
+correctif, fichier verrouillé). **Images v2 (31/08, ~22h, 3 agents)** : audit des 83 images + chasse
+NetBox devicetype-library + réadaptation Pillow en série (rognage,
+≤2000 px, ré-encodage). Résultat : 4 remplacées haute résolution,
+34 rognées, trou APC Smart-UPS 3000 comblé (84 types avec image),
+12,74 → 8,70 Mo, catalogues DEV et EXE md5-identiques, originaux dans
+`_originaux-2026-08-31\` de chaque catalogue. ⚠️ Le workspace est
+gitignoré : ces images ne vivent QUE sur disque — les inclure dans
+toute sauvegarde. Restent 2 trous sans source NetBox (fortigate-600e,
+poweredge-r650) et 11 modèles à ~700 px sans meilleure source connue.
 
 ## 🌉 Pont d'Hemingway — prochaine étape exacte
 
