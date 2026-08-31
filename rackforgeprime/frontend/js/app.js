@@ -449,11 +449,48 @@ function drawCategoryDecor(g, t, x, y, w, h) {
   }
 }
 
+/* Motif discret dans les U LIBRES (idée Panther) : suit le fond du plan
+   choisi — ruche, points, carreaux, lignes — en version très atténuée.
+   « Uni » = U libres unis. Écran seulement : les exports DAT restent sobres. */
+function makeSlotPattern(rackId) {
+  if (canvasBg === "uni") return null;
+  const col = C.slotLine;
+  const pat = svgEl("pattern", {
+    id: "slotpat-" + rackId, patternUnits: "userSpaceOnUse",
+    width: 12, height: 12,
+  });
+  if (canvasBg === "points") {
+    pat.setAttribute("width", 10); pat.setAttribute("height", 10);
+    pat.appendChild(svgEl("circle", { cx: 2, cy: 2, r: 1, fill: col,
+      "fill-opacity": 0.6 }));
+  } else if (canvasBg === "carreaux") {
+    pat.appendChild(svgEl("path", { d: "M12 0H0V12", fill: "none",
+      stroke: col, "stroke-opacity": 0.5, "stroke-width": 1 }));
+  } else if (canvasBg === "lignes") {
+    pat.appendChild(svgEl("line", { x1: 0, y1: 6, x2: 12, y2: 6,
+      stroke: col, "stroke-opacity": 0.5 }));
+  } else {  /* ruche */
+    pat.setAttribute("width", 14); pat.setAttribute("height", 24.5);
+    pat.appendChild(svgEl("path", {
+      d: "M7 4.6l6.5 3.75v7.5L7 19.6.5 15.85v-7.5L7 4.6z"
+         + "M0 16.25l6.5 3.75v8M13.5 16.25L7 20m0-16.5L.5 0m6.5 3.5L13.5 0",
+      fill: "none", stroke: col, "stroke-opacity": 0.45, "stroke-width": 0.8,
+    }));
+  }
+  return pat;
+}
+
 function renderRackSVG(rack) {
   const { w, h } = rackSize(rack);
   const innerX = FRAME_PAD + RAIL_W;
   const svg = svgEl("svg", { width: w, height: h, viewBox: `0 0 ${w} ${h}` });
   svg.dataset.rackId = rack.id;
+  const slotPat = makeSlotPattern(rack.id);
+  if (slotPat) {
+    const defs = svgEl("defs", {});
+    defs.appendChild(slotPat);
+    svg.appendChild(defs);
+  }
 
   svg.appendChild(svgEl("rect", { x: 0, y: 0, width: w, height: h, rx: 6,
     fill: C.frame, stroke: C.faceStroke, "stroke-width": 1.5 }));
@@ -551,7 +588,8 @@ function renderRackSVG(rack) {
     if (occupied.has(u)) continue;
     const slot = svgEl("rect", {
       x: innerX + 2, y: uToY(rack, u) + 2, width: RACK_W - 4, height: U_PX - 4,
-      rx: 2, class: "slot-free", fill: "transparent",
+      rx: 2, class: "slot-free",
+      fill: slotPat ? `url(#slotpat-${rack.id})` : "transparent",
     });
     slot.addEventListener("click", (e) => openSlotPopover(e, rack, u));
     svg.appendChild(slot);
@@ -1724,6 +1762,7 @@ $("#btn-canvas-bg").addEventListener("click", () => {
   document.body.dataset.canvasBg = canvasBg;
   localStorage.setItem("rfp-canvas-bg", canvasBg);
   renderStatus("Fond du plan : " + CANVAS_BG_LABELS[canvasBg]);
+  if (viewMode === "physical") renderAll();  // les U libres suivent le motif
 });
 
 /* ---- Zoom / pan du plan — Ctrl+molette, boutons, glisser le fond ----
