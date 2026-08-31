@@ -244,9 +244,11 @@ function itemTipHTML(t, item) {
   const rows = [
     ["Modèle", `${t.vendor} ${t.model}`],
     ["Hauteur", t.u_height + "U"],
+    ["IP mgmt", m.mgmt_ip],
     ["VLAN", m.vlan],
     ["Prise murale", m.wall_outlet],
     ["N° série", m.serial],
+    ["Asset", m.asset],
     ["Ports brassés", (m.port_usage || []).length || ""],
   ].filter(([, v]) => v);
   return `<div class="tip-title">${esc(m.hostname || t.model)}</div>` +
@@ -552,7 +554,9 @@ function openDeviceSheet(itemId) {
   $("#device-sub").textContent =
     `${t.vendor} ${t.model} · ${t.u_height}U · ${rack.name} U${item.position_u}` +
     (isPoE(t) ? " · PoE ⚡" : "") +
-    (item.meta.serial ? ` · S/N ${item.meta.serial}` : "");
+    (item.meta.mgmt_ip ? ` · ${item.meta.mgmt_ip}` : "") +
+    (item.meta.serial ? ` · S/N ${item.meta.serial}` : "") +
+    (item.meta.asset ? ` · ${item.meta.asset}` : "");
 
   const ports = t.ports || [];
   const used = ports.filter((p) => portUsageOf(item, p.name)).length;
@@ -694,7 +698,8 @@ function searchMatches(q) {
       const t = typesById[item.type_id];
       if (!t) continue;
       const hay = (`${item.meta.hostname} ${t.vendor} ${t.model} ` +
-        `${item.meta.vlan} ${item.meta.serial}`).toLowerCase();
+        `${item.meta.vlan} ${item.meta.serial} ${item.meta.mgmt_ip} ` +
+        `${item.meta.asset}`).toLowerCase();
       if (hay.includes(q))
         out.push({ item, rack, t,
           label: item.meta.hostname || `${t.vendor} ${t.model}`,
@@ -1205,7 +1210,8 @@ function selectItem(id) {
   $("#inspector-type").textContent =
     `${t.vendor} ${t.model} — ${t.u_height}U — ${rack.name} U${item.position_u}`;
   const f = $("#inspector-form");
-  for (const k of ["hostname", "role", "vlan", "wall_outlet", "serial", "notes"])
+  for (const k of ["hostname", "role", "vlan", "wall_outlet", "mgmt_ip",
+                   "serial", "asset", "notes"])
     f.elements[k].value = item.meta[k] || "";
   renderPortRows(item);
   renderAll();

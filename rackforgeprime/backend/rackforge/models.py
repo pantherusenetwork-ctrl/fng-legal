@@ -80,6 +80,8 @@ class ItemMeta(BaseModel):
     port_usage: list[PortUsage] = []
     serial: str = ""
     notes: str = ""
+    mgmt_ip: str = ""   # IP de management — l'attente pro n°1 (Packet Pushers)
+    asset: str = ""     # asset tag / n° d'inventaire
 
 
 class RackItem(BaseModel):

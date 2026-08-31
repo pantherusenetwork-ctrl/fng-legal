@@ -121,6 +121,7 @@ def _collect_nodes(project: Project, types: dict[str, EquipmentType]) -> list[di
                 "id": item.id,
                 "label": item.meta.hostname or f"{t.vendor} {t.model}",
                 "sub": f"{rack.name} · U{item.position_u}"
+                       + (f" · {item.meta.mgmt_ip}" if item.meta.mgmt_ip else "")
                        + (f" · VLAN {item.meta.vlan}" if item.meta.vlan else ""),
                 "category": t.category,
                 "color": t.color,
