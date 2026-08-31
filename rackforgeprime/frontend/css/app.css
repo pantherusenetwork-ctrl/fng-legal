@@ -512,3 +512,9 @@ body[data-theme="clair"] #search-overlay .search-box { background: rgba(255, 255
 }
 #statusbar { font-size: 13px; }
 #tip-text { font-size: 12.5px; }
+
+/* Photos officielles adoucies sur fond sombre (ecran seulement : les
+   exports clair gardent la photo brute) */
+body:not([data-theme="clair"]) #canvas svg image {
+  filter: brightness(.86) saturate(.88);
+}

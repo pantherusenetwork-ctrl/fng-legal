@@ -228,7 +228,7 @@ def render_rack(rack: Rack, types: dict[str, EquipmentType],
         for rx in (FRAME_PAD, FRAME_PAD + RAIL_W + RACK_W):
             s.append(f'<text x="{rx + RAIL_W / 2:.0f}" y="{y + U_PX / 2 + 3:.1f}" '
                      f'text-anchor="middle" font-family="{FONT_MONO}" '
-                     f'font-size="8" fill="{p["dim"]}">{u}</text>')
+                     f'font-size="9.5" fill="{p["dim"]}">{u}</text>')
             for k in range(3):
                 hy = y + 4 + k * ((U_PX - 8) / 2)
                 s.append(f'<rect x="{rx + 2}" y="{hy:.1f}" width="3" height="3" '

@@ -100,8 +100,8 @@ def _page_frame(c, page_w: float, page_h: float, project: Project,
     # Bandeau cartouche sur toute la largeur, en bas du cadre.
     y0 = _MARGIN
     c.rect(_MARGIN, y0, page_w - 2 * _MARGIN, _CARTOUCHE_H)
-    cols = [_MARGIN, page_w * 0.42, page_w * 0.62, page_w * 0.78,
-            page_w - _MARGIN - 90, page_w - _MARGIN]
+    cols = [_MARGIN, page_w * 0.38, page_w * 0.56, page_w * 0.68,
+            page_w - _MARGIN - 76, page_w - _MARGIN]
     for x in cols[1:-1]:
         c.line(x, y0, x, y0 + _CARTOUCHE_H)
 
@@ -153,11 +153,14 @@ def _draw_table_page(c, page_w: float, page_h: float, title: str,
                      rows: list[list[str]], pal: dict) -> None:
     """Une page de tableau (les lignes DOIVENT tenir : paginé par l'appelant)."""
     x, y, w, _h = _content_zone(page_w, page_h)
-    top = page_h - _MARGIN - 30
+    line_h = 18
+    # Bloc titre + tableau centré verticalement quand il est court —
+    # fini les pages remplies au tiers.
+    block = 60 + len(rows) * line_h
+    top = min(page_h - _MARGIN - 30, y + (_h + block) / 2)
     c.setFillColorRGB(*pal["accent"])
     c.setFont("Helvetica-Bold", 15)
     c.drawString(x, top, title)
-    line_h = 18
     ty = top - 30
     scale_w = w / sum(col_w)
     c.setFont("Helvetica-Bold", 10)
@@ -252,13 +255,26 @@ def render_project_dossier_pdf(project: Project,
         c.showPage()
         page_no += 1
 
-    for chunk in bom_pages:
+    types = type_index(project)
+    total_w_charge = sum(
+        types[i.type_id].power_w
+        for r in project.racks for i in r.items if i.type_id in types)
+    for k, chunk in enumerate(bom_pages):
         _page_frame(c, page_w, page_h, project, "Nomenclature",
                     page_no, total, pal)
         _draw_table_page(
             c, page_w, page_h, "Nomenclature (BOM)",
             ["Constructeur", "Modèle", "Hauteur", "Qté", "U totaux", "Conso totale"],
             [16, 30, 10, 8, 10, 14], chunk, pal)
+        if k == len(bom_pages) - 1:
+            # Bilan énergie : la somme que l'exploitant confronte à la
+            # capacité de son onduleur.
+            c.setFillColorRGB(*pal["accent"])
+            c.setFont("Helvetica-Bold", 11)
+            c.drawString(_MARGIN + 10, _MARGIN + _CARTOUCHE_H + 12,
+                         f"Charge totale estimée : {total_w_charge:g} W "
+                         f"(hors budget PoE délivré — à confronter à la "
+                         f"capacité de l'onduleur)")
         c.showPage()
         page_no += 1
 

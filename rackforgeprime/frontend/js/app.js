@@ -444,7 +444,7 @@ function renderRackSVG(rack) {
     for (const rx of [FRAME_PAD, FRAME_PAD + RAIL_W + RACK_W]) {
       if (showUNumbers)
         svg.appendChild(svgEl("text", { x: rx + RAIL_W / 2, y: y + U_PX / 2 + 3,
-          "text-anchor": "middle", "font-size": 8, fill: C.dim,
+          "text-anchor": "middle", "font-size": 9.5, fill: C.dim,
           "font-family": "monospace" }, String(u)));
       for (let k = 0; k < 3; k++)
         svg.appendChild(svgEl("rect", { x: rx + 2, y: y + 4 + k * ((U_PX - 8) / 2),
