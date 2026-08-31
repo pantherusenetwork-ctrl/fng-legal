@@ -164,7 +164,11 @@
       <div id="device-grid"><!-- grille de ports générée --></div>
       <div id="device-legend">
         <span><span class="lg lg-used"></span>Brassé</span>
+        <span><span class="lg lg-up"></span>Up</span>
+        <span><span class="lg lg-down"></span>Down</span>
+        <span><span class="lg lg-reserve"></span>Réservé</span>
         <span><span class="lg lg-free"></span>Libre</span>
+        <span>⚡ PoE</span>
         <span class="dialog-hint">Survolez un port pour sa config — cliquez pour l'éditer.</span>
       </div>
     </div>
@@ -174,6 +178,14 @@
         <label>Prise murale <input name="outlet" autocomplete="off"></label>
         <label>VLAN <input name="vlan" autocomplete="off"></label>
         <label>Usage <input name="usage" autocomplete="off"></label>
+        <label>État
+          <select name="etat">
+            <option value="">—</option>
+            <option value="up">Up (actif)</option>
+            <option value="down">Down</option>
+            <option value="reserve">Réservé</option>
+          </select>
+        </label>
       </div>
       <div class="dpf-actions">
         <button type="submit">Enregistrer</button>

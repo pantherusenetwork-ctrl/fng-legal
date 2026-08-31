@@ -565,3 +565,16 @@ body:not([data-theme="clair"]) #canvas svg image {
   background: var(--panel-2); border: 1px solid var(--line);
   border-radius: 999px; padding: 3px 11px; font-family: var(--mono); font-size: 12px;
 }
+
+/* ---- Etats de port + PoE dans la fiche equipement ---- */
+.dp-cell { position: relative; }
+.dp-cell.p-up { background: #16a34a; color: #ffffff; font-weight: 600; }
+.dp-cell.p-down { background: #dc2626; color: #ffffff; font-weight: 600; }
+.dp-cell.p-reserve { background: #eab308; color: #1c2126; font-weight: 600; }
+.dp-cell .dp-poe { position: absolute; top: -5px; right: -3px; font-size: 8px; filter: grayscale(0); }
+.dp-cell.p-free .dp-poe { opacity: .45; }
+#device-legend .lg-up { background: #16a34a; }
+#device-legend .lg-down { background: #dc2626; }
+#device-legend .lg-reserve { background: #eab308; }
+.dpf-fields { grid-template-columns: repeat(4, 1fr); }
+.dpf-fields select { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; color: var(--text); padding: 6px 9px; font-size: 13px; }

@@ -221,7 +221,7 @@ def render_project_dossier_pdf(project: Project,
     pal = _pdf_palette(theme)
     page_w, page_h = landscape(A4)
     patch_rows = [[r["rack"], f"U{r['u']}", r["equipment"], r["port"],
-                   r["outlet"], r["vlan"], r["usage"]]
+                   r["outlet"], r["vlan"], r["usage"], r["etat"]]
                   for r in patch_table(project, type_index(project))]
     patch_pages = _paginate(patch_rows)
     bom_pages = _paginate(_bom_rows(project))
@@ -250,8 +250,9 @@ def render_project_dossier_pdf(project: Project,
                     page_no, total, pal)
         _draw_table_page(
             c, page_w, page_h, "Tableau de brassage — généré, jamais dessiné",
-            ["Baie", "U", "Équipement", "Port", "Prise murale", "VLAN", "Usage"],
-            [10, 6, 24, 12, 14, 8, 26], chunk, pal)
+            ["Baie", "U", "Équipement", "Port", "Prise murale", "VLAN",
+             "Usage", "État"],
+            [10, 6, 22, 11, 13, 8, 20, 9], chunk, pal)
         c.showPage()
         page_no += 1
 

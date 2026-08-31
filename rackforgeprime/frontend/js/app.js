@@ -225,6 +225,8 @@ function portTipHTML(t, item, port) {
     ["VLAN", vlan],
     ["Prise murale", outlet],
     ["Usage", pu?.usage || ""],
+    ["État", ETAT_LABELS[pu?.etat] || ""],
+    ["PoE", (isPoE(t) && /base-t/i.test(port.type || "")) ? "oui ⚡" : ""],
   ].filter(([, v]) => v);
   return `<div class="tip-title">${esc(port.name)}</div>` +
     (rows.length
@@ -526,6 +528,15 @@ function portUsageOf(item, portName) {
   return (item.meta.port_usage || []).find((p) => p.port === portName);
 }
 
+/* PoE ? — déduit du nom du modèle (POE/FPOE/UPOE, et -xxP / -xxU Cisco). */
+function isPoE(t) {
+  const s = `${t.model} ${t.id}`;
+  return /(^|[^a-z])(poe|fpoe|upoe)([^a-z]|$)/i.test(s) ||
+         (t.vendor === "Cisco" && /-\d+(p|u)\b/i.test(t.model));
+}
+
+const ETAT_LABELS = { up: "Up", down: "Down", reserve: "Réservé" };
+
 function openDeviceSheet(itemId) {
   const found = findItem(itemId);
   if (!found) return;
@@ -537,6 +548,7 @@ function openDeviceSheet(itemId) {
   $("#device-title").textContent = item.meta.hostname || `${t.vendor} ${t.model}`;
   $("#device-sub").textContent =
     `${t.vendor} ${t.model} · ${t.u_height}U · ${rack.name} U${item.position_u}` +
+    (isPoE(t) ? " · PoE ⚡" : "") +
     (item.meta.serial ? ` · S/N ${item.meta.serial}` : "");
 
   const ports = t.ports || [];
@@ -568,7 +580,10 @@ function openDeviceSheet(itemId) {
         if (!port) { grid.appendChild(cell); continue; }
         const pu = portUsageOf(item, port.name);
         cell.classList.add(pu ? "p-used" : "p-free");
-        cell.innerHTML = `<span class="dp-num">${i + 1}</span>`;
+        if (pu?.etat) cell.classList.add("p-" + pu.etat);
+        const poe = isPoE(t) && /base-t/i.test(port.type || "");
+        cell.innerHTML = `<span class="dp-num">${i + 1}</span>` +
+          (poe ? '<span class="dp-poe">⚡</span>' : "");
         cell.title = port.name;
         cell.addEventListener("mousemove", (e) => showTip(portTipHTML(t, item, port), e));
         cell.addEventListener("mouseleave", hideTip);
@@ -606,6 +621,7 @@ function openPortEditor(item, port) {
   f.elements.outlet.value = pu.outlet || "";
   f.elements.vlan.value = pu.vlan || "";
   f.elements.usage.value = pu.usage || "";
+  f.elements.etat.value = pu.etat || "";
   f.hidden = false;
   f.elements.outlet.focus();
 }
@@ -617,13 +633,14 @@ $("#device-port-form").addEventListener("submit", (e) => {
   const f = e.target;
   let pu = portUsageOf(item, port.name);
   if (!pu) {
-    pu = { port: port.name, outlet: "", vlan: "", usage: "" };
+    pu = { port: port.name, outlet: "", vlan: "", usage: "", etat: "" };
     item.meta.port_usage = item.meta.port_usage || [];
     item.meta.port_usage.push(pu);
   }
   pu.outlet = f.elements.outlet.value.trim();
   pu.vlan = f.elements.vlan.value.trim();
   pu.usage = f.elements.usage.value.trim();
+  pu.etat = f.elements.etat.value;
   renderAll();
   openDeviceSheet(deviceItemId);
 });
@@ -1717,13 +1734,15 @@ $("#btn-patch-table").addEventListener("click", async () => {
   if (!res.ok) { wrap.textContent = "Projet invalide."; }
   else {
     const { rows } = await res.json();
-    const head = ["Baie", "U", "Équipement", "Port", "Prise", "VLAN", "Usage"];
+    const head = ["Baie", "U", "Équipement", "Port", "Prise", "VLAN",
+                  "Usage", "État"];
     wrap.innerHTML = "<table><thead><tr>" +
       head.map((h) => `<th>${h}</th>`).join("") + "</tr></thead><tbody>" +
       (rows.length ? rows.map((r) =>
         `<tr><td>${r.rack}</td><td>U${r.u}</td><td>${r.equipment}</td>` +
-        `<td>${r.port}</td><td>${r.outlet}</td><td>${r.vlan}</td><td>${r.usage}</td></tr>`
-      ).join("") : '<tr><td colspan="7">Aucun équipement.</td></tr>') +
+        `<td>${r.port}</td><td>${r.outlet}</td><td>${r.vlan}</td>` +
+        `<td>${r.usage}</td><td>${ETAT_LABELS[r.etat] || ""}</td></tr>`
+      ).join("") : '<tr><td colspan="8">Aucun équipement.</td></tr>') +
       "</tbody></table>";
   }
   $("#patch-dialog").showModal();

@@ -69,6 +69,7 @@ class PortUsage(BaseModel):
     outlet: str = ""  # prise murale
     vlan: str = ""
     usage: str = ""
+    etat: str = ""    # "" (non renseigné) | up | down | reserve
 
 
 class ItemMeta(BaseModel):
@@ -288,6 +289,7 @@ def patch_table(project: Project, types: dict[str, EquipmentType]
                     "outlet": pu.outlet or item.meta.wall_outlet,
                     "vlan": pu.vlan or item.meta.vlan,
                     "usage": pu.usage,
+                    "etat": pu.etat,
                 })
     return rows
 
@@ -300,8 +302,8 @@ def patch_table_csv(project: Project, types: dict[str, EquipmentType]) -> str:
     buf = io.StringIO()
     writer = csv.writer(buf, delimiter=";")
     writer.writerow(["Baie", "U", "Équipement", "Port", "Prise murale",
-                     "VLAN", "Usage"])
+                     "VLAN", "Usage", "État"])
     for r in patch_table(project, types):
         writer.writerow([r["rack"], f"U{r['u']}", r["equipment"], r["port"],
-                         r["outlet"], r["vlan"], r["usage"]])
+                         r["outlet"], r["vlan"], r["usage"], r["etat"]])
     return buf.getvalue()
