@@ -24,7 +24,7 @@ _BG = (0.043, 0.055, 0.078)      # #0b0e14
 _FRAME = (0.16, 0.20, 0.29)      # #2a3446
 _TEXT = (0.80, 0.84, 0.88)       # #cbd5e1
 _DIM = (0.39, 0.45, 0.55)        # #64748b
-_ACCENT = (0.13, 0.83, 0.93)     # #22d3ee
+_ACCENT = (0.976, 0.451, 0.086)  # #f97316 — l'orange, seule couleur de marque
 _CARTOUCHE_H = 46
 _MARGIN = 18
 
@@ -42,10 +42,10 @@ def render_project_pdf(project: Project, view: str = "physical") -> bytes:
 
     page_w, page_h = landscape(A4)
     margin = 24
-    # Mise à l'échelle uniforme pour tenir dans la page, sans jamais agrandir
-    # (l'échelle U reste exacte relative — on ne déforme rien).
+    # Mise à l'échelle uniforme pour REMPLIR la page (agrandissement borné :
+    # l'échelle U reste exacte relative — on ne déforme rien).
     scale = min((page_w - 2 * margin) / drawing.width,
-                (page_h - 2 * margin) / drawing.height, 1.0)
+                (page_h - 2 * margin) / drawing.height, 1.75)
     drawing.scale(scale, scale)
 
     buf = io.BytesIO()
@@ -120,9 +120,12 @@ def _draw_svg_page(c, svg: str, page_w: float, page_h: float) -> None:
     if drawing is None:
         raise RuntimeError("Conversion SVG -> PDF impossible (SVG invalide)")
     x, y, w, h = _content_zone(page_w, page_h)
-    scale = min(w / drawing.width, h / drawing.height, 1.0)
+    # Le dessin REMPLIT la page (agrandi si besoin, borné pour ne pas
+    # pixelliser les textes) et est centré — plus de page aux 2/3 vide.
+    scale = min(w / drawing.width, h / drawing.height, 1.75)
+    dw, dh = drawing.width * scale, drawing.height * scale
     drawing.scale(scale, scale)
-    renderPDF.draw(drawing, c, x, y + h - drawing.height * scale)
+    renderPDF.draw(drawing, c, x + (w - dw) / 2, y + (h - dh) / 2)
 
 
 def _draw_table_page(c, page_w: float, page_h: float, title: str,

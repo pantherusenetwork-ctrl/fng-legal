@@ -463,3 +463,43 @@ body[data-theme="clair"] .dropdown-menu { background: rgba(255, 255, 255, .8); b
 .palette-group-title:hover { color: var(--accent); }
 .palette-item .vendor { color: var(--text-dim); font-size: 10.5px; }
 .palette-item .model { font-weight: 600; color: var(--text); font-size: 13px; }
+
+/* ---- Affordances : crayon de baie, bouton "..." d equipement ---- */
+.rack-pencil { opacity: 0; transition: opacity .15s; }
+.rack-title:hover .rack-pencil { opacity: 1; }
+g.rack-item .item-more { opacity: 0; transition: opacity .15s; }
+g.rack-item:hover .item-more { opacity: 1; }
+
+/* ---- Recherche globale Ctrl+K ---- */
+#search-overlay {
+  position: fixed; inset: 0; z-index: 80;
+  background: rgba(5, 8, 12, .45); display: flex;
+  justify-content: center; align-items: flex-start; padding-top: 12vh;
+}
+#search-overlay .search-box {
+  width: 460px; max-width: 92vw;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 14px; padding: 10px; box-shadow: 0 20px 50px rgba(0, 0, 0, .5);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+}
+body[data-theme="clair"] #search-overlay .search-box { background: rgba(255, 255, 255, .85); }
+#search-overlay input {
+  width: 100%; box-sizing: border-box; font-size: 15px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 9px;
+  color: var(--text); padding: 10px 14px;
+}
+#search-overlay .search-results { margin-top: 6px; max-height: 320px; overflow-y: auto; }
+.search-row {
+  display: flex; align-items: center; gap: 9px; padding: 8px 10px;
+  border-radius: 8px; cursor: pointer; font-size: 13.5px;
+}
+.search-row:hover { background: rgba(249, 115, 22, .12); }
+.search-row .sr-label { font-weight: 600; color: var(--text); }
+.search-row .sr-sub { margin-left: auto; color: var(--text-dim); font-family: var(--mono); font-size: 11px; }
+.search-empty { color: var(--text-dim); font-style: italic; padding: 10px; }
+
+/* ---- Astuces en barre d etat ---- */
+#statusbar { display: flex; align-items: center; gap: 16px; }
+#tip-text { margin-left: auto; color: var(--text-dim); font-size: 12px; cursor: pointer; }
+#tip-text:hover { color: var(--accent); }

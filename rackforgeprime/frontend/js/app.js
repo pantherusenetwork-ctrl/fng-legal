@@ -337,22 +337,30 @@ function drawPortBanks(g, t, item, x, y, w, h) {
     const r = i % rows, c = Math.floor(i / rows);
     const px = x0 + c * (pw + gapx) + Math.floor(c / group) * ggap;
     const py = y0 + r * (ph + 3);
-    g.appendChild(svgEl("rect", {
+    const portRect = svgEl("rect", {
       x: px, y: py, width: pw, height: ph, rx: 1,
       fill: C.portFill, stroke: color, "stroke-width": 0.7,
-    }));
+    });
+    g.appendChild(portRect);
     g.appendChild(svgEl("rect", {
       x: px + 2, y: py + ph - 1.6, width: 3, height: 1.6,
       fill: color, "fill-opacity": 0.85,
     }));
-    /* Zone de survol invisible, plus large que le port dessiné. */
+    /* Zone de survol invisible, plus large que le port dessiné ;
+       le port s'allume sous la souris (affordance). */
     const port = t.ports[i];
     const hit = svgEl("rect", {
       x: px - 1, y: py - 2, width: pw + 3, height: ph + 5,
       fill: "transparent", class: "port-hit",
     });
-    hit.addEventListener("mousemove", (e) => showTip(portTipHTML(t, item, port), e));
-    hit.addEventListener("mouseleave", hideTip);
+    hit.addEventListener("mousemove", (e) => {
+      portRect.setAttribute("stroke-width", "1.8");
+      showTip(portTipHTML(t, item, port), e);
+    });
+    hit.addEventListener("mouseleave", () => {
+      portRect.setAttribute("stroke-width", "0.7");
+      hideTip();
+    });
     g.appendChild(hit);
   }
 }
@@ -399,12 +407,19 @@ function renderRackSVG(rack) {
 
   svg.appendChild(svgEl("rect", { x: 0, y: 0, width: w, height: h, rx: 6,
     fill: C.frame, stroke: C.faceStroke, "stroke-width": 1.5 }));
-  const title = svgEl("text", { x: w / 2, y: 24, "text-anchor": "middle",
-    "font-size": 15, "font-weight": "bold", fill: C.text,
-    style: "cursor: pointer;" }, rack.name);
-  /* Clic sur le nom = édition de la baie (nom, hauteur 6-60U, localisation). */
-  title.addEventListener("click", (e) => openRackMenu(e, rack));
-  svg.appendChild(title);
+  /* Nom de baie éditable — le crayon apparaît au survol (affordance). */
+  const titleG = svgEl("g", { class: "rack-title", style: "cursor: pointer;" });
+  titleG.appendChild(svgEl("text", { x: w / 2, y: 24, "text-anchor": "middle",
+    "font-size": 15, "font-weight": "bold", fill: C.text }, rack.name));
+  const pencil = svgEl("g", { class: "rack-pencil",
+    transform: `translate(${w / 2 + rack.name.length * 4.2 + 12}, 12)` });
+  pencil.appendChild(svgEl("path", {
+    d: "M 0 9 L 8 1 L 11 4 L 3 12 L 0 12 Z", fill: "none",
+    stroke: C.accent, "stroke-width": 1.4, "stroke-linejoin": "round",
+  }));
+  titleG.appendChild(pencil);
+  titleG.addEventListener("click", (e) => openRackMenu(e, rack));
+  svg.appendChild(titleG);
 
   const zoneY = HEADER_H + FRAME_PAD, zoneH = rack.u_height * U_PX;
   svg.appendChild(svgEl("rect", { x: innerX, y: zoneY, width: RACK_W, height: zoneH, fill: C.slot }));
@@ -446,6 +461,23 @@ function renderRackSVG(rack) {
     g.addEventListener("mouseleave", clearHighlight);
     /* Clic droit = menu contextuel (dupliquer, connecter, supprimer). */
     g.addEventListener("contextmenu", (e) => openItemMenu(e, rack, item));
+    /* Bouton « ⋯ » visible au survol : le menu sans connaître le clic
+       droit (affordance). */
+    const t2 = typesById[item.type_id];
+    const my = uToY(rack, rack.desc_units ? item.position_u
+      : item.position_u + t2.u_height - 1) + (t2.u_height * U_PX) / 2;
+    const more = svgEl("g", { class: "item-more", style: "cursor: pointer;" });
+    more.appendChild(svgEl("circle", { cx: innerX + RACK_W - 46, cy: my,
+      r: 7.5, fill: C.frame, stroke: C.accent, "stroke-width": 1 }));
+    for (const dx of [-3.4, 0, 3.4])
+      more.appendChild(svgEl("circle", { cx: innerX + RACK_W - 46 + dx,
+        cy: my, r: 1, fill: C.accent }));
+    more.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openItemMenu(e, rack, item);
+    });
+    more.addEventListener("pointerdown", (e) => e.stopPropagation());
+    g.appendChild(more);
     svg.appendChild(g);
   }
 
@@ -471,6 +503,105 @@ function renderRackSVG(rack) {
 
   return svg;
 }
+
+/* =====================================================================
+ * Astuces rotatives (barre d'état) — les gestes qui ne se voient pas
+ * =================================================================== */
+
+const TIPS = [
+  "Astuce : clic droit sur un équipement — dupliquer, connecter, supprimer.",
+  "Astuce : cliquez un U libre pour ajouter sans glisser.",
+  "Astuce : survolez un port pour voir VLAN, prise et usage.",
+  "Astuce : cliquez le nom d'une baie pour la renommer ou changer sa hauteur.",
+  "Astuce : Ctrl+K cherche un hostname, un VLAN ou un modèle.",
+  "Astuce : Ctrl+Z annule — tout est réversible.",
+  "Astuce : survolez un équipement câblé, ses voisins reliés restent allumés.",
+];
+let tipIndex = Math.floor(Date.now() / 60000) % TIPS.length;
+function showNextTip() {
+  tipIndex = (tipIndex + 1) % TIPS.length;
+  $("#tip-text").textContent = TIPS[tipIndex];
+}
+$("#tip-text").textContent = TIPS[tipIndex];
+$("#tip-text").addEventListener("click", showNextTip);
+setInterval(showNextTip, 20000);
+
+/* =====================================================================
+ * Recherche globale (Ctrl+K) : hostname, VLAN, modèle → sélection
+ * =================================================================== */
+
+function closeSearch() {
+  document.getElementById("search-overlay")?.remove();
+}
+
+function searchMatches(q) {
+  const out = [];
+  for (const rack of project.racks)
+    for (const item of rack.items) {
+      const t = typesById[item.type_id];
+      if (!t) continue;
+      const hay = (`${item.meta.hostname} ${t.vendor} ${t.model} ` +
+        `${item.meta.vlan} ${item.meta.serial}`).toLowerCase();
+      if (hay.includes(q))
+        out.push({ item, rack, t,
+          label: item.meta.hostname || `${t.vendor} ${t.model}`,
+          sub: `${rack.name} · U${item.position_u}` +
+               (item.meta.vlan ? ` · VLAN ${item.meta.vlan}` : "") });
+    }
+  return out.slice(0, 12);
+}
+
+function openSearch() {
+  closeSearch();
+  const ov = document.createElement("div");
+  ov.id = "search-overlay";
+  ov.innerHTML = '<div class="search-box">' +
+    '<input type="search" placeholder="Hostname, VLAN, modèle… (Échap pour fermer)">' +
+    '<div class="search-results"></div></div>';
+  document.body.appendChild(ov);
+  const input = ov.querySelector("input");
+  const list = ov.querySelector(".search-results");
+  const fill = () => {
+    const q = input.value.trim().toLowerCase();
+    list.innerHTML = "";
+    if (!q) return;
+    const matches = searchMatches(q);
+    if (!matches.length) {
+      list.innerHTML = '<div class="search-empty">Aucun équipement ne correspond.</div>';
+      return;
+    }
+    for (const m of matches) {
+      const row = document.createElement("div");
+      row.className = "search-row";
+      row.innerHTML =
+        `<span class="role-dot" style="background:${m.t.color}"></span>` +
+        `<span class="sr-label">${esc(m.label)}</span>` +
+        `<span class="sr-sub">${esc(m.sub)}</span>`;
+      row.addEventListener("click", () => {
+        closeSearch();
+        if (viewMode !== "physical") setView("physical");
+        selectItem(m.item.id);
+        document.querySelector(`g[data-item-id="${m.item.id}"]`)
+          ?.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
+      list.appendChild(row);
+    }
+  };
+  input.addEventListener("input", fill);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") list.querySelector(".search-row")?.click();
+  });
+  ov.addEventListener("pointerdown", (e) => { if (e.target === ov) closeSearch(); });
+  input.focus();
+}
+
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+    e.preventDefault();
+    openSearch();
+  }
+  if (e.key === "Escape") closeSearch();
+});
 
 /* =====================================================================
  * Édition de baie (clic sur son nom) : nom, hauteur, localisation
