@@ -207,6 +207,31 @@ function refreshTypes() {
   for (const t of catalog.types) typesById[t.id] = t;
   for (const t of (project?.equipment_types || [])) typesById[t.id] = t;
 }
+
+/* Images de catalogue en CHARGEMENT DIFFÉRÉ : le catalogue arrive léger
+   (has_image), l'image d'un type n'est récupérée que quand un équipement
+   posé en a besoin — indispensable avec 1 000+ types. */
+const _imgFetching = new Set();
+function ensureProjectImages() {
+  const wanted = new Set();
+  for (const rack of project?.racks || [])
+    for (const it of rack.items) wanted.add(it.type_id);
+  const missing = [...wanted].filter((id) => {
+    const t = typesById[id];
+    return t && t.has_image && !t.faceplate_image && !t.faceplate_svg
+           && !_imgFetching.has(id);
+  });
+  if (!missing.length) return;
+  missing.forEach((id) => _imgFetching.add(id));
+  Promise.all(missing.map((id) =>
+    fetch("/api/catalog/image/" + encodeURIComponent(id))
+      .then((r) => r.json())
+      .then((d) => { if (d.image && typesById[id]) typesById[id].faceplate_image = d.image; })
+      .catch(() => {})
+  )).then(() => {
+    if (viewMode === "physical") renderAll();
+  });
+}
 function allTypes() {
   return Object.values(typesById);
 }
@@ -1240,6 +1265,7 @@ document.addEventListener("keydown", (e) => {
 function renderAll() {
   if (viewMode === "logical") { renderLogical(); return; }
   if (viewMode === "diagram") { renderDiagram(); return; }
+  ensureProjectImages();
   const canvas = $("#canvas");
   canvas.innerHTML = "";
   for (const rack of project.racks) canvas.appendChild(renderRackSVG(rack));

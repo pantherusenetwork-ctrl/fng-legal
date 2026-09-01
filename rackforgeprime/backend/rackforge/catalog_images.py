@@ -57,6 +57,25 @@ def _to_data_uri(path: Path) -> str:
     return f"data:{mime};base64,{payload}"
 
 
+def official_image_path(type_id: str) -> Path | None:
+    """Fichier image officiel d'un type, ou None."""
+    d = images_dir()
+    if d is None:
+        return None
+    for ext in _MIME:
+        candidate = d / f"{type_id}{ext}"
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def image_data_uri(type_id: str) -> str | None:
+    """Data URI de l'image officielle d'un type (chargement différé —
+    le catalogue complet en data URIs pèserait des dizaines de Mo)."""
+    path = official_image_path(type_id)
+    return _to_data_uri(path) if path else None
+
+
 def apply_official_images(types: list[EquipmentType]) -> list[EquipmentType]:
     """Retourne des copies des types, enrichies de leur image si présente.
 

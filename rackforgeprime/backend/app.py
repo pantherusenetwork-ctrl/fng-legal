@@ -19,7 +19,8 @@ from pydantic import ValidationError
 
 from rackforge import storage
 from rackforge.catalog import BUILTIN_TYPES, ROLE_COLORS
-from rackforge.catalog_images import apply_official_images
+from rackforge.catalog_images import (apply_official_images, image_data_uri,
+                                      official_image_path)
 from rackforge.catalog_packs import merged_catalog
 from rackforge.importers import import_netbox_yaml, parse_datasheet_pdf
 from rackforge.models import (Project, patch_table, patch_table_csv,
@@ -71,12 +72,22 @@ def _parse_project(payload: dict) -> Project:
 
 @app.get("/api/catalog")
 def get_catalog() -> dict:
-    """Types intégrés + packs constructeurs + images officielles du workspace."""
-    types = apply_official_images(merged_catalog(BUILTIN_TYPES))
-    return {
-        "types": [t.model_dump() for t in types],
-        "role_colors": ROLE_COLORS,
-    }
+    """Types intégrés + packs constructeurs. Les images sont en
+    CHARGEMENT DIFFÉRÉ (``has_image`` + /api/catalog/image/{id}) : un
+    catalogue de 1 000+ types en data URIs pèserait des dizaines de Mo."""
+    out = []
+    for t in merged_catalog(BUILTIN_TYPES):
+        d = t.model_dump()
+        d["has_image"] = bool(t.faceplate_image or t.faceplate_svg
+                              or official_image_path(t.id))
+        out.append(d)
+    return {"types": out, "role_colors": ROLE_COLORS}
+
+
+@app.get("/api/catalog/image/{type_id}")
+def get_catalog_image(type_id: str) -> dict:
+    """Image officielle d'un type, à la demande (data URI ou null)."""
+    return {"id": type_id, "image": image_data_uri(type_id)}
 
 
 # --- Validation / stats / brassage -----------------------------------------
