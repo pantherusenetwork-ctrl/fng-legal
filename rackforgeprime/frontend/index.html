@@ -67,6 +67,19 @@
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"></circle><circle cx="8" cy="8" r="2.4" fill="currentColor" stroke="none"></circle></svg>
           VLAN
         </button>
+        <span class="dropdown logical-only">
+          <button id="btn-calques" title="Calques du schéma : afficher/masquer zones, liens, étiquettes, nœuds, dessin — l'export suit l'écran">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8 1.8 14.5 5 8 8.2 1.5 5z"></path><path d="M1.5 8.2 8 11.4l6.5-3.2 M1.5 11.4 8 14.6l6.5-3.2"></path></svg>
+            Calques
+          </button>
+          <span id="calques-menu" class="dropdown-menu" hidden>
+            <label class="calque-row"><input type="checkbox" data-calque="zones" checked> Zones de couches</label>
+            <label class="calque-row"><input type="checkbox" data-calque="liens" checked> Liens</label>
+            <label class="calque-row"><input type="checkbox" data-calque="etiquettes" checked> Étiquettes</label>
+            <label class="calque-row"><input type="checkbox" data-calque="noeuds" checked> Équipements</label>
+            <label class="calque-row"><input type="checkbox" data-calque="dessin" checked> Dessin libre</label>
+          </span>
+        </span>
       </span>
       <span class="tb-group logical-only" aria-label="Dessin libre">
         <button id="btn-annot-texte" data-annot="texte" title="Poser un texte libre sur le schéma (cliquez ensuite l'endroit voulu)">
@@ -89,6 +102,16 @@
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3,2"><ellipse cx="8" cy="8" rx="6" ry="4.5"></ellipse></svg>
           Ellipse
         </button>
+        <span class="dropdown">
+          <button id="btn-formes" title="Bibliothèque de formes réseau (icônes vectorielles) — cliquez une forme puis l'endroit du schéma">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="5.4" height="5.4" rx="1"></rect><rect x="9.1" y="1.5" width="5.4" height="5.4" rx="1"></rect><rect x="1.5" y="9.1" width="5.4" height="5.4" rx="1"></rect><circle cx="11.8" cy="11.8" r="2.9"></circle></svg>
+            Formes
+          </button>
+          <span id="formes-menu" class="dropdown-menu" hidden>
+            <input id="formes-filter" type="text" placeholder="Filtrer (routeur, nuage…)" autocomplete="off">
+            <div id="formes-grid"></div>
+          </span>
+        </span>
       </span>
       <span class="tb-group" aria-label="Livrables">
         <button id="btn-patch-table" title="Tableau de brassage généré depuis les métadonnées">
@@ -171,6 +194,7 @@
     <!-- Canvas : les baies, rendues en SVG à l'échelle U exacte -->
     <section id="canvas-wrap">
       <div id="canvas"><!-- SVG des baies, généré par app.js --></div>
+      <div id="minimap" class="hidden" title="Minimap — cliquez ou glissez pour naviguer"><canvas width="192" height="132"></canvas></div>
     </section>
 
     <!-- Panneau métadonnées : s'ouvre au clic sur un équipement -->

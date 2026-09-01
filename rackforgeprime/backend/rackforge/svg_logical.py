@@ -379,6 +379,26 @@ def _render_annotations(annotations) -> tuple[list[str], list[str]]:
                    f'font-family="{FONT}" font-size="12" fill="{color}">'
                    f'{escape(a.text)}</text>' if a.text else "")
                 + '</g>')
+        elif a.kind == "icone":
+            from .formes import forme_inline
+            size = a.x2 if a.x2 >= 20 else 64
+            g = forme_inline(a.icon, a.x, a.y, size, a.color or C_TEXT)
+            if g is None:
+                over.append(f'<g {gid}><rect x="{a.x - 24:.0f}" '
+                            f'y="{a.y - 24:.0f}" width="48" height="48" '
+                            f'rx="6" fill="none" stroke="{C_TEXT_DIM}" '
+                            f'stroke-dasharray="4,3"/>'
+                            f'<text x="{a.x:.0f}" y="{a.y + 4:.0f}" '
+                            f'text-anchor="middle" font-family="{FONT}" '
+                            f'font-size="9" fill="{C_TEXT_DIM}">?</text></g>')
+            else:
+                over.append(f'<g {gid}>{g}'
+                            + (f'<text x="{a.x:.0f}" '
+                               f'y="{a.y + size / 2 + 14:.0f}" '
+                               f'text-anchor="middle" font-family="{FONT}" '
+                               f'font-size="12" fill="{a.color or C_TEXT}">'
+                               f'{escape(a.text)}</text>' if a.text else "")
+                            + '</g>')
         else:  # texte
             tw = max(len(a.text) * 7.2, 20)
             over.append(
@@ -419,9 +439,20 @@ def render_diagram_svg(project: Project, theme: str = "sombre") -> str:
     return "\n".join(s)
 
 
-def render_logical_svg(project: Project, theme: str = "sombre") -> str:
-    """Schéma logique complet du projet -> SVG."""
+# Calques du schéma logique (esprit Visio/draw.io : superposer sans
+# mélanger). Noms stables, partagés avec l'UI et l'API.
+LOGICAL_LAYERS = ("zones", "liens", "etiquettes", "noeuds", "dessin")
+
+
+def render_logical_svg(project: Project, theme: str = "sombre",
+                       layers=None) -> str:
+    """Schéma logique complet du projet -> SVG.
+
+    ``layers`` : sous-ensemble de LOGICAL_LAYERS à dessiner (None = tout).
+    Ce que l'écran masque, l'export le masque aussi — un seul moteur.
+    """
     _set_theme(theme)
+    L = set(LOGICAL_LAYERS) if layers is None else set(layers)
     types = type_index(project)
     nodes = _collect_nodes(project, types)
     pos = layout_nodes(project, types)
@@ -455,7 +486,8 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
     ]
 
     # Dessin libre : les zones utilisateur passent sous tout le reste.
-    annot_under, annot_over = _render_annotations(project.logical.annotations)
+    annot_under, annot_over = (_render_annotations(project.logical.annotations)
+                               if "dessin" in L else ([], []))
     s.extend(annot_under)
 
     # Zones de couche (conteneurs Lucid : bordure + titre, pas de fond) —
@@ -466,7 +498,7 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
         rank = LAYER_RANK.get(cat_by_id.get(nid, "other"), 5)
         ranks.setdefault(rank, []).append(nid)
     zone_lbls: list[str] = []
-    for rank, ids in sorted(ranks.items()):
+    for rank, ids in sorted(ranks.items()) if "zones" in L else []:
         xs = [pos[i][0] for i in ids]
         ys = [pos[i][1] for i in ids]
         zx, zy = min(xs) - 16, min(ys) - 24
@@ -508,15 +540,17 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
         pair_seen[pair] = idx + 1
         line, lbl, stack = _render_link(link, pos, vlan_colors, placed,
                                         fan=(idx, pair_total[pair]))
-        s.extend(line)
-        labels.extend(lbl)
-        if stack:
-            stacks.append(stack)
+        if "liens" in L:
+            s.extend(line)
+        if "etiquettes" in L:
+            labels.extend(lbl)
+            if stack:
+                stacks.append(stack)
 
     # Nuage WAN / Internet — dessiné seulement s'il est documenté (un
     # port dont l'usage mentionne WAN) : jamais inventé.
     wan = _wan_item(project)
-    if wan is not None and wan.id in pos:
+    if wan is not None and wan.id in pos and "noeuds" in L:
         wx = pos[wan.id][0] + NODE_W / 2
         # Borné : un nœud WAN déplacé à la main près du bord haut ne doit
         # pas envoyer le nuage hors du canvas (y négatif).
@@ -537,7 +571,7 @@ def render_logical_svg(project: Project, theme: str = "sombre") -> str:
         s.append('</g>')
 
     # Nœuds.
-    for n in nodes:
+    for n in nodes if "noeuds" in L else []:
         x, y = pos[n["id"]]
         s.append(f'<g id="lnode-{escape(n["id"])}">')
         s.append(f'<rect x="{x:.0f}" y="{y:.0f}" width="{NODE_W}" '

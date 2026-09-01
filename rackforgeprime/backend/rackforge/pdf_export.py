@@ -63,6 +63,7 @@ def _pdf_palette(theme: str) -> dict:
 
 
 def render_project_pdf(project: Project, view: str = "physical",
+                       layers=None,
                        theme: str = "sombre",
                        rendu: str = "photos") -> bytes:
     """Projet -> PDF (bytes). Le SVG est la source, le PDF une vue.
@@ -71,7 +72,7 @@ def render_project_pdf(project: Project, view: str = "physical",
     ``theme`` : « sombre » (écran) ou « clair » (impression).
     """
     if view == "logical":
-        svg = render_logical_svg(project, theme=theme)
+        svg = render_logical_svg(project, theme=theme, layers=layers)
     elif view == "diagram":
         svg = render_diagram_svg(project, theme=theme)
     else:

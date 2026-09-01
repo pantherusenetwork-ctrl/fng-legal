@@ -143,7 +143,9 @@ class Annotation(BaseModel):
     texte posé, zone encadrée, flèche. Rendu par le backend — présent
     dans TOUS les exports (SVG, PDF, PNG), pas un artefact d'écran."""
     id: str
-    kind: Literal["texte", "zone", "fleche", "ligne", "ellipse"]
+    kind: Literal["texte", "zone", "fleche", "ligne", "ellipse", "icone"]
+    # icone : nom de la forme de catalogue/formes/ ; x2 = taille (px).
+    icon: str = ""
     x: float = Field(allow_inf_nan=False)
     y: float = Field(allow_inf_nan=False)
     # zone : coin opposé ; flèche : pointe d'arrivée.

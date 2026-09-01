@@ -26,11 +26,13 @@ from rackforge.importers import import_netbox_yaml, parse_datasheet_pdf
 from rackforge.models import (Project, patch_table, patch_table_csv,
                               rack_stats, type_index)
 from rackforge.drawio_export import render_drawio
+from rackforge.formes import forme_svg, list_formes
 from rackforge.pdf_export import (render_labels_pdf,
                                   render_project_dossier_pdf,
                                   render_project_pdf)
 from rackforge.svg_export import render_project_svg
-from rackforge.svg_logical import render_diagram_svg, render_logical_svg
+from rackforge.svg_logical import (LOGICAL_LAYERS, render_diagram_svg,
+                                   render_logical_svg)
 
 # Packagé (PyInstaller) : le frontend est embarqué sous sys._MEIPASS.
 if getattr(sys, "frozen", False):
@@ -48,6 +50,20 @@ app = FastAPI(title="RackForgePrime", version=VERSION, docs_url="/api/docs")
 # silence sur le défaut — l'appelant sait tout de suite qu'il s'est trompé.
 Theme = Literal["sombre", "clair", "kaki", "nuit"]
 Rendu = Literal["photos", "dessin"]
+
+
+def _parse_layers(layers: str | None):
+    """``layers=zones,liens`` -> sous-ensemble validé, None = tout."""
+    if layers is None or layers == "":
+        return None
+    asked = {p.strip() for p in layers.split(",") if p.strip()}
+    unknown = asked - set(LOGICAL_LAYERS)
+    if unknown:
+        raise HTTPException(
+            status_code=422,
+            detail=[f"Calque inconnu : {', '.join(sorted(unknown))} "
+                    f"(attendus : {', '.join(LOGICAL_LAYERS)})"])
+    return asked
 
 
 def _parse_project(payload: dict) -> Project:
@@ -88,6 +104,23 @@ def get_catalog() -> dict:
 def get_catalog_image(type_id: str) -> dict:
     """Image officielle d'un type, à la demande (data URI ou null)."""
     return {"id": type_id, "image": image_data_uri(type_id)}
+
+
+# --- Formes vectorielles (icônes réseau du Diagramme) -----------------------
+
+@app.get("/api/formes")
+def get_formes() -> dict:
+    """Noms des formes disponibles (catalogue/formes/*.svg)."""
+    return {"formes": list_formes()}
+
+
+@app.get("/api/formes/svg/{name}")
+def get_forme_svg(name: str, color: str = "#8b95a3") -> Response:
+    """SVG d'une forme, currentColor résolu (aperçus de la palette)."""
+    svg = forme_svg(name, color)
+    if svg is None:
+        raise HTTPException(status_code=404, detail="Forme inconnue")
+    return Response(content=svg, media_type="image/svg+xml")
 
 
 # --- Validation / stats / brassage -----------------------------------------
@@ -147,13 +180,16 @@ async def import_datasheet(file: UploadFile = File(...)) -> dict:
 @app.post("/api/export/svg")
 def export_svg(payload: dict,
                view: Literal["physical", "logical", "diagram"] = "physical",
-               theme: Theme = "sombre", rendu: Rendu = "photos") -> Response:
+               theme: Theme = "sombre", rendu: Rendu = "photos",
+               layers: str | None = None) -> Response:
     """``view=physical`` : élévation ; ``logical`` : VLANs/liens ;
     ``diagram`` : page de dessin libre.
-    ``theme`` : sombre/clair/kaki/nuit. ``rendu`` : photos ou dessin."""
+    ``theme`` : sombre/clair/kaki/nuit. ``rendu`` : photos ou dessin.
+    ``layers`` : calques logiques à dessiner (csv), vide = tous."""
     project = _parse_project(payload)
     if view == "logical":
-        svg = render_logical_svg(project, theme=theme)
+        svg = render_logical_svg(project, theme=theme,
+                                 layers=_parse_layers(layers))
     elif view == "diagram":
         svg = render_diagram_svg(project, theme=theme)
     else:
@@ -170,7 +206,8 @@ def export_svg(payload: dict,
 def export_pdf(payload: dict,
                view: Literal["physical", "logical", "diagram",
                              "dossier"] = "physical",
-               theme: Theme = "sombre", rendu: Rendu = "photos") -> Response:
+               theme: Theme = "sombre", rendu: Rendu = "photos",
+               layers: str | None = None) -> Response:
     """``view`` : physical, logical, diagram, ou ``dossier`` (livrable DAT
     complet : élévation + logique + brassage + nomenclature, cartouche).
     ``theme`` : sombre/clair/kaki/nuit. ``rendu`` : photos ou dessin."""
@@ -179,7 +216,8 @@ def export_pdf(payload: dict,
         pdf = render_project_dossier_pdf(project, theme=theme, rendu=rendu)
         suffix = "-dossier"
     else:
-        pdf = render_project_pdf(project, view=view, theme=theme, rendu=rendu)
+        pdf = render_project_pdf(project, view=view, theme=theme, rendu=rendu,
+                                 layers=_parse_layers(layers))
         suffix = {"logical": "-logique", "diagram": "-diagramme"}.get(view, "")
     return Response(
         content=pdf, media_type="application/pdf",

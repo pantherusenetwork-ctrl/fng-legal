@@ -1276,6 +1276,7 @@ function renderAll() {
   ghost.title = "Ajouter une baie";
   ghost.addEventListener("click", () => $("#btn-add-rack").click());
   canvas.appendChild(ghost);
+  requestAnimationFrame(updateMinimap);
   renderOnboarding();
   renderStatus();
   saveLocal();
@@ -1595,10 +1596,14 @@ function viewSuffix() {
 }
 function exportQuery(view) {
   const q = new URLSearchParams();
-  q.set("view", view ||
-    ({ logical: "logical", diagram: "diagram" }[viewMode] || "physical"));
+  const v = view ||
+    ({ logical: "logical", diagram: "diagram" }[viewMode] || "physical");
+  q.set("view", v);
   q.set("theme", theme);
   q.set("rendu", renderMode);
+  /* Les calques masqués à l'écran le sont aussi à l'export. */
+  if (v === "logical" && hiddenLayers.size)
+    q.set("layers", ALL_LAYERS.filter((l) => !hiddenLayers.has(l)).join(","));
   return "?" + q.toString();
 }
 
@@ -1693,7 +1698,8 @@ $("#btn-import-json input").addEventListener("change", async (e) => {
  * =================================================================== */
 
 async function renderLogical() {
-  const res = await fetch("/api/export/svg?view=logical&theme=" + theme, {
+  const res = await fetch("/api/export/svg?view=logical&theme=" + theme
+                          + layersQuery(), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify(currentProject()),
   });
@@ -1707,6 +1713,7 @@ async function renderLogical() {
   wireLogical(canvas.querySelector("svg"));
   renderStatus();
   saveLocal();
+  requestAnimationFrame(updateMinimap);
 }
 
 /* ---- Boîte de saisie interne (remplace prompt/confirm natifs, absents
@@ -1796,6 +1803,7 @@ function setCanvasZoom(z, cx, cy) {
   $("#btn-zoom-reset").textContent = Math.round(canvasZoom * 100) + " %";
   wrap.scrollLeft = lx * canvasZoom - px;
   wrap.scrollTop = ly * canvasZoom - py;
+  requestAnimationFrame(updateMinimap);
 }
 $("#btn-zoom-in").addEventListener("click", () => setCanvasZoom(canvasZoom * 1.2));
 $("#btn-zoom-out").addEventListener("click", () => setCanvasZoom(canvasZoom / 1.2));
@@ -1829,6 +1837,156 @@ $("#canvas-wrap").addEventListener("pointerdown", (e) => {
   document.addEventListener("pointerup", up);
 });
 
+/* ---- Minimap de navigation (coin bas-droit, toutes vues) ------------
+   Dessin schématique : une boîte par élément posé + le rectangle du
+   viewport. Cachée quand tout tient à l'écran. */
+function updateMinimap() {
+  const wrap = $("#canvas-wrap");
+  const mini = $("#minimap");
+  if (!wrap || !mini) return;
+  /* Ne s'affiche que si le débord vaut la peine d'être navigué. */
+  const fits = wrap.scrollWidth <= wrap.clientWidth + 40 &&
+               wrap.scrollHeight <= wrap.clientHeight + 40;
+  mini.classList.toggle("hidden", fits);
+  if (fits) return;
+  /* Épingle au coin bas-droit du VIEWPORT (le conteneur défile). */
+  mini.style.left = (wrap.scrollLeft + wrap.clientWidth - 192 - 14) + "px";
+  mini.style.top = (wrap.scrollTop + wrap.clientHeight - 132 - 14) + "px";
+  const cv = mini.querySelector("canvas");
+  const ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  const sw = wrap.scrollWidth, sh = wrap.scrollHeight;
+  const k = Math.min(W / sw, H / sh);
+  const ox = (W - sw * k) / 2, oy = (H - sh * k) / 2;
+  const css = getComputedStyle(document.body);
+  ctx.fillStyle = css.getPropertyValue("--panel-2").trim() || "#161b28";
+  ctx.fillRect(0, 0, W, H);
+  /* Une boîte par SVG/bloc posé (baies, schéma, page de diagramme) —
+     en couleur de texte estompée : lisible sur les 4 thèmes. */
+  ctx.fillStyle = css.getPropertyValue("--text-dim").trim() || "#64748b";
+  ctx.globalAlpha = 0.55;
+  for (const el of $("#canvas").children) {
+    const x = (el.offsetLeft + $("#canvas").offsetLeft) * canvasZoom;
+    const y = (el.offsetTop + $("#canvas").offsetTop) * canvasZoom;
+    const w = el.offsetWidth * canvasZoom, h = el.offsetHeight * canvasZoom;
+    ctx.fillRect(ox + x * k, oy + y * k, Math.max(2, w * k), Math.max(2, h * k));
+  }
+  /* Viewport. */
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = css.getPropertyValue("--accent").trim() || "#f97316";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(ox + wrap.scrollLeft * k, oy + wrap.scrollTop * k,
+                 wrap.clientWidth * k, wrap.clientHeight * k);
+}
+
+(function wireMinimap() {
+  const mini = $("#minimap");
+  const wrap = $("#canvas-wrap");
+  if (!mini || !wrap) return;
+  const goTo = (e) => {
+    const r = mini.getBoundingClientRect();
+    const cv = mini.querySelector("canvas");
+    const sw = wrap.scrollWidth, sh = wrap.scrollHeight;
+    const k = Math.min(cv.width / sw, cv.height / sh);
+    const ox = (cv.width - sw * k) / 2, oy = (cv.height - sh * k) / 2;
+    const mx = (e.clientX - r.left) * (cv.width / r.width);
+    const my = (e.clientY - r.top) * (cv.height / r.height);
+    wrap.scrollLeft = (mx - ox) / k - wrap.clientWidth / 2;
+    wrap.scrollTop = (my - oy) / k - wrap.clientHeight / 2;
+  };
+  mini.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    goTo(e);
+    const move = (ev) => goTo(ev);
+    const up = () => {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+    };
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+  });
+  wrap.addEventListener("scroll", () => updateMinimap());
+  window.addEventListener("resize", () => updateMinimap());
+})();
+
+/* ---- Calques du schéma logique (superposer sans mélanger) ----------- */
+const ALL_LAYERS = ["zones", "liens", "etiquettes", "noeuds", "dessin"];
+let hiddenLayers = new Set(
+  JSON.parse(localStorage.getItem("rfp-calques-masques") || "[]"));
+
+function layersQuery() {
+  if (!hiddenLayers.size) return "";
+  const shown = ALL_LAYERS.filter((l) => !hiddenLayers.has(l));
+  return "&layers=" + shown.join(",");
+}
+
+$("#btn-calques").addEventListener("click", () => {
+  const menu = $("#calques-menu");
+  menu.hidden = !menu.hidden;
+  if (!menu.hidden)
+    menu.querySelectorAll("[data-calque]").forEach((cb) => {
+      cb.checked = !hiddenLayers.has(cb.dataset.calque);
+    });
+});
+document.querySelectorAll("#calques-menu [data-calque]").forEach((cb) =>
+  cb.addEventListener("change", () => {
+    if (cb.checked) hiddenLayers.delete(cb.dataset.calque);
+    else hiddenLayers.add(cb.dataset.calque);
+    localStorage.setItem("rfp-calques-masques",
+      JSON.stringify([...hiddenLayers]));
+    renderLogical();
+  }));
+
+/* ---- Bibliothèque de formes (icônes réseau vectorielles) ------------ */
+let formesList = null;   // noms chargés à la demande
+let pendingIcon = null;  // forme choisie, en attente d'un clic de pose
+
+async function openFormesMenu() {
+  const menu = $("#formes-menu");
+  if (menu.hidden === false) { menu.hidden = true; return; }
+  if (!formesList) {
+    try {
+      formesList = (await (await fetch("/api/formes")).json()).formes || [];
+    } catch { formesList = []; }
+  }
+  renderFormesGrid($("#formes-filter").value || "");
+  menu.hidden = false;
+  $("#formes-filter").focus();
+}
+
+function renderFormesGrid(filter) {
+  const grid = $("#formes-grid");
+  grid.innerHTML = "";
+  const f = filter.trim().toLowerCase();
+  const names = (formesList || []).filter((n) => !f || n.includes(f));
+  if (!names.length) {
+    grid.innerHTML = '<div class="dialog-hint">Aucune forme' +
+      (formesList?.length ? " ne correspond." : " dans le workspace (catalogue/formes/).") + "</div>";
+    return;
+  }
+  for (const name of names) {
+    const cell = document.createElement("button");
+    cell.type = "button";
+    cell.className = "forme-cell";
+    cell.title = name.replace(/-/g, " ");
+    const img = document.createElement("img");
+    img.src = "/api/formes/svg/" + encodeURIComponent(name) +
+              "?color=" + encodeURIComponent(C.text);
+    img.alt = name;
+    cell.appendChild(img);
+    cell.addEventListener("click", () => {
+      pendingIcon = name;
+      $("#formes-menu").hidden = true;
+      setAnnotTool("icone");
+    });
+    grid.appendChild(cell);
+  }
+}
+
+$("#btn-formes").addEventListener("click", openFormesMenu);
+$("#formes-filter").addEventListener("input",
+  (e) => renderFormesGrid(e.target.value));
+
 /* ---- Dessin libre (Texte / Zone / Flèche) — esprit draw.io ---------- */
 let annotTool = null; // null | "texte" | "zone" | "fleche"
 
@@ -1842,6 +2000,7 @@ function setAnnotTool(tool) {
     fleche: "Cliquez-glissez du départ vers l'arrivée",
     ligne: "Cliquez-glissez pour tracer la ligne (diagonale libre)",
     ellipse: "Cliquez-glissez pour entourer en ellipse",
+    icone: "Cliquez l'endroit du schéma où poser la forme",
   };
   renderStatus(annotTool ? hints[annotTool] + " — Échap pour annuler" : "");
 }
@@ -1896,6 +2055,13 @@ function wireAnnotTools(svg) {
       askText("Texte à poser").then((text) => {
         if (text) addAnnotation({ kind: "texte", x: start.x, y: start.y, text });
       });
+      return;
+    }
+    if (annotTool === "icone") {
+      setAnnotTool(annotTool);
+      if (pendingIcon)
+        addAnnotation({ kind: "icone", icon: pendingIcon,
+                        x: start.x, y: start.y, x2: 64 });
       return;
     }
     /* zone / ellipse / flèche / ligne : glisser avec aperçu en direct. */
@@ -1955,7 +2121,8 @@ function wireAnnotationMenus(svg) {
       const a = list.find((x) => x.id === anId);
       if (!a) return;
       _logicalMenu(e, a.text || { texte: "Texte", zone: "Zone", fleche: "Flèche",
-                                  ligne: "Ligne", ellipse: "Ellipse" }[a.kind], [
+                                  ligne: "Ligne", ellipse: "Ellipse",
+                                  icone: a.icon || "Forme" }[a.kind], [
         ["Modifier le texte", async () => {
           const t = await askText("Texte", "", a.text);
           if (t !== null) { a.text = t; renderAnnotView(); }
@@ -1991,6 +2158,7 @@ async function renderDiagram() {
   }
   renderStatus();
   saveLocal();
+  requestAnimationFrame(updateMinimap);
 }
 
 function wireLogical(svg) {
