@@ -47,12 +47,12 @@ PALETTES: dict[str, dict[str, str]] = {
         "band": "#1c2126",
     },
     "kaki": {
-        "bg": "#0c0e06", "frame": "#171a0c", "rail": "#232816",
-        "hole": "#070903", "slot": "#12150a", "slot_line": "#1e2210",
-        "text": "#d4d9b8", "dim": "#7f8663", "face": "#1b1f0e",
-        "accent": "#eb9c14", "face_stroke": "#2c3118", "pill": "#3d4423",
-        "port_fill": "#0b0d05", "decor_fill": "#14180b",
-        "decor_stroke": "#2c3118", "ring": "#3f4725", "lcd": "#12200e",
+        "bg": "#0c0e06", "frame": "#1c220e", "rail": "#2b3316",
+        "hole": "#070903", "slot": "#161b0b", "slot_line": "#262e12",
+        "text": "#d4d9b8", "dim": "#8a935f", "face": "#20270f",
+        "accent": "#eb9c14", "face_stroke": "#39421c", "pill": "#4a5522",
+        "port_fill": "#0e1206", "decor_fill": "#1a200d",
+        "decor_stroke": "#39421c", "ring": "#4d5926", "lcd": "#12200e",
         "band": "#0c0e06",
     },
     "nuit": {
@@ -175,12 +175,12 @@ def _u_pill(t: EquipmentType, x: int, yc: float, w: int,
 
 # Cartouche de nom À CÔTÉ de l'équipement (style Patchdocs) : le texte ne
 # se pose jamais sur le matériel.
-_LABEL_W = 118
+_LABEL_W = 138
 
 
 def _name_plate(label: str, x: float, y: float, ih: float,
                 color: str, p: dict) -> list[str]:
-    txt = label if len(label) <= 17 else label[:16] + "…"
+    txt = label if len(label) <= 21 else label[:20] + "…"
     return [
         f'<rect x="{x + 4}" y="{y + 2}" width="{_LABEL_W - 6}" '
         f'height="{ih - 4}" rx="3" fill="{p["band"]}"/>',

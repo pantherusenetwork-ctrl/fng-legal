@@ -708,11 +708,11 @@ body[data-theme="kaki"] {
   --bg: #0c0e06;
   --grid-color: #20250f;
   --panel: rgba(18, 21, 10, .85);
-  --panel-2: #151808;
-  --frame: #171a0c;
-  --line: #2c3118;
+  --panel-2: #191f0c;
+  --frame: #1c220e;
+  --line: #39421c;
   --text: #d4d9b8;
-  --text-dim: #7f8663;
+  --text-dim: #8a935f;
   --accent: #eb9c14;
   --danger: #e06c5a;
 }

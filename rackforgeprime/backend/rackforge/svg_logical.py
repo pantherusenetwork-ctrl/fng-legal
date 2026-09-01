@@ -57,8 +57,8 @@ LPALETTES = {
                "text": "#cbd5e1", "dim": "#64748b", "accent": "#f97316"},
     "clair": {"bg": "#ffffff", "node": "#f7f8f9", "line": "#d3d8de",
               "text": "#1c2126", "dim": "#6b7480", "accent": "#ea580c"},
-    "kaki": {"bg": "#0c0e06", "node": "#171a0c", "line": "#2c3118",
-             "text": "#d4d9b8", "dim": "#7f8663", "accent": "#eb9c14"},
+    "kaki": {"bg": "#0c0e06", "node": "#1c220e", "line": "#39421c",
+             "text": "#d4d9b8", "dim": "#8a935f", "accent": "#eb9c14"},
     "nuit": {"bg": "#000000", "node": "#0d0d11", "line": "#20202a",
              "text": "#dde3ec", "dim": "#59637a", "accent": "#ff7a1a"},
 }
@@ -431,7 +431,8 @@ def render_diagram_svg(project: Project, theme: str = "sombre") -> str:
         s.append(f'<text x="{max_x / 2:.0f}" y="{max_y / 2:.0f}" '
                  f'text-anchor="middle" font-family="{FONT}" font-size="14" '
                  f'fill="{C_TEXT_DIM}">Page blanche — dessinez avec Texte, '
-                 f'Zone, Flèche, Ligne ou Ellipse</text>')
+                 f'Zone, Flèche, Ligne, Ellipse ou la bibliothèque de '
+                 f'Formes</text>')
     under, over = _render_annotations(annots)
     s.extend(under)
     s.extend(over)

@@ -34,11 +34,11 @@ const THEMES = {
     lcd: "#fdf3ec", band: "#1c2126",
   },
   kaki: {
-    frame: "#171a0c", rail: "#232816", hole: "#070903", slot: "#12150a",
-    slotLine: "#1e2210", text: "#d4d9b8", dim: "#7f8663", face: "#1b1f0e",
+    frame: "#1c220e", rail: "#2b3316", hole: "#070903", slot: "#161b0b",
+    slotLine: "#262e12", text: "#d4d9b8", dim: "#8a935f", face: "#20270f",
     accent: "#eb9c14", danger: "#e06c5a",
-    faceStroke: "#2c3118", pill: "#3d4423", portFill: "#0b0d05",
-    decorFill: "#14180b", decorStroke: "#2c3118", ring: "#3f4725",
+    faceStroke: "#39421c", pill: "#4a5522", portFill: "#0e1206",
+    decorFill: "#1a200d", decorStroke: "#39421c", ring: "#4d5926",
     lcd: "#12200e", band: "#0c0e06",
   },
   nuit: {
@@ -306,9 +306,9 @@ function itemTipHTML(t, item) {
 
 /* Cartouche de nom À CÔTÉ de l'équipement (style Patchdocs) — miroir
    de _name_plate() côté Python : rien d'écrit sur le matériel. */
-const LABEL_W = 118;
+const LABEL_W = 138;
 function drawNamePlate(g, label, x, y, h) {
-  const txt = label.length <= 17 ? label : label.slice(0, 16) + "…";
+  const txt = label.length <= 21 ? label : label.slice(0, 20) + "…";
   g.appendChild(svgEl("rect", {
     x: x + 4, y: y + 2, width: LABEL_W - 6, height: h - 4, rx: 3, fill: C.band,
   }));
@@ -1364,6 +1364,27 @@ function renderPalette(filter) {
 let _lastClickItem = null;
 let _lastClickAt = 0;
 
+/* Touche Suppr : retire l'équipement sélectionné (vue physique), avec
+   purge de ses liens — hors champs de saisie. */
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Delete" || viewMode !== "physical" || !selectedItemId) return;
+  const tag = (document.activeElement?.tagName || "").toLowerCase();
+  if (["input", "textarea", "select"].includes(tag)) return;
+  for (const rack of project.racks) {
+    const item = rack.items.find((i) => i.id === selectedItemId);
+    if (!item) continue;
+    project.logical.links = (project.logical.links || []).filter((l) =>
+      l.from.equipment_id !== item.id && l.to.equipment_id !== item.id);
+    if (project.logical.positions) delete project.logical.positions[item.id];
+    rack.items = rack.items.filter((i) => i !== item);
+    selectedItemId = null;
+    closeInspector();
+    renderAll();
+    renderStatus("Équipement supprimé — Ctrl+Z pour annuler");
+    return;
+  }
+});
+
 function startPaletteDrag(e, type) {
   e.preventDefault();
   drag = { type, itemId: null, fromRackId: null };
@@ -1808,6 +1829,16 @@ function setCanvasZoom(z, cx, cy) {
 $("#btn-zoom-in").addEventListener("click", () => setCanvasZoom(canvasZoom * 1.2));
 $("#btn-zoom-out").addEventListener("click", () => setCanvasZoom(canvasZoom / 1.2));
 $("#btn-zoom-reset").addEventListener("click", () => setCanvasZoom(1));
+$("#btn-zoom-fit").addEventListener("click", () => {
+  /* Ajuster : tout le plan visible d'un coup. */
+  const wrap = $("#canvas-wrap");
+  const fit = canvasZoom * Math.min(
+    wrap.clientWidth / wrap.scrollWidth,
+    wrap.clientHeight / wrap.scrollHeight);
+  setCanvasZoom(Math.min(1, fit * 0.98));
+  wrap.scrollLeft = 0;
+  wrap.scrollTop = 0;
+});
 $("#canvas-wrap").addEventListener("wheel", (e) => {
   if (!e.ctrlKey) return;  // molette seule = défilement normal
   e.preventDefault();
@@ -1862,14 +1893,18 @@ function updateMinimap() {
   ctx.fillStyle = css.getPropertyValue("--panel-2").trim() || "#161b28";
   ctx.fillRect(0, 0, W, H);
   /* Une boîte par SVG/bloc posé (baies, schéma, page de diagramme) —
-     en couleur de texte estompée : lisible sur les 4 thèmes. */
+     en couleur de texte estompée : lisible sur les 4 thèmes.
+     getBoundingClientRect obligatoire : offsetLeft n'existe pas sur les
+     éléments SVG (NaN silencieux = minimap vide). */
   ctx.fillStyle = css.getPropertyValue("--text-dim").trim() || "#64748b";
-  ctx.globalAlpha = 0.55;
+  ctx.globalAlpha = 0.6;
+  const wr = wrap.getBoundingClientRect();
   for (const el of $("#canvas").children) {
-    const x = (el.offsetLeft + $("#canvas").offsetLeft) * canvasZoom;
-    const y = (el.offsetTop + $("#canvas").offsetTop) * canvasZoom;
-    const w = el.offsetWidth * canvasZoom, h = el.offsetHeight * canvasZoom;
-    ctx.fillRect(ox + x * k, oy + y * k, Math.max(2, w * k), Math.max(2, h * k));
+    const r = el.getBoundingClientRect();
+    const x = r.left - wr.left + wrap.scrollLeft;
+    const y = r.top - wr.top + wrap.scrollTop;
+    ctx.fillRect(ox + x * k, oy + y * k,
+                 Math.max(2, r.width * k), Math.max(2, r.height * k));
   }
   /* Viewport. */
   ctx.globalAlpha = 1;
