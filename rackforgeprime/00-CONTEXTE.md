@@ -56,6 +56,14 @@ fonctions comparées)** — acquis : le métier réseau bat déjà les deux
 6. Multi-pages libres, calques, groupes/verrouillage (moyenne, gros)
 7. Impression à l'échelle, styles à l'objet, texte riche (moyenne)
 
+**Bibliothèque d'images maîtresse (demande Panther 01/09)** : dossier
+`catalogue\bibliotheque\<Constructeur>\` dans le workspace du Bureau —
+TOUTES les images en TAILLE D'ORIGINE (aucune limite), triées par
+constructeur, avec 00-INDEX.md. Il pioche à la main dedans, l'app aussi
+(via l'import Image/SVG). À construire par l'agent bibliothécaire dès la
+fin de l'aspiration NetBox (les originaux sont dans son extraction).
+Les copies optimisées ≤300 Ko restent dans images-officielles\ pour l'app.
+
 ## 🌉 Pont d'Hemingway — prochaine étape exacte
 
 **Vue plan d'étage + navigation hiérarchique** : le 31/08 Panther a
