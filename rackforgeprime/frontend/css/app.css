@@ -90,6 +90,9 @@ body[data-view="logical"] g[id^="link-"] { cursor: pointer; }
 }
 #minimap canvas { width: 100%; height: 100%; display: block; }
 #minimap.hidden { display: none; }
+/* Elle s'efface sous la souris : jamais un cartouche masqué pour de bon. */
+#minimap:hover { opacity: 0.22; }
+#minimap { transition: opacity .15s; }
 
 /* Bibliothèque de formes (Diagramme / Logique) */
 #formes-menu { width: 292px; padding: 10px; }
