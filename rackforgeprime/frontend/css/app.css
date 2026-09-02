@@ -78,21 +78,33 @@ body[data-view="logical"] g[id^="link-"] { cursor: pointer; }
 .calque-row:hover { background: var(--panel-2); }
 .calque-row input { accent-color: var(--accent); }
 
-/* Minimap de navigation (coin bas-droit du plan) */
+/* Minimap de navigation — discrète, collée au coin bas-droit, façon
+   draw.io : un panneau fin, des blocs doux, le viewport en liseré. */
 #minimap {
   /* Épinglée au coin du viewport par JS (left/top recalculés au scroll —
      un absolute défilerait avec le contenu). */
   position: absolute; z-index: 6;
-  width: 192px; height: 132px;
-  background: var(--panel); border: 1px solid var(--line);
-  border-radius: 8px; overflow: hidden; cursor: crosshair;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, .35);
+  width: 150px; height: 100px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 9px; overflow: hidden; cursor: crosshair;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, .3);
+  opacity: 0.75; transition: opacity .15s;
 }
 #minimap canvas { width: 100%; height: 100%; display: block; }
 #minimap.hidden { display: none; }
-/* Elle s'efface sous la souris : jamais un cartouche masqué pour de bon. */
-#minimap:hover { opacity: 0.22; }
-#minimap { transition: opacity .15s; }
+/* Sous la souris elle s'affirme (on la pilote) ; dès qu'on la quitte,
+   elle redevient discrète. */
+#minimap:hover { opacity: 1; }
+#minimap-close {
+  position: absolute; top: 2px; right: 2px; width: 16px; height: 16px;
+  padding: 0; line-height: 14px; font-size: 12px; text-align: center;
+  background: var(--panel-2); color: var(--text-dim);
+  border: 1px solid var(--line); border-radius: 5px; cursor: pointer;
+  opacity: 0; transition: opacity .15s;
+}
+#minimap:hover #minimap-close { opacity: 1; }
+#minimap-close:hover { color: var(--text); border-color: var(--accent); }
 
 /* Bibliothèque de formes (Diagramme / Logique) */
 #formes-menu { width: 292px; padding: 10px; }
@@ -127,6 +139,33 @@ body[data-view="logical"] g[id^="link-"] { cursor: pointer; }
   font-family: var(--mono); font-size: 13px; margin-bottom: 12px;
 }
 #ask-dialog .ask-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* Sauvegarde : trois groupes de choix */
+#backup-dialog {
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--line); border-radius: 10px; padding: 18px;
+  width: 400px;
+}
+#backup-dialog::backdrop { background: rgba(0, 0, 0, .6); }
+#backup-dialog h2 { margin: 0 0 4px; font-size: 15px; }
+#backup-dialog fieldset {
+  border: 1px solid var(--line); border-radius: 8px;
+  margin: 0 0 10px; padding: 8px 12px 10px;
+}
+#backup-dialog legend { font-size: 11px; color: var(--text-dim); padding: 0 5px; text-transform: uppercase; letter-spacing: .4px; }
+#backup-dialog label { display: block; font-size: 13px; padding: 3px 0; cursor: pointer; }
+#backup-dialog label small { color: var(--text-dim); }
+#backup-dialog input[type="radio"] { accent-color: var(--accent); margin-right: 7px; }
+#backup-dialog .ask-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+#backup-dialog #bk-dir {
+  width: 100%; margin-top: 5px; background: var(--panel-2);
+  border: 1px solid var(--line); border-radius: 5px; color: var(--text);
+  padding: 6px 9px; font-family: var(--mono); font-size: 12px;
+}
+#backup-dialog #bk-dossier-app {
+  display: inline-block; max-width: 240px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom;
+}
 
 /* Modales lien / VLAN : mêmes styles que la proposition */
 #link-dialog, #vlan-dialog {
@@ -222,8 +261,18 @@ button.danger:hover { border-color: var(--danger); }
 
 /* Canvas */
 #canvas-wrap { flex: 1; overflow: auto; padding: 20px; }
-#canvas { display: flex; gap: 40px; align-items: flex-start; min-width: min-content; }
+#canvas { display: flex; gap: 40px; align-items: flex-start; min-width: min-content; position: relative; }
 #canvas svg { display: block; }
+
+/* Cordons de brassage (vue câblage PATCHBOX) : par-dessus les baies,
+   cliquables individuellement, le reste transparent aux clics. */
+#cables-overlay {
+  position: absolute; left: 0; top: 0; z-index: 5;
+  pointer-events: none; overflow: visible;
+}
+#cables-overlay .cable-path { pointer-events: stroke; cursor: pointer; }
+#cables-overlay .cable-path:hover { stroke-width: 3.6; }
+#btn-cables.actif { color: var(--accent); border-color: var(--accent); }
 
 /* Fond du plan — 5 options au choix (liberté draw.io), couleur par thème
    via --grid-color. Posé par JS sur body[data-canvas-bg]. */
@@ -285,6 +334,7 @@ g.rack-item { cursor: grab; }
 }
 #statusbar .stat-accent { color: var(--accent); }
 #statusbar .stat-err { color: var(--danger); }
+#statusbar .stat-warn { color: var(--warn, #eab308); }
 
 /* Modale brassage */
 #patch-dialog {
@@ -616,6 +666,25 @@ body:not([data-theme="clair"]) #canvas svg image {
 }
 
 /* ---- Fiche equipement (vue type Aruba Central) ---- */
+#port-state-menu {
+  position: fixed; z-index: 90; display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; padding: 4px; box-shadow: 0 6px 20px rgba(0,0,0,.4);
+}
+#port-state-menu button {
+  background: none; border: none; color: var(--text); text-align: left;
+  padding: 6px 12px; font-size: 13px; border-radius: 5px; cursor: pointer;
+}
+#port-state-menu button:hover { background: var(--panel-2); }
+
+#device-photo {
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;
+  text-align: center;
+}
+#device-photo img {
+  max-width: 100%; max-height: 110px; display: inline-block;
+}
 #device-dialog {
   background: var(--panel); color: var(--text);
   border: 1px solid var(--line); border-radius: 14px;

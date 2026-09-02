@@ -47,6 +47,11 @@ class EquipmentType(BaseModel):
     ports: list[Port] = []
     # Couleur de rôle utilisée par le placeholder quand faceplate_svg est absent.
     color: str = "#64748b"
+    # Largeur physique réelle en mm — un boîtier compact (FortiGate 60,
+    # box opérateur…) s'affiche alors à SA largeur dans la baie, comme
+    # dans la réalité, au lieu d'être cadré sur les 19 pouces.
+    # None = pleine largeur rack (équipement rackable standard).
+    width_mm: Optional[float] = Field(default=None, gt=0, le=483)
     # SVG officiel constructeur (inline) — None => placeholder fidèle à l'échelle U.
     faceplate_svg: Optional[str] = None
     # Image raster (PNG/JPEG) en data URI — « Remplacer par image officielle ».
@@ -90,6 +95,11 @@ class RackItem(BaseModel):
     id: str
     type_id: str
     position_u: int = Field(ge=1)  # U le plus bas occupé
+    # Position horizontale RÉELLE en mm (bord gauche dans le U, référence
+    # façade 19" = 482,6 mm). Permet de poser PLUSIEURS boîtiers compacts
+    # côte à côte dans le même U (deux FGT 60F = 2×216 mm : ça tient),
+    # comme dans la vraie baie. None = équipement pleine largeur/centré.
+    position_x_mm: Optional[float] = Field(default=None, ge=0, lt=482.6)
     face: Literal["front", "rear"] = "front"
     meta: ItemMeta = ItemMeta()
 
@@ -247,7 +257,7 @@ def validate_placement(project: Project, types: dict[str, EquipmentType]
     errors: list[str] = []
     seen_ids: set[str] = set()
     for rack in project.racks:
-        occupied: dict[int, str] = {}  # U -> item id
+        occupied: dict[int, list[RackItem]] = {}  # U -> items présents
         for item in rack.items:
             if item.id in seen_ids:
                 errors.append(f"id d'équipement dupliqué : {item.id}")
@@ -266,13 +276,39 @@ def validate_placement(project: Project, types: dict[str, EquipmentType]
                 )
                 continue
             for u in item_span(item, types):
-                if u in occupied:
+                occupied.setdefault(u, []).append(item)
+        # Un U partagé n'est PAS une collision si tout le monde y tient EN
+        # LARGEUR : chaque cohabitant est un boîtier compact (width_mm)
+        # positionné (position_x_mm), et les empreintes ne se chevauchent
+        # pas dans les 482,6 mm de la façade 19".
+        for u, its in sorted(occupied.items()):
+            if len(its) < 2:
+                continue
+            solid = [i for i in its
+                     if not (types[i.type_id].width_mm
+                             and i.position_x_mm is not None)]
+            if solid:
+                errors.append(
+                    f"{rack.name} : collision en U{u} entre "
+                    f"{' et '.join(i.id for i in its)} — pour cohabiter, "
+                    f"chaque équipement doit avoir une largeur réelle "
+                    f"(width_mm) et une position (position_x_mm)"
+                )
+                continue
+            spans = sorted((i.position_x_mm,
+                            i.position_x_mm + types[i.type_id].width_mm,
+                            i.id) for i in its)
+            for (a0, a1, aid), (b0, b1, bid) in zip(spans, spans[1:]):
+                if b0 < a1 - 0.01:
                     errors.append(
-                        f"{rack.name} : collision en U{u} entre "
-                        f"{occupied[u]} et {item.id}"
+                        f"{rack.name} : chevauchement en U{u} entre {aid} "
+                        f"et {bid} ({a1 - b0:.0f} mm de recouvrement)"
                     )
-                else:
-                    occupied[u] = item.id
+            if spans and spans[-1][1] > 482.6 + 0.01:
+                errors.append(
+                    f"{rack.name} : U{u} déborde de la façade 19" + '"'
+                    f" ({spans[-1][1]:.0f} mm sur 482,6)"
+                )
     return errors
 
 
@@ -298,8 +334,10 @@ def free_positions(rack: Rack, u_height_needed: int,
 
 def rack_stats(rack: Rack, types: dict[str, EquipmentType]) -> dict:
     """Stats live : U occupés / libres, puissance cumulée."""
-    used = sum(types[i.type_id].u_height for i in rack.items
-               if i.type_id in types)
+    # Ensemble des U réellement occupés : deux compacts côte à côte dans
+    # le même U ne comptent qu'une fois.
+    used = len({u for i in rack.items if i.type_id in types
+                for u in item_span(i, types)})
     power = sum(types[i.type_id].power_w for i in rack.items
                 if i.type_id in types)
     return {

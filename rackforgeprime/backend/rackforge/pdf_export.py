@@ -8,6 +8,7 @@ Une page A4 paysage par défaut, le dessin mis à l'échelle pour tenir dedans.
 from __future__ import annotations
 
 import io
+import re as _re
 from datetime import date
 
 from reportlab.graphics import renderPDF
@@ -71,29 +72,75 @@ def render_project_pdf(project: Project, view: str = "physical",
     ``view`` : « physical » (élévation de baies) ou « logical » (VLANs/liens).
     ``theme`` : « sombre » (écran) ou « clair » (impression).
     """
+    buf = io.BytesIO()
+    if view == "physical":
+        # UNE BAIE PAR PAGE A4 PORTRAIT (pratique DAT, style Patchdocs) :
+        # à l'échelle réelle une baie 42U est très haute — sur une page
+        # commune les textes tomberaient sous 4 pt. Page par page, chaque
+        # baie profite de toute la hauteur.
+        c = pdf_canvas.Canvas(buf, pagesize=A4)
+        c.setTitle(project.name)
+        c.setAuthor("RackForgePrime")
+        page_w, page_h = A4
+        margin = 24
+        for rack in project.racks:
+            sub = project.model_copy(update={"racks": [rack]})
+            svg = render_project_svg(sub, theme=theme, rendu=rendu)
+            drawing = svg2rlg(io.StringIO(svg))
+            if drawing is None:
+                raise RuntimeError(
+                    "Conversion SVG -> PDF impossible (SVG invalide)")
+            scale = min((page_w - 2 * margin) / drawing.width,
+                        (page_h - 2 * margin) / drawing.height, 1.75)
+            drawing.scale(scale, scale)
+            c.setFillColorRGB(*_pdf_palette(theme)["bg"])
+            c.rect(0, 0, page_w, page_h, stroke=0, fill=1)
+            renderPDF.draw(drawing, c, (page_w - drawing.width * scale) / 2,
+                           page_h - margin - drawing.height * scale)
+            c.showPage()
+        c.save()
+        return buf.getvalue()
+
     if view == "logical":
         svg = render_logical_svg(project, theme=theme, layers=layers)
-    elif view == "diagram":
-        svg = render_diagram_svg(project, theme=theme)
     else:
-        svg = render_project_svg(project, theme=theme, rendu=rendu)
+        svg = render_diagram_svg(project, theme=theme)
     drawing = svg2rlg(io.StringIO(svg))
     if drawing is None:  # SVG illisible : bug de génération, pas de l'utilisateur
         raise RuntimeError("Conversion SVG -> PDF impossible (SVG invalide)")
 
     page_w, page_h = landscape(A4)
     margin = 24
-    # Mise à l'échelle uniforme pour REMPLIR la page (agrandissement borné :
-    # l'échelle U reste exacte relative — on ne déforme rien).
-    scale = min((page_w - 2 * margin) / drawing.width,
-                (page_h - 2 * margin) / drawing.height, 1.75)
-    drawing.scale(scale, scale)
-
-    buf = io.BytesIO()
+    w, h = page_w - 2 * margin, page_h - 2 * margin
     c = pdf_canvas.Canvas(buf, pagesize=landscape(A4))
     c.setTitle(project.name)
     c.setAuthor("RackForgePrime")
-    # Fond pleine page dans le thème demandé.
+
+    if view == "logical":
+        # Lisible avant tout : échelle sur la HAUTEUR, puis tranches
+        # verticales — une page par tranche (style plan d'architecte).
+        import math
+        scale = min(h / drawing.height, 1.0)
+        n = max(1, math.ceil(drawing.width * scale / w))
+        drawing.scale(scale, scale)
+        for i in range(n):
+            c.setFillColorRGB(*_pdf_palette(theme)["bg"])
+            c.rect(0, 0, page_w, page_h, stroke=0, fill=1)
+            c.saveState()
+            p = c.beginPath()
+            p.rect(margin, margin, w, h)
+            c.clipPath(p, stroke=0, fill=0)
+            renderPDF.draw(drawing, c, margin - i * w,
+                           margin + h - drawing.height * scale)
+            c.restoreState()
+            c.showPage()
+        c.save()
+        return buf.getvalue()
+
+    # Diagramme : mise à l'échelle uniforme pour remplir la page
+    # (agrandissement borné — l'échelle relative reste exacte).
+    scale = min(w / drawing.width, h / drawing.height, 1.75)
+    drawing.scale(scale, scale)
     c.setFillColorRGB(*_pdf_palette(theme)["bg"])
     c.rect(0, 0, page_w, page_h, stroke=0, fill=1)
     renderPDF.draw(drawing, c, margin,
@@ -178,6 +225,32 @@ def _draw_svg_page(c, svg: str, page_w: float, page_h: float) -> None:
     dw, dh = drawing.width * scale, drawing.height * scale
     drawing.scale(scale, scale)
     renderPDF.draw(drawing, c, x + (w - dw) / 2, y + h - dh)
+
+
+def _logical_slices(drawing, page_w: float, page_h: float) -> int:
+    """Nombre de pages nécessaires pour un schéma logique LISIBLE.
+
+    Principe « plan d'architecte » : le dessin est mis à l'échelle sur la
+    HAUTEUR de la zone (jamais réduit pour tenir en largeur — c'est ça
+    qui écrasait les textes à 2 pt), puis découpé en tranches verticales,
+    une page par tranche."""
+    x, y, w, h = _content_zone(page_w, page_h)
+    scale = min(h / drawing.height, 1.0)
+    import math
+    return max(1, math.ceil(drawing.width * scale / w))
+
+
+def _draw_svg_slice(c, drawing, page_w: float, page_h: float,
+                    i: int, scale: float) -> None:
+    """Tranche n° i du dessin (déjà mis à l'échelle), clippée à la zone."""
+    x, y, w, h = _content_zone(page_w, page_h)
+    c.saveState()
+    p = c.beginPath()
+    p.rect(x, y, w, h)
+    c.clipPath(p, stroke=0, fill=0)
+    renderPDF.draw(drawing, c, x - i * w,
+                   y + h - drawing.height * scale)
+    c.restoreState()
 
 
 def _draw_table_page(c, page_w: float, page_h: float, title: str,
@@ -359,7 +432,14 @@ def render_project_dossier_pdf(project: Project, theme: str = "sombre",
     patch_pages = _paginate(patch_rows)
     bom_pages = _paginate(_bom_rows(project))
     has_revs = bool(project.revisions)
-    total = 2 + len(patch_pages) + len(bom_pages) + (1 if has_revs else 0)
+    # Une page d'élévation PAR BAIE (portrait), la logique en tranches
+    # lisibles, puis les tableaux.
+    logical_drawing = svg2rlg(io.StringIO(
+        render_logical_svg(project, theme=theme)))
+    n_logical = (_logical_slices(logical_drawing, *landscape(A4))
+                 if logical_drawing is not None else 0)
+    total = (len(project.racks) + n_logical + len(patch_pages)
+             + len(bom_pages) + (1 if has_revs else 0))
 
     buf = io.BytesIO()
     c = pdf_canvas.Canvas(buf, pagesize=landscape(A4))
@@ -383,23 +463,34 @@ def render_project_dossier_pdf(project: Project, theme: str = "sombre",
         c.showPage()
         page_no += 1
 
-    _page_frame(c, page_w, page_h, project, "Élévation physique",
-                page_no, total, pal)
-    _draw_svg_page(c, render_project_svg(project, theme=theme, rendu=rendu),
-                   page_w, page_h)
-    c.showPage()
-    page_no += 1
-
-    # Page logique en PORTRAIT (pratique DAT : l'orientation suit le
-    # dessin) — un schéma en colonne remplit une page verticale.
+    # Élévations en PORTRAIT, une baie par page : à l'échelle réelle une
+    # baie 42U est très haute — page commune = textes sous 4 pt illisibles.
     c.setPageSize(A4)
-    _page_frame(c, page_h, page_w, project, "Architecture logique",
-                page_no, total, pal)
-    _draw_svg_page(c, render_logical_svg(project, theme=theme),
-                   page_h, page_w)
-    c.showPage()
+    for rack in project.racks:
+        sub = project.model_copy(update={"racks": [rack]})
+        _page_frame(c, page_h, page_w, project,
+                    f"Élévation — {rack.name}", page_no, total, pal)
+        _draw_svg_page(c, render_project_svg(sub, theme=theme, rendu=rendu),
+                       page_h, page_w)
+        c.showPage()
+        page_no += 1
     c.setPageSize(landscape(A4))
-    page_no += 1
+
+    # Architecture logique, LISIBLE : le schéma est mis à l'échelle sur
+    # la hauteur de page puis découpé en tranches verticales (une page
+    # par tranche, style plan d'architecte) — jamais écrasé pour tenir.
+    if logical_drawing is not None:
+        lx, ly, lw, lh = _content_zone(page_w, page_h)
+        lscale = min(lh / logical_drawing.height, 1.0)
+        logical_drawing.scale(lscale, lscale)
+        for i in range(n_logical):
+            section = ("Architecture logique" if n_logical == 1 else
+                       f"Architecture logique ({i + 1}/{n_logical})")
+            _page_frame(c, page_w, page_h, project, section,
+                        page_no, total, pal)
+            _draw_svg_slice(c, logical_drawing, page_w, page_h, i, lscale)
+            c.showPage()
+            page_no += 1
 
     for chunk in patch_pages:
         _page_frame(c, page_w, page_h, project, "Tableau de brassage",
@@ -419,7 +510,6 @@ def render_project_dossier_pdf(project: Project, theme: str = "sombre",
     # Capacité onduleur : valeurs constructeur pour les gammes connues
     # (APC : 1500 VA -> 1000 W réels), sinon VA du modèle × 0,66 marqué
     # comme estimation — jamais présentée comme mesurée.
-    import re as _re
     _UPS_W = {"1500": 1000, "2200": 1980, "3000": 2700}
     ups_w, ups_estime = 0.0, False
     for r in project.racks:

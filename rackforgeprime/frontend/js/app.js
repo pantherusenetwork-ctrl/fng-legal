@@ -9,8 +9,13 @@
  */
 "use strict";
 
-/* ---- Constantes d'échelle (miroir de svg_export.py) ---- */
-const U_PX = 22, RACK_W = 440, RAIL_W = 26, FRAME_PAD = 14,
+/* ---- Constantes d'échelle (miroir de svg_export.py) ----
+ * ÉCHELLE RÉELLE, GRAVÉE AU MM (EIA-310) : façade 19" = 482,6 mm sur
+ * RACK_W = 440 px → 0,9117 px/mm → 1U (44,45 mm) = 40,5 px. Le slot a
+ * le VRAI ratio d'une baie : les façades le remplissent sans étirement,
+ * les boîtiers compacts (width_mm) s'affichent à leur largeur exacte. */
+const MM_19_POUCES = 482.6;
+const U_PX = 40.5, RACK_W = 440, RAIL_W = 26, FRAME_PAD = 14,
       HEADER_H = 40, FOOTER_H = 30;
 
 /* ---- Palettes de dessin SVG par thème ----
@@ -148,6 +153,35 @@ function canPlace(rack, positionU, uHeight, ignoreId) {
   for (let u = positionU; u < positionU + uHeight; u++)
     if (occupied.has(u)) return false;
   return true;
+}
+
+/* Cohabitation dans un U (échelle réelle) : si le U visé est tenu par
+ * des boîtiers compacts et que le nouveau (compact aussi) tient dans les
+ * 482,6 mm restants, il se COLLE au dernier — deux FGT 60F côte à côte,
+ * comme dans la vraie baie. Retourne la position x en mm, ou null. */
+function tryShare(rack, u, type, ignoreId) {
+  if (!type.width_mm) return null;
+  const span = new Set();
+  for (let uu = u; uu < u + type.u_height; uu++) span.add(uu);
+  const occ = rack.items.filter((it) => it.id !== ignoreId &&
+    [...itemSpan(it)].some((uu) => span.has(uu)));
+  if (!occ.length) return null;            // U libre : placement normal
+  for (const it of occ) {
+    const t = typesById[it.type_id];
+    if (!t || !t.width_mm) return null;    // un pleine-largeur : refus
+  }
+  /* Normalise : les compacts encore « centrés » (sans x) sont empilés
+     depuis la gauche, puis le nouveau se colle à la suite. */
+  let cursor = 0;
+  for (const it of occ.filter((i) => i.position_x_mm != null)
+                      .sort((a, b) => a.position_x_mm - b.position_x_mm))
+    cursor = Math.max(cursor,
+                      it.position_x_mm + typesById[it.type_id].width_mm);
+  for (const it of occ.filter((i) => i.position_x_mm == null)) {
+    it.position_x_mm = cursor;
+    cursor += typesById[it.type_id].width_mm;
+  }
+  return cursor + type.width_mm <= MM_19_POUCES + 0.01 ? cursor : null;
 }
 
 function rackStats(rack) {
@@ -308,12 +342,13 @@ function itemTipHTML(t, item) {
    de _name_plate() côté Python : rien d'écrit sur le matériel. */
 const LABEL_W = 138;
 function drawNamePlate(g, label, x, y, h) {
-  const txt = label.length <= 21 ? label : label.slice(0, 20) + "…";
+  /* Polices à l'échelle U_PX=40.5 — miroir Python. */
+  const txt = label.length <= 15 ? label : label.slice(0, 14) + "…";
   g.appendChild(svgEl("rect", {
     x: x + 4, y: y + 2, width: LABEL_W - 6, height: h - 4, rx: 3, fill: C.band,
   }));
   g.appendChild(svgEl("text", {
-    x: x + 12, y: y + h / 2 + 3.5, "font-size": 9.5, "font-weight": "bold",
+    x: x + 12, y: y + h / 2 + 5, "font-size": 15, "font-weight": "bold",
     fill: "#f1f5f9", "font-family": "system-ui, sans-serif",
   }, txt));
 }
@@ -323,13 +358,23 @@ function drawFaceplate(g, t, x, y, label, selected, item) {
   const h = t.u_height * U_PX;
   const lw = label ? LABEL_W : 0;
   if (t.faceplate_image && renderMode !== "dessin") {
-    /* Image aux proportions respectées, nom dans le cartouche à côté —
-       même règle que l'export Python. */
-    g.appendChild(svgEl("rect", { x, y: y + 1, width: RACK_W, height: h - 2, fill: C.face }));
-    if (label) drawNamePlate(g, label, x, y, h);
+    /* Mode photos : AUCUN cartouche — le nom vient au survol (fiche).
+       Le slot est à l'ÉCHELLE RÉELLE : jamais d'étirement (meet
+       toujours). Une façade 19" le remplit d'elle-même ; un boîtier
+       compact (width_mm) est cadré à SA largeur, au mm — et s'il a une
+       position_x_mm, il cohabite côte à côte avec ses voisins du même U
+       (deux FGT 60F collés, comme en vrai). Miroir Python. */
+    const iw = t.width_mm
+      ? Math.min(RACK_W, RACK_W * t.width_mm / MM_19_POUCES) : RACK_W;
+    const shared = !!(t.width_mm && item && item.position_x_mm != null);
+    const ix = shared ? x + RACK_W * item.position_x_mm / MM_19_POUCES
+                      : x + (RACK_W - iw) / 2;
+    const bx = shared ? ix : x, bw = shared ? iw : RACK_W;
+    g.appendChild(svgEl("rect", { x: bx, y: y + 1, width: bw, height: h - 2, fill: C.face }));
     const img = svgEl("image", {
-      x: x + lw, y: y + 1, width: RACK_W - lw, height: h - 2,
-      preserveAspectRatio: "xMidYMid meet", href: t.faceplate_image,
+      x: ix, y: y + 1, width: iw, height: h - 2,
+      preserveAspectRatio: "xMidYMid meet",
+      href: t.faceplate_image,
     });
     g.appendChild(img);
     /* Sur une photo officielle les ports ne sont pas localisables :
@@ -338,23 +383,26 @@ function drawFaceplate(g, t, x, y, label, selected, item) {
       img.addEventListener("mousemove", (e) => showTip(itemTipHTML(t, item), e));
       img.addEventListener("mouseleave", hideTip);
     }
-    /* Le MÊME cadre que les dessins : bordure, liseré de rôle, bandeau
-       hostname, pastille U — un seul langage visuel (miroir Python). */
+    /* Le MÊME cadre que les dessins : bordure, liseré de rôle, pastille
+       U — limité à l'EMPREINTE de l'équipement quand il cohabite
+       (miroir Python ; pas de pastille à deux : fouillis). */
     g.appendChild(svgEl("rect", {
-      x, y: y + 1, width: RACK_W, height: h - 2, rx: 2, fill: "none",
+      x: bx, y: y + 1, width: bw, height: h - 2, rx: 2, fill: "none",
       stroke: C.faceStroke, "stroke-width": 1,
     }));
-    g.appendChild(svgEl("rect", { x, y: y + 1, width: 4, height: h - 2, fill: t.color }));
-    g.appendChild(svgEl("rect", {
-      x: x + RACK_W - 34, y: y + h / 2 - 7, width: 26, height: 14, rx: 7,
-      fill: C.face, "fill-opacity": 0.85, stroke: C.pill, "stroke-width": 1,
-    }));
-    g.appendChild(svgEl("text", {
-      x: x + RACK_W - 21, y: y + h / 2 + 3, "text-anchor": "middle",
-      "font-size": 8.5, fill: C.dim, "font-family": "monospace",
-    }, t.u_height + "U"));
+    g.appendChild(svgEl("rect", { x: bx, y: y + 1, width: 4, height: h - 2, fill: t.color }));
+    if (!shared) {
+      g.appendChild(svgEl("rect", {
+        x: x + RACK_W - 44, y: y + h / 2 - 9.5, width: 36, height: 19, rx: 9,
+        fill: C.face, "fill-opacity": 0.85, stroke: C.pill, "stroke-width": 1,
+      }));
+      g.appendChild(svgEl("text", {
+        x: x + RACK_W - 26, y: y + h / 2 + 4.5, "text-anchor": "middle",
+        "font-size": 13, fill: C.dim, "font-family": "monospace",
+      }, t.u_height + "U"));
+    }
     if (selected)
-      g.appendChild(svgEl("rect", { x, y: y + 1, width: RACK_W, height: h - 2,
+      g.appendChild(svgEl("rect", { x: bx, y: y + 1, width: bw, height: h - 2,
         fill: "none", stroke: C.accent, "stroke-width": 1.6 }));
     return;
   }
@@ -377,12 +425,12 @@ function drawFaceplate(g, t, x, y, label, selected, item) {
     drawPortBanks(g, t, item, x + lw, y, RACK_W - lw, h);
   /* Pastille de hauteur U. */
   g.appendChild(svgEl("rect", {
-    x: x + RACK_W - 34, y: yc - 7, width: 26, height: 14, rx: 7,
+    x: x + RACK_W - 44, y: yc - 9.5, width: 36, height: 19, rx: 9,
     fill: C.face, "fill-opacity": 0.85, stroke: C.pill, "stroke-width": 1,
   }));
   g.appendChild(svgEl("text", {
-    x: x + RACK_W - 21, y: yc + 3, "text-anchor": "middle",
-    "font-size": 8.5, fill: C.dim, "font-family": "monospace",
+    x: x + RACK_W - 26, y: yc + 4.5, "text-anchor": "middle",
+    "font-size": 13, fill: C.dim, "font-family": "monospace",
   }, t.u_height + "U"));
 }
 
@@ -393,17 +441,18 @@ function drawPortBanks(g, t, item, x, y, w, h) {
   const n = Math.min((t.ports || []).length, 48);
   const rows = n > 12 ? 2 : 1;
   const cols = Math.ceil(n / rows);
-  const pw = 7, gapx = 2, group = 6, ggap = 4;
-  const ph = rows === 2 ? 6 : 8;
+  /* Dimensions à l'échelle U_PX=40.5 — miroir Python. */
+  const pw = 8, gapx = 2, group = 6, ggap = 6;
+  const ph = rows === 2 ? 10 : 14;
   const groups = Math.ceil(cols / group);
   const totalW = cols * (pw + gapx) - gapx + (groups - 1) * ggap;
   const x0 = x + w - 46 - totalW;
-  const blockH = rows * ph + (rows - 1) * 3;
+  const blockH = rows * ph + (rows - 1) * 4;
   const y0 = y + (h - blockH) / 2;
   for (let i = 0; i < n; i++) {
     const r = i % rows, c = Math.floor(i / rows);
     const px = x0 + c * (pw + gapx) + Math.floor(c / group) * ggap;
-    const py = y0 + r * (ph + 3);
+    const py = y0 + r * (ph + 4);
     const portRect = svgEl("rect", {
       x: px, y: py, width: pw, height: ph, rx: 1,
       fill: C.portFill, stroke: color, "stroke-width": 0.7,
@@ -434,8 +483,9 @@ function drawPortBanks(g, t, item, x, y, w, h) {
 
 /* Décor par catégorie pour les types sans ports (miroir Python). */
 function drawCategoryDecor(g, t, x, y, w, h) {
+  /* Dimensions à l'échelle U_PX=40.5 — miroir Python. */
   if (t.category === "server") {
-    const bw = 13, gap = 3, count = 10;
+    const bw = 17, gap = 4, count = 10;
     const x0 = x + w - 46 - count * (bw + gap);
     for (let i = 0; i < count; i++) {
       const bx = x0 + i * (bw + gap);
@@ -444,24 +494,24 @@ function drawCategoryDecor(g, t, x, y, w, h) {
         fill: C.decorFill, stroke: C.decorStroke, "stroke-width": 0.7,
       }));
       g.appendChild(svgEl("circle", {
-        cx: bx + bw / 2, cy: y + 7, r: 1.3, fill: t.color,
+        cx: bx + bw / 2, cy: y + 9, r: 2, fill: t.color,
       }));
     }
   } else if (t.category === "ups") {
     g.appendChild(svgEl("rect", {
-      x: x + w - 200, y: y + h / 2 - 8, width: 30, height: 16, rx: 2,
-      fill: C.lcd, stroke: t.color, "stroke-width": 0.8,
+      x: x + w - 210, y: y + h / 2 - 12, width: 40, height: 24, rx: 3,
+      fill: C.lcd, stroke: t.color, "stroke-width": 1,
     }));
     for (let i = 0; i < 24; i++)
       g.appendChild(svgEl("rect", {
-        x: x + w - 155 + i * 5, y: y + h / 2 - 6, width: 2, height: 12,
-        rx: 1, fill: C.decorFill,
+        x: x + w - 155 + i * 6, y: y + h / 2 - 10, width: 3, height: 20,
+        rx: 1.5, fill: C.decorFill,
       }));
   } else if (t.category === "cable-mgmt") {
     for (let i = 0; i < 4; i++)
       g.appendChild(svgEl("rect", {
-        x: x + 200 + i * 50, y: y + 3, width: 30, height: h - 6, rx: 4,
-        fill: "none", stroke: C.ring, "stroke-width": 2,
+        x: x + 200 + i * 50, y: y + 4, width: 30, height: h - 8, rx: 6,
+        fill: "none", stroke: C.ring, "stroke-width": 3,
       }));
   }
 }
@@ -513,10 +563,10 @@ function renderRackSVG(rack) {
     fill: C.frame, stroke: C.faceStroke, "stroke-width": 1.5 }));
   /* Nom de baie éditable — le crayon apparaît au survol (affordance). */
   const titleG = svgEl("g", { class: "rack-title", style: "cursor: pointer;" });
-  titleG.appendChild(svgEl("text", { x: w / 2, y: 24, "text-anchor": "middle",
-    "font-size": 15, "font-weight": "bold", fill: C.text }, rack.name));
+  titleG.appendChild(svgEl("text", { x: w / 2, y: 22, "text-anchor": "middle",
+    "font-size": 19, "font-weight": "bold", fill: C.text }, rack.name));
   const pencil = svgEl("g", { class: "rack-pencil",
-    transform: `translate(${w / 2 + rack.name.length * 4.2 + 12}, 12)` });
+    transform: `translate(${w / 2 + rack.name.length * 5.3 + 14}, 10)` });
   pencil.appendChild(svgEl("path", {
     d: "M 0 9 L 8 1 L 11 4 L 3 12 L 0 12 Z", fill: "none",
     stroke: C.accent, "stroke-width": 1.4, "stroke-linejoin": "round",
@@ -533,7 +583,7 @@ function renderRackSVG(rack) {
   /* Localisation (salle, adresse) sous le nom — comme à l'export. */
   if (rack.location)
     svg.appendChild(svgEl("text", { x: w / 2, y: 37, "text-anchor": "middle",
-      "font-size": 10.5, fill: C.dim }, rack.location));
+      "font-size": 12, fill: C.dim }, rack.location));
 
   const zoneY = HEADER_H + FRAME_PAD, zoneH = rack.u_height * U_PX;
   svg.appendChild(svgEl("rect", { x: innerX, y: zoneY, width: RACK_W, height: zoneH, fill: C.slot }));
@@ -547,8 +597,8 @@ function renderRackSVG(rack) {
       stroke: C.slotLine, "stroke-width": 1 }));
     for (const rx of [FRAME_PAD, FRAME_PAD + RAIL_W + RACK_W]) {
       if (showUNumbers)
-        svg.appendChild(svgEl("text", { x: rx + RAIL_W / 2, y: y + U_PX / 2 + 3,
-          "text-anchor": "middle", "font-size": 9.5, fill: C.dim,
+        svg.appendChild(svgEl("text", { x: rx + RAIL_W / 2, y: y + U_PX / 2 + 5,
+          "text-anchor": "middle", "font-size": 14, fill: C.dim,
           "font-family": "monospace" }, String(u)));
       for (let k = 0; k < 3; k++)
         svg.appendChild(svgEl("rect", { x: rx + 2, y: y + 4 + k * ((U_PX - 8) / 2),
@@ -566,7 +616,10 @@ function renderRackSVG(rack) {
     const y = uToY(rack, topU);
     const g = svgEl("g", { "data-item-id": item.id, class: "rack-item" });
     if (item.id === selectedItemId) g.classList.add("item-selected");
-    const label = item.meta.hostname || `${t.vendor} ${t.model}`;
+    /* RÈGLE : rien n'est écrit sur le dessin SAUF un hostname saisi PAR
+       L'UTILISATEUR — jamais de « constructeur modèle » auto-posé (le
+       survol, lui, donne toujours la fiche complète). */
+    const label = item.meta.hostname || "";
     drawFaceplate(g, t, innerX, y, label, item.id === selectedItemId, item);
     /* Clic = inspection ; pointerdown long = déplacement (géré globalement). */
     g.addEventListener("pointerdown", (e) => startItemDrag(e, rack, item));
@@ -615,7 +668,7 @@ function renderRackSVG(rack) {
   /* Stats de la baie. */
   const st = rackStats(rack);
   svg.appendChild(svgEl("text", { x: w / 2, y: h - FOOTER_H / 2, "text-anchor": "middle",
-    "font-size": 11, fill: C.accent, "font-family": "monospace" },
+    "font-size": 14, fill: C.accent, "font-family": "monospace" },
     `${st.used}U occupés · ${st.free}U libres · ${st.power} W`));
 
   return svg;
@@ -656,6 +709,31 @@ function openDeviceSheet(itemId) {
     (item.meta.mgmt_ip ? ` · ${item.meta.mgmt_ip}` : "") +
     (item.meta.serial ? ` · S/N ${item.meta.serial}` : "") +
     (item.meta.asset ? ` · ${item.meta.asset}` : "");
+
+  /* Renommer depuis la fiche : le nom saisi ICI est un nom MANUEL — il
+     s'écrit donc sur le schéma (c'est la règle : rien d'automatique). */
+  const doRename = async () => {
+    const nom = await askText("Nom de l'équipement",
+      "Laisse vide pour ne rien écrire sur le schéma (le survol garde la fiche).",
+      item.meta.hostname || "");
+    if (nom === null) return;
+    item.meta.hostname = nom.trim();
+    $("#device-title").textContent = item.meta.hostname ||
+      `${t.vendor} ${t.model}`;
+    saveLocal();
+    renderAll();
+  };
+  $("#btn-rename-device").onclick = doRename;
+  $("#device-title").onclick = doRename;
+
+  /* La VUE : la façade réelle de l'équipement, en grand dans la fiche. */
+  const photo = $("#device-photo");
+  if (t.faceplate_image) {
+    photo.querySelector("img").src = t.faceplate_image;
+    photo.hidden = false;
+  } else {
+    photo.hidden = true;
+  }
 
   const ports = t.ports || [];
   const used = ports.filter((p) => portUsageOf(item, p.name)).length;
@@ -700,6 +778,12 @@ function openDeviceSheet(itemId) {
             return;
           }
           openPortEditor(item, port);
+        });
+        /* Clic droit = état direct : Up / Down / Réservé / Brassé /
+           Libre — la couleur change en un geste, sans formulaire. */
+        cell.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          openPortStateMenu(e, item, port);
         });
         grid.appendChild(cell);
       }
@@ -767,6 +851,60 @@ document.addEventListener("keydown", (e) => {
 });
 
 let editingPort = null;
+/* Menu d'état rapide d'un port (clic droit dans la fiche) : la couleur
+   change en un geste — Up / Down / Réservé / Brassé / Libre. */
+function openPortStateMenu(e, item, port) {
+  document.getElementById("port-state-menu")?.remove();
+  const menu = document.createElement("div");
+  menu.id = "port-state-menu";
+  const states = [
+    ["up", "● Up", "#22c55e"],
+    ["down", "● Down", "#ef4444"],
+    ["reserve", "● Réservé", "#eab308"],
+    ["", "● Brassé", "#f97316"],
+    ["libre", "○ Libre", ""],
+  ];
+  for (const [val, lbl, color] of states) {
+    const b = document.createElement("button");
+    b.textContent = lbl;
+    if (color) b.style.color = color;
+    b.addEventListener("click", async () => {
+      menu.remove();
+      let pu = portUsageOf(item, port.name);
+      if (val === "libre") {
+        if (pu && (pu.vlan || pu.outlet || pu.usage)) {
+          const ok = await askConfirm(`Libérer le port ${port.name} ?`,
+            "Sa config de brassage (VLAN, prise, usage) sera effacée.");
+          if (!ok) return;
+        }
+        item.meta.port_usage =
+          (item.meta.port_usage || []).filter((u) => u.port !== port.name);
+      } else {
+        if (!pu) {
+          pu = { port: port.name, outlet: "", vlan: "", usage: "", etat: "" };
+          item.meta.port_usage = item.meta.port_usage || [];
+          item.meta.port_usage.push(pu);
+        }
+        pu.etat = val;
+      }
+      saveLocal();
+      openDeviceSheet(deviceItemId);   // la grille se recolore
+      renderAll();
+    });
+    menu.appendChild(b);
+  }
+  /* Dans le dialog (top layer) : ajouté au body il serait derrière le
+     modal et inerte. position:fixed = coordonnées viewport, inchangées. */
+  $("#device-dialog").appendChild(menu);
+  menu.style.left = Math.min(e.clientX, window.innerWidth - 130) + "px";
+  menu.style.top = Math.min(e.clientY, window.innerHeight - 180) + "px";
+  const close = (ev) => {
+    if (!menu.contains(ev.target)) { menu.remove();
+      document.removeEventListener("pointerdown", close, true); }
+  };
+  document.addEventListener("pointerdown", close, true);
+}
+
 function openPortEditor(item, port) {
   editingPort = { item, port };
   $("#device-trace").hidden = true;
@@ -1277,9 +1415,89 @@ function renderAll() {
   ghost.addEventListener("click", () => $("#btn-add-rack").click());
   canvas.appendChild(ghost);
   requestAnimationFrame(updateMinimap);
+  requestAnimationFrame(renderCables);
   renderOnboarding();
   renderStatus();
   saveLocal();
+}
+
+/* =====================================================================
+ * Vue câblage (esprit PATCHBOX) : les cordons de brassage dessinés
+ * par-dessus l'élévation. Chaque lien part du bord de l'équipement,
+ * descend dans la « goulotte » entre les baies et rejoint sa cible —
+ * couleur = type de câble (les vraies couleurs de cordons : monomode
+ * jaune, OM4 aqua, cuivre bleu, DAC gris). Survol = détail du lien.
+ * =================================================================== */
+const CABLE_COLORS = {
+  "cuivre-cat6a": "#2563eb", "cuivre-cat6": "#60a5fa",
+  "fibre-om4": "#22d3ee", "fibre-os2": "#eab308",
+  "fibre": "#22d3ee", "dac": "#64748b",
+};
+let cablesVisible = localStorage.getItem("rfp-cables-visibles") === "1";
+
+function renderCables() {
+  document.getElementById("cables-overlay")?.remove();
+  if (!cablesVisible || viewMode !== "physical") return;
+  const canvas = $("#canvas");
+  const links = project.logical?.links || [];
+  if (!links.length) return;
+  const cRect = canvas.getBoundingClientRect();
+  const overlay = svgEl("svg", { id: "cables-overlay" });
+  /* Le canvas est zoomé en CSS : les rects mesurés sont en pixels
+     écran — on redivise pour dessiner dans le repère du canvas. */
+  const z = canvasZoom;
+  overlay.setAttribute("width", canvas.scrollWidth);
+  overlay.setAttribute("height", canvas.scrollHeight);
+  let n = 0;
+  for (const link of links) {
+    const gFrom = canvas.querySelector(
+      `[data-item-id="${CSS.escape(link.from.equipment_id)}"]`);
+    const gTo = canvas.querySelector(
+      `[data-item-id="${CSS.escape(link.to.equipment_id)}"]`);
+    if (!gFrom || !gTo) continue;
+    const a = gFrom.getBoundingClientRect(), b = gTo.getBoundingClientRect();
+    const aCx = (a.left + a.right) / 2, bCx = (b.left + b.right) / 2;
+    const y1 = (a.top + a.height / 2 - cRect.top) / z;
+    const y2 = (b.top + b.height / 2 - cRect.top) / z;
+    const sag = 26 + (n % 5) * 9;   // cordons étagés dans la goulotte
+    const sameBay = Math.abs(aCx - bCx) < a.width / 2;
+    let d;
+    if (sameBay) {
+      /* Même baie : le cordon sort à DROITE, longe la goulotte du rail
+         et revient — jamais en diagonale à travers les équipements. */
+      const x1 = (a.right - cRect.left) / z;
+      const x2 = (b.right - cRect.left) / z;
+      const g = Math.max(x1, x2) + sag;
+      d = `M ${x1} ${y1} C ${g} ${y1}, ${g} ${y2}, ${x2} ${y2}`;
+    } else {
+      /* Baies différentes : sortie côté voisin, traversée de l'allée. */
+      const toRight = bCx >= aCx;
+      const x1 = ((toRight ? a.right : a.left) - cRect.left) / z;
+      const x2 = ((toRight ? b.left : b.right) - cRect.left) / z;
+      const dx = toRight ? sag : -sag;
+      d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+    }
+    const color = CABLE_COLORS[link.media] || "#94a3b8";
+    /* Halo sombre dessous : le cordon se lit sur les photos claires. */
+    const halo = svgEl("path", { d, fill: "none", stroke: "rgba(0,0,0,.45)",
+      "stroke-width": 4.5, "stroke-linecap": "round" });
+    const path = svgEl("path", { d, fill: "none", stroke: color,
+      "stroke-width": 2.2, "stroke-linecap": "round", class: "cable-path" });
+    const fi = findItem(link.from.equipment_id), ti = findItem(link.to.equipment_id);
+    const tip = `${fi?.item.meta.hostname || link.from.equipment_id}` +
+      (link.from.port ? ` · ${link.from.port}` : "") + "  ⟶  " +
+      `${ti?.item.meta.hostname || link.to.equipment_id}` +
+      (link.to.port ? ` · ${link.to.port}` : "") +
+      (link.media ? `  (${link.media})` : "") +
+      (link.vlans?.length ? `  VLAN ${link.vlans.join(",")}` : "");
+    path.addEventListener("mousemove", (e) => showTip(esc(tip), e));
+    path.addEventListener("mouseleave", hideTip);
+    path.addEventListener("click", () => openLinkDialog(link));
+    overlay.appendChild(halo);
+    overlay.appendChild(path);
+    n++;
+  }
+  canvas.appendChild(overlay);
 }
 
 /* Carte de prise en main : visible tant que les baies sont vides,
@@ -1481,10 +1699,17 @@ document.addEventListener("pointerup", (e) => {
 
   if (!hit) { renderAll(); return; }
   const { rack, u } = hit;
+  let shareX = null;
   if (!canPlace(rack, u, d.type.u_height, d.itemId)) {
-    renderStatus('<span class="stat-err">Collision — dépôt refusé</span>');
-    renderAll();
-    return;
+    /* U occupé : peut-être une cohabitation côte à côte (compacts). */
+    shareX = tryShare(rack, u, d.type, d.itemId);
+    if (shareX == null) {
+      renderStatus('<span class="stat-err">Collision — dépôt refusé'
+        + (d.type.width_mm ? " (plus assez de place dans le U)" : "")
+        + '</span>');
+      renderAll();
+      return;
+    }
   }
   if (d.itemId) {
     /* Déplacement (y compris entre baies). */
@@ -1492,15 +1717,19 @@ document.addEventListener("pointerup", (e) => {
     const idx = fromRack.items.findIndex((i) => i.id === d.itemId);
     const [item] = fromRack.items.splice(idx, 1);
     item.position_u = u;
+    item.position_x_mm = shareX;           // null = redevient seul/centré
     rack.items.push(item);
   } else {
     /* Nouveau depuis la palette. */
     rack.items.push({
       id: nextItemId(), type_id: d.type.id, position_u: u, face: "front",
+      position_x_mm: shareX,
       meta: { hostname: "", role: d.type.category, vlan: "", wall_outlet: "",
               port_usage: [], serial: "", notes: "" },
     });
   }
+  if (shareX != null)
+    renderStatus(`Posé côte à côte — à ${Math.round(shareX)} mm du bord gauche du U${u}`);
   renderAll();
 });
 
@@ -1592,7 +1821,46 @@ function currentProject() {
   return project;
 }
 
-async function postForBlob(url, filename) {
+/* « Enregistrer sous » — comme draw.io / Visio : la vraie boîte Windows
+ * quand le navigateur la propose (Chromium), sinon téléchargement
+ * classique. L'utilisateur choisit lui-même le dossier et le nom. */
+const SAVE_TYPES = {
+  ".json":   { description: "Projet RackForgePrime", accept: { "application/json": [".json"] } },
+  ".zip":    { description: "Archive ZIP",           accept: { "application/zip": [".zip"] } },
+  ".pdf":    { description: "Document PDF",          accept: { "application/pdf": [".pdf"] } },
+  ".svg":    { description: "Image SVG",             accept: { "image/svg+xml": [".svg"] } },
+  ".png":    { description: "Image PNG",             accept: { "image/png": [".png"] } },
+  ".drawio": { description: "Schéma draw.io",        accept: { "application/xml": [".drawio"] } },
+};
+async function saveBlob(blob, filename) {
+  const ext = "." + filename.split(".").pop().toLowerCase();
+  if (window.showSaveFilePicker && SAVE_TYPES[ext]) {
+    try {
+      const handle = await showSaveFilePicker({
+        suggestedName: filename, types: [SAVE_TYPES[ext]],
+      });
+      const w = await handle.createWritable();
+      await w.write(blob);
+      await w.close();
+      renderStatus(`Enregistré ✓ ${handle.name}`);
+      return true;
+    } catch (err) {
+      if (err.name === "AbortError") {          // l'utilisateur a annulé
+        renderStatus("Enregistrement annulé");
+        return false;
+      }
+      /* API refusée (iframe, politique…) : téléchargement classique. */
+    }
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  return true;
+}
+
+async function fetchExportBlob(url) {
   const res = await fetch(url, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify(currentProject()),
@@ -1600,14 +1868,13 @@ async function postForBlob(url, filename) {
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     renderStatus(`<span class="stat-err">Export refusé : ${JSON.stringify(err.detail)}</span>`);
-    return;
+    return null;
   }
-  const blob = await res.blob();
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  return res.blob();
+}
+async function postForBlob(url, filename) {
+  const blob = await fetchExportBlob(url);
+  if (blob) await saveBlob(blob, filename);
 }
 
 /* Les exports suivent la vue active ET le thème affiché : ce que tu
@@ -1646,51 +1913,48 @@ $("#btn-export-drawio").addEventListener("click", () =>
 
 /* PNG : le SVG d'export rasterisé en local (à imprimer, scotcher sur la
  * baie — la demande NetBox n°1182 jamais servie). Échelle 2x. */
-$("#btn-export-png").addEventListener("click", async () => {
+async function makePngBlob() {
   const res = await fetch("/api/export/svg" + exportQuery(), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify(currentProject()),
   });
   if (!res.ok) {
     renderStatus('<span class="stat-err">Export refusé — projet invalide</span>');
-    return;
+    return null;
   }
   const svgText = await res.text();
   const size = /viewBox="0 0 (\d+(?:\.\d+)?) (\d+(?:\.\d+)?)"/.exec(svgText);
   const w = size ? parseFloat(size[1]) : 1200;
   const h = size ? parseFloat(size[2]) : 900;
-  const img = new Image();
-  const url = URL.createObjectURL(new Blob([svgText], { type: "image/svg+xml" }));
-  img.onload = () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = w * 2;
-    canvas.height = h * 2;
-    const ctx = canvas.getContext("2d");
-    ctx.scale(2, 2);
-    ctx.drawImage(img, 0, 0);
-    URL.revokeObjectURL(url);
-    canvas.toBlob((blob) => {
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = currentProject().id + viewSuffix() + ".png";
-      a.click();
-      URL.revokeObjectURL(a.href);
-    }, "image/png");
-  };
-  img.onerror = () => {
-    URL.revokeObjectURL(url);
-    renderStatus('<span class="stat-err">Rasterisation PNG impossible</span>');
-  };
-  img.src = url;
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(new Blob([svgText], { type: "image/svg+xml" }));
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = w * 2;
+      canvas.height = h * 2;
+      const ctx = canvas.getContext("2d");
+      ctx.scale(2, 2);
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((blob) => resolve(blob), "image/png");
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      renderStatus('<span class="stat-err">Rasterisation PNG impossible</span>');
+      resolve(null);
+    };
+    img.src = url;
+  });
+}
+$("#btn-export-png").addEventListener("click", async () => {
+  const blob = await makePngBlob();
+  if (blob) await saveBlob(blob, currentProject().id + viewSuffix() + ".png");
 });
 $("#btn-export-json").addEventListener("click", () => {
   const blob = new Blob([JSON.stringify(currentProject(), null, 2)],
                        { type: "application/json" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = currentProject().id + ".json";
-  a.click();
-  URL.revokeObjectURL(a.href);
+  saveBlob(blob, currentProject().id + ".json");
 });
 
 $("#btn-import-json input").addEventListener("change", async (e) => {
@@ -1789,6 +2053,160 @@ $("#btn-new-version").addEventListener("click", async () => {
   renderStatus(`Projet passé en V${cur + 1} — historique dans le dossier DAT`);
 });
 
+/* ---- Sauvegarde façon draw.io / Visio : quoi, format, où — tout au
+   choix. Les formats visuels (PDF, SVG, PNG, draw.io) ne valent que pour
+   le projet ouvert ; « Enregistrer sous » laisse choisir librement ;
+   « un dossier précis » accepte n'importe quel chemin (NAS, clé USB…)
+   et le mémorise pour la fois suivante. -------------------------------- */
+let backupCfg = { dossier_app: "", dernier_dossier: "" };
+/* Le DERNIER choix devient LE défaut (quoi / format / où) : celui qui
+   sauvegarde toujours en PDF retrouve PDF pré-coché. */
+function restoreBackupChoices() {
+  for (const name of ["bk-scope", "bk-format", "bk-dest"]) {
+    const saved = localStorage.getItem("rfp-" + name);
+    const radio = saved &&
+      document.querySelector(`#backup-form input[name="${name}"][value="${saved}"]`);
+    if (radio && radio.closest("label").style.display !== "none")
+      radio.checked = true;
+  }
+}
+$("#btn-backup").addEventListener("click", async () => {
+  try {
+    backupCfg = await (await fetch("/api/backup/config")).json();
+  } catch { /* la config est un confort, pas une condition */ }
+  $("#bk-dossier-app").textContent = backupCfg.dossier_app || "";
+  const dir = $("#bk-dir");
+  if (!dir.value) dir.value = backupCfg.dernier_dossier || "";
+  restoreBackupChoices();
+  syncBackupForm();
+  $("#backup-dialog").showModal();
+});
+$("#backup-cancel").addEventListener("click", (e) => {
+  e.preventDefault();
+  $("#backup-dialog").close();
+});
+function syncBackupForm() {
+  const f = new FormData($("#backup-form"));
+  const scope = f.get("bk-scope");
+  /* Un lot de projets ou l'espace de travail ne se dessine pas : les
+     formats visuels ne valent que pour LE projet ouvert. */
+  const visualsOk = scope === "projet";
+  document.querySelectorAll("#bk-format-group .bk-visual").forEach((l) => {
+    l.style.display = visualsOk ? "" : "none";
+  });
+  const fmt = f.get("bk-format");
+  if (!visualsOk && !["zip", "json"].includes(fmt))
+    $('#backup-form input[name="bk-format"][value="zip"]').checked = true;
+  $("#bk-dir").hidden = f.get("bk-dest") !== "dossier";
+}
+$("#backup-form").addEventListener("change", syncBackupForm);
+$("#backup-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = new FormData($("#backup-form"));
+  const scope = f.get("bk-scope"), fmt = f.get("bk-format"),
+        dest = f.get("bk-dest"), dir = $("#bk-dir").value.trim();
+  localStorage.setItem("rfp-bk-scope", scope);
+  localStorage.setItem("rfp-bk-format", fmt);
+  localStorage.setItem("rfp-bk-dest", dest);
+  if (dest === "dossier" && !dir) {
+    renderStatus('<span class="stat-err">Tape le chemin du dossier voulu</span>');
+    return;
+  }
+  $("#backup-dialog").close();
+  renderStatus("Sauvegarde en cours…");
+  try {
+    if (["zip", "json"].includes(fmt)) {
+      /* Fichiers de données : le serveur les fabrique. */
+      const body = { scope, format: fmt, dest, dir, project: currentProject() };
+      const res = await fetch("/api/backup", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (dest === "telecharger") {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: res.statusText }));
+          throw new Error(err.detail || "échec");
+        }
+        const name = /filename="([^"]+)"/
+          .exec(res.headers.get("Content-Disposition") || "");
+        await saveBlob(await res.blob(), name ? name[1] : "sauvegarde." + fmt);
+        return;
+      }
+      const r = await res.json();
+      if (!res.ok) throw new Error(r.detail || "échec");
+      reportBackup(r);
+      return;
+    }
+    /* Formats visuels : on génère l'export, puis on le range. */
+    const id = currentProject().id;
+    let blob = null, name = "";
+    if (fmt === "pdf") {
+      blob = await fetchExportBlob("/api/export/pdf" + exportQuery("dossier"));
+      name = id + "-dossier.pdf";
+    } else if (fmt === "svg") {
+      blob = await fetchExportBlob("/api/export/svg" + exportQuery());
+      name = id + viewSuffix() + ".svg";
+    } else if (fmt === "png") {
+      blob = await makePngBlob();
+      name = id + viewSuffix() + ".png";
+    } else if (fmt === "drawio") {
+      blob = await fetchExportBlob("/api/export/drawio");
+      name = id + ".drawio";
+    }
+    if (!blob) return;                       // l'erreur est déjà affichée
+    if (dest === "telecharger") {
+      await saveBlob(blob, name);
+      return;
+    }
+    const targets = [];
+    if (dest === "pc" || dest === "deux") targets.push(backupCfg.dossier_app);
+    if (dest === "dossier" || dest === "deux") targets.push(dir);
+    const oks = [], kos = [];
+    for (const t of targets) {
+      const res = await fetch("/api/backup/fichier?dir=" +
+        encodeURIComponent(t) + "&name=" + encodeURIComponent(name),
+        { method: "POST", body: blob });
+      const r = await res.json().catch(() => ({}));
+      if (res.ok) oks.push(r.fichier);
+      else kos.push((r.detail || "échec") + " (" + t + ")");
+    }
+    if (kos.length)
+      renderStatus(`<span class="${oks.length ? "stat-warn" : "stat-err"}">` +
+        (oks.length ? `Enregistré ${oks.join(" · ")} — MAIS ` : "Échec — ") +
+        kos.join(" · ") + "</span>");
+    else
+      renderStatus(`Enregistré ✓ ${oks.join(" · ")}`);
+  } catch (err) {
+    renderStatus(`<span class="stat-err">Sauvegarde échouée — ${err.message}</span>`);
+  }
+});
+function reportBackup(r) {
+  const oks = (r.resultats || []).map((x) =>
+    `${x.destination} : ${x.elements} élément(s), ${(x.octets / 1048576).toFixed(1)} Mo`);
+  const kos = (r.erreurs || []).map((x) => `${x.destination} : ${x.erreur}`);
+  if (kos.length && oks.length)
+    renderStatus(`<span class="stat-warn">Sauvé ${oks.join(" · ")} — MAIS ${kos.join(" · ")}</span>`);
+  else if (kos.length)
+    renderStatus(`<span class="stat-err">Sauvegarde échouée — ${kos.join(" · ")}</span>`);
+  else
+    renderStatus(`Sauvegardé ✓ ${oks.join(" · ")}`);
+}
+
+/* ---- Vue câblage : bouton bandeau, état mémorisé ------------------- */
+function syncCablesBtn() {
+  $("#btn-cables").classList.toggle("actif", cablesVisible);
+}
+$("#btn-cables").addEventListener("click", () => {
+  cablesVisible = !cablesVisible;
+  localStorage.setItem("rfp-cables-visibles", cablesVisible ? "1" : "0");
+  syncCablesBtn();
+  renderCables();
+  renderStatus(cablesVisible
+    ? "Cordons affichés — couleur = type de câble, cliquez un cordon pour l'éditer"
+    : "Cordons masqués");
+});
+syncCablesBtn();
+
 /* ---- Fond du plan : 5 options, mémorisé, cyclé depuis le bandeau ---- */
 const CANVAS_BGS = ["points", "carreaux", "ruche", "lignes", "uni"];
 const CANVAS_BG_LABELS = { points: "Points", carreaux: "Carreaux",
@@ -1871,47 +2289,58 @@ $("#canvas-wrap").addEventListener("pointerdown", (e) => {
 /* ---- Minimap de navigation (coin bas-droit, toutes vues) ------------
    Dessin schématique : une boîte par élément posé + le rectangle du
    viewport. Cachée quand tout tient à l'écran. */
+let minimapOff = localStorage.getItem("rfp-minimap-off") === "1";
 function updateMinimap() {
   const wrap = $("#canvas-wrap");
   const mini = $("#minimap");
   if (!wrap || !mini) return;
-  /* Ne s'affiche que si le débord vaut la peine d'être navigué. */
+  /* Ne s'affiche que si le débord vaut la peine d'être navigué —
+     et jamais si l'utilisateur l'a fermée (son choix, mémorisé). */
   const fits = wrap.scrollWidth <= wrap.clientWidth + 40 &&
                wrap.scrollHeight <= wrap.clientHeight + 40;
-  mini.classList.toggle("hidden", fits);
-  if (fits) return;
+  mini.classList.toggle("hidden", fits || minimapOff);
+  if (fits || minimapOff) return;
   /* Épingle au coin bas-droit du VIEWPORT (le conteneur défile). */
-  mini.style.left = (wrap.scrollLeft + wrap.clientWidth - 192 - 14) + "px";
-  mini.style.top = (wrap.scrollTop + wrap.clientHeight - 132 - 14) + "px";
+  mini.style.left = (wrap.scrollLeft + wrap.clientWidth - 150 - 12) + "px";
+  mini.style.top = (wrap.scrollTop + wrap.clientHeight - 100 - 12) + "px";
   const cv = mini.querySelector("canvas");
   const ctx = cv.getContext("2d");
   const W = cv.width, H = cv.height;
   const sw = wrap.scrollWidth, sh = wrap.scrollHeight;
-  const k = Math.min(W / sw, H / sh);
+  const PAD = 7;                     /* marge interne : rien ne colle au bord */
+  const k = Math.min((W - PAD * 2) / sw, (H - PAD * 2) / sh);
   const ox = (W - sw * k) / 2, oy = (H - sh * k) / 2;
   const css = getComputedStyle(document.body);
-  ctx.fillStyle = css.getPropertyValue("--panel-2").trim() || "#161b28";
-  ctx.fillRect(0, 0, W, H);
-  /* Une boîte par SVG/bloc posé (baies, schéma, page de diagramme) —
-     en couleur de texte estompée : lisible sur les 4 thèmes.
+  ctx.clearRect(0, 0, W, H);         /* le fond du panneau (CSS) respire */
+  /* Une boîte DOUCE par bloc posé (baie, schéma, page) — coins ronds,
+     teinte estompée : un plan, pas un pavage.
      getBoundingClientRect obligatoire : offsetLeft n'existe pas sur les
      éléments SVG (NaN silencieux = minimap vide). */
   ctx.fillStyle = css.getPropertyValue("--text-dim").trim() || "#64748b";
-  ctx.globalAlpha = 0.6;
+  ctx.globalAlpha = 0.35;
   const wr = wrap.getBoundingClientRect();
   for (const el of $("#canvas").children) {
     const r = el.getBoundingClientRect();
     const x = r.left - wr.left + wrap.scrollLeft;
     const y = r.top - wr.top + wrap.scrollTop;
-    ctx.fillRect(ox + x * k, oy + y * k,
-                 Math.max(2, r.width * k), Math.max(2, r.height * k));
+    ctx.beginPath();
+    ctx.roundRect(ox + x * k + 0.5, oy + y * k + 0.5,
+                  Math.max(3, r.width * k - 1), Math.max(3, r.height * k - 1), 2);
+    ctx.fill();
   }
-  /* Viewport. */
+  /* Viewport : liseré accent fin + voile léger — on voit OÙ on est sans
+     que le rectangle écrase le plan. */
+  const vx = ox + wrap.scrollLeft * k, vy = oy + wrap.scrollTop * k;
+  const vw = wrap.clientWidth * k, vh = wrap.clientHeight * k;
+  const accent = css.getPropertyValue("--accent").trim() || "#f97316";
+  ctx.globalAlpha = 0.12;
+  ctx.fillStyle = accent;
+  ctx.beginPath(); ctx.roundRect(vx, vy, vw, vh, 3); ctx.fill();
   ctx.globalAlpha = 1;
-  ctx.strokeStyle = css.getPropertyValue("--accent").trim() || "#f97316";
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(ox + wrap.scrollLeft * k, oy + wrap.scrollTop * k,
-                 wrap.clientWidth * k, wrap.clientHeight * k);
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 1.25;
+  ctx.beginPath(); ctx.roundRect(vx + 0.5, vy + 0.5, vw - 1, vh - 1, 3);
+  ctx.stroke();
 }
 
 (function wireMinimap() {
@@ -1929,7 +2358,26 @@ function updateMinimap() {
     wrap.scrollLeft = (mx - ox) / k - wrap.clientWidth / 2;
     wrap.scrollTop = (my - oy) / k - wrap.clientHeight / 2;
   };
+  /* La croix masque la minimap — le choix est mémorisé, et la case
+     « Minimap » du menu Calques la ramène quand on veut. */
+  const closeBtn = $("#minimap-close");
+  const chk = $("#calque-minimap");
+  if (chk) chk.checked = !minimapOff;
+  const setMinimap = (off) => {
+    minimapOff = off;
+    localStorage.setItem("rfp-minimap-off", off ? "1" : "0");
+    if (chk) chk.checked = !off;
+    updateMinimap();
+  };
+  if (closeBtn) closeBtn.addEventListener("pointerdown", (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setMinimap(true);
+    renderStatus("Minimap masquée — réactivable dans le menu Calques");
+  });
+  if (chk) chk.addEventListener("change", () => setMinimap(!chk.checked));
   mini.addEventListener("pointerdown", (e) => {
+    if (e.target === closeBtn) return;
     e.preventDefault();
     goTo(e);
     const move = (ev) => goTo(ev);

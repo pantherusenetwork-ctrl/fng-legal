@@ -1,0 +1,682 @@
+{
+ "facades": 1027,
+ "angles": [
+  {
+   "id": "netlink-fd-6166-2xrj-45-8p-8c-5",
+   "u": 1,
+   "pct_largeur": 11
+  },
+  {
+   "id": "sangoma-pbxact-25",
+   "u": 1,
+   "pct_largeur": 24
+  },
+  {
+   "id": "sangoma-pbxact-40",
+   "u": 1,
+   "pct_largeur": 24
+  },
+  {
+   "id": "corning-edge-01u",
+   "u": 1,
+   "pct_largeur": 26
+  },
+  {
+   "id": "cisco-ie-4000-16t4g-e",
+   "u": 3,
+   "pct_largeur": 28
+  },
+  {
+   "id": "nabu-casa-home-assistant-green",
+   "u": 1,
+   "pct_largeur": 31
+  },
+  {
+   "id": "sangoma-pbxact-75",
+   "u": 1,
+   "pct_largeur": 31
+  },
+  {
+   "id": "fortinet-fg-80f",
+   "u": 1,
+   "pct_largeur": 33
+  },
+  {
+   "id": "fs-fhd-1ufmt-n",
+   "u": 1,
+   "pct_largeur": 35
+  },
+  {
+   "id": "generic-lc-12-fibre",
+   "u": 1,
+   "pct_largeur": 36
+  },
+  {
+   "id": "minisforum-ms-01",
+   "u": 1,
+   "pct_largeur": 37
+  },
+  {
+   "id": "mitrastar-gpt-2541gnac",
+   "u": 1,
+   "pct_largeur": 37
+  },
+  {
+   "id": "cisco-ws-c2960s-24ts-l",
+   "u": 1,
+   "pct_largeur": 39
+  },
+  {
+   "id": "exegate-eppw-12-8p8c-c5e-fr",
+   "u": 1,
+   "pct_largeur": 40
+  },
+  {
+   "id": "hpe-aruba-7008",
+   "u": 1,
+   "pct_largeur": 44
+  },
+  {
+   "id": "mellanox-sn2100",
+   "u": 1,
+   "pct_largeur": 44
+  },
+  {
+   "id": "mikrotik-crs112-8p-4s-in",
+   "u": 1,
+   "pct_largeur": 44
+  },
+  {
+   "id": "hpe-aruba-7005",
+   "u": 1,
+   "pct_largeur": 45
+  },
+  {
+   "id": "arista-dcs-7050cx4m-48d8-f",
+   "u": 1,
+   "pct_largeur": 46
+  },
+  {
+   "id": "arista-dcs-7280cr2-60-f",
+   "u": 1,
+   "pct_largeur": 46
+  },
+  {
+   "id": "arista-dcs-7280cr2a-60-f",
+   "u": 1,
+   "pct_largeur": 46
+  },
+  {
+   "id": "arista-dcs-7280cr2k-60-f",
+   "u": 1,
+   "pct_largeur": 46
+  },
+  {
+   "id": "fortinet-fg-80d",
+   "u": 1,
+   "pct_largeur": 46
+  },
+  {
+   "id": "generic-cable-mgmt-1u",
+   "u": 1,
+   "pct_largeur": 47
+  },
+  {
+   "id": "hpe-aruba-ec-xs",
+   "u": 1,
+   "pct_largeur": 47
+  },
+  {
+   "id": "hpe-aruba-ec-xs-fips",
+   "u": 1,
+   "pct_largeur": 47
+  },
+  {
+   "id": "barracuda-f80b",
+   "u": 1,
+   "pct_largeur": 48
+  },
+  {
+   "id": "hpe-aruba-ec-10104",
+   "u": 1,
+   "pct_largeur": 48
+  },
+  {
+   "id": "hpe-aruba-ec-xs-gen2",
+   "u": 1,
+   "pct_largeur": 48
+  },
+  {
+   "id": "mikrotik-css318-16g-2s-plus-in",
+   "u": 1,
+   "pct_largeur": 48
+  },
+  {
+   "id": "palo-alto-networks-pa-200",
+   "u": 1,
+   "pct_largeur": 48
+  },
+  {
+   "id": "sophos-xgs-107",
+   "u": 1,
+   "pct_largeur": 48
+  },
+  {
+   "id": "ubiquiti-unifi-switch-lite-8-poe",
+   "u": 1,
+   "pct_largeur": 48
+  },
+  {
+   "id": "zyxel-gs1100-16",
+   "u": 1,
+   "pct_largeur": 48
+  },
+  {
+   "id": "cisco-cbs250-8t-d",
+   "u": 1,
+   "pct_largeur": 49
+  },
+  {
+   "id": "hpe-aruba-ec-xs-gen3",
+   "u": 1,
+   "pct_largeur": 49
+  },
+  {
+   "id": "generic-lc-48-fibre",
+   "u": 1,
+   "pct_largeur": 50
+  },
+  {
+   "id": "cisco-fpr4115-ngfw-k9",
+   "u": 1,
+   "pct_largeur": 50
+  },
+  {
+   "id": "fortinet-fg-50g-sfp",
+   "u": 1,
+   "pct_largeur": 51
+  },
+  {
+   "id": "fortinet-fg-50g-sfp-poe",
+   "u": 1,
+   "pct_largeur": 51
+  },
+  {
+   "id": "huawei-s5735-l8t4x-a1",
+   "u": 1,
+   "pct_largeur": 51
+  },
+  {
+   "id": "rackifyus-1u-vented-panel",
+   "u": 1,
+   "pct_largeur": 51
+  },
+  {
+   "id": "rackifyus-jetkvm-1x",
+   "u": 1,
+   "pct_largeur": 51
+  },
+  {
+   "id": "rackifyus-jetkvm-2x",
+   "u": 1,
+   "pct_largeur": 51
+  },
+  {
+   "id": "rackifyus-jetkvm-4x",
+   "u": 1,
+   "pct_largeur": 51
+  },
+  {
+   "id": "rackifyus-keystone-panel",
+   "u": 1,
+   "pct_largeur": 51
+  },
+  {
+   "id": "generic-blank-2u",
+   "u": 2,
+   "pct_largeur": 52
+  },
+  {
+   "id": "hpe-aruba-2530-8-poep",
+   "u": 1,
+   "pct_largeur": 52
+  },
+  {
+   "id": "hpe-aruba-2530-8g",
+   "u": 1,
+   "pct_largeur": 52
+  },
+  {
+   "id": "hpe-aruba-2530-8g-poep",
+   "u": 1,
+   "pct_largeur": 52
+  },
+  {
+   "id": "hpe-aruba-2930f-12g-poep-2sfpp",
+   "u": 1,
+   "pct_largeur": 52
+  },
+  {
+   "id": "hpe-aruba-2930f-8g-poep-2sfpp",
+   "u": 1,
+   "pct_largeur": 52
+  },
+  {
+   "id": "hpe-aruba-6000-12g-poe4-2sfp",
+   "u": 1,
+   "pct_largeur": 52
+  },
+  {
+   "id": "rackifyus-1-inch-grommet-panel",
+   "u": 1,
+   "pct_largeur": 52
+  },
+  {
+   "id": "rackifyus-2u-blank-panel",
+   "u": 2,
+   "pct_largeur": 52
+  },
+  {
+   "id": "rackifyus-2u-vented-panel",
+   "u": 2,
+   "pct_largeur": 52
+  },
+  {
+   "id": "generic-blank-1u",
+   "u": 1,
+   "pct_largeur": 53
+  },
+  {
+   "id": "exegate-epp3-10-12-8p8c-c6-110d",
+   "u": 1,
+   "pct_largeur": 53
+  },
+  {
+   "id": "hpe-aruba-ec-us",
+   "u": 1,
+   "pct_largeur": 53
+  },
+  {
+   "id": "hpe-officeconnect-1920s-8g",
+   "u": 1,
+   "pct_largeur": 53
+  },
+  {
+   "id": "hpe-procurve-2520-8-poe",
+   "u": 1,
+   "pct_largeur": 53
+  },
+  {
+   "id": "hpe-procurve-2520g-8-poe",
+   "u": 1,
+   "pct_largeur": 53
+  },
+  {
+   "id": "rackifyus-1u-blank-panel",
+   "u": 1,
+   "pct_largeur": 53
+  },
+  {
+   "id": "rackifyus-jetkvm-3x",
+   "u": 1,
+   "pct_largeur": 53
+  },
+  {
+   "id": "fortinet-fg-60e",
+   "u": 1,
+   "pct_largeur": 54
+  },
+  {
+   "id": "hpe-aruba-6100-12g-poe4-2sfpp",
+   "u": 1,
+   "pct_largeur": 55
+  },
+  {
+   "id": "zyxel-es1100-8p",
+   "u": 1,
+   "pct_largeur": 55
+  },
+  {
+   "id": "cisco-c1000-8t-2g-l",
+   "u": 1,
+   "pct_largeur": 56
+  },
+  {
+   "id": "cisco-c1200-16t-2g",
+   "u": 1,
+   "pct_largeur": 56
+  },
+  {
+   "id": "cisco-cc9200cx-8uxg-2x",
+   "u": 1,
+   "pct_largeur": 56
+  },
+  {
+   "id": "cisco-ws-c2960l-8ps-ll",
+   "u": 1,
+   "pct_largeur": 56
+  },
+  {
+   "id": "fortinet-fg-50e",
+   "u": 1,
+   "pct_largeur": 56
+  },
+  {
+   "id": "fortinet-fg-51e",
+   "u": 1,
+   "pct_largeur": 56
+  },
+  {
+   "id": "hpe-officeconnect-1820-8g",
+   "u": 1,
+   "pct_largeur": 56
+  },
+  {
+   "id": "hpe-officeconnect-1820-8g-poe-65w",
+   "u": 1,
+   "pct_largeur": 56
+  },
+  {
+   "id": "juniper-ex4000-12mp",
+   "u": 1,
+   "pct_largeur": 56
+  },
+  {
+   "id": "juniper-ex4000-12p",
+   "u": 1,
+   "pct_largeur": 56
+  },
+  {
+   "id": "juniper-ex4000-8p",
+   "u": 1,
+   "pct_largeur": 56
+  },
+  {
+   "id": "juniper-ex4100-f-12p",
+   "u": 1,
+   "pct_largeur": 56
+  },
+  {
+   "id": "arista-ccs-710p-16p",
+   "u": 1,
+   "pct_largeur": 57
+  },
+  {
+   "id": "cisco-ws-c3560cx-12pc-s",
+   "u": 1,
+   "pct_largeur": 57
+  },
+  {
+   "id": "cisco-cbs250-16t-2g",
+   "u": 1,
+   "pct_largeur": 57
+  },
+  {
+   "id": "juniper-ex4000-12t",
+   "u": 1,
+   "pct_largeur": 57
+  },
+  {
+   "id": "juniper-ex2300-c-12p",
+   "u": 1,
+   "pct_largeur": 58
+  },
+  {
+   "id": "cisco-c1300-12xt-2x",
+   "u": 1,
+   "pct_largeur": 59
+  },
+  {
+   "id": "hpe-officeconnect-1920-8g",
+   "u": 1,
+   "pct_largeur": 59
+  },
+  {
+   "id": "cisco-c1300-12xs",
+   "u": 1,
+   "pct_largeur": 60
+  },
+  {
+   "id": "cisco-c1300-16fp-2g",
+   "u": 1,
+   "pct_largeur": 60
+  },
+  {
+   "id": "cisco-c1300-16p-2g",
+   "u": 1,
+   "pct_largeur": 60
+  },
+  {
+   "id": "cisco-c1300-16p-4x",
+   "u": 1,
+   "pct_largeur": 60
+  },
+  {
+   "id": "cisco-c1300-16t-2g",
+   "u": 1,
+   "pct_largeur": 60
+  },
+  {
+   "id": "cisco-c1300-16xts",
+   "u": 1,
+   "pct_largeur": 60
+  },
+  {
+   "id": "cisco-c1300-8p-e-2g",
+   "u": 1,
+   "pct_largeur": 60
+  },
+  {
+   "id": "hpe-aruba-ec-10106",
+   "u": 1,
+   "pct_largeur": 60
+  },
+  {
+   "id": "hpe-aruba-ec-10108",
+   "u": 1,
+   "pct_largeur": 60
+  },
+  {
+   "id": "ciena-3984-ac",
+   "u": 1,
+   "pct_largeur": 61
+  },
+  {
+   "id": "ciena-3984-dc",
+   "u": 1,
+   "pct_largeur": 61
+  },
+  {
+   "id": "extreme-networks-x440-g2-12p-10ge4",
+   "u": 1,
+   "pct_largeur": 62
+  },
+  {
+   "id": "extreme-networks-x440-g2-12t-10ge4",
+   "u": 1,
+   "pct_largeur": 62
+  },
+  {
+   "id": "extreme-networks-x440-g2-12t8fx-ge4",
+   "u": 1,
+   "pct_largeur": 62
+  },
+  {
+   "id": "hpe-aruba-7030",
+   "u": 1,
+   "pct_largeur": 62
+  },
+  {
+   "id": "cisco-cbs250-8t-e-2g",
+   "u": 1,
+   "pct_largeur": 63
+  },
+  {
+   "id": "nb-cisco-isr-1121-4p",
+   "u": 1,
+   "pct_largeur": 63
+  },
+  {
+   "id": "cisco-isr-1121-4p",
+   "u": 1,
+   "pct_largeur": 63
+  },
+  {
+   "id": "extreme-networks-x620-8t-2x",
+   "u": 1,
+   "pct_largeur": 65
+  },
+  {
+   "id": "sophos-xgs-126",
+   "u": 1,
+   "pct_largeur": 66
+  },
+  {
+   "id": "sophos-xgs-136",
+   "u": 1,
+   "pct_largeur": 66
+  },
+  {
+   "id": "hpe-aruba-7010",
+   "u": 1,
+   "pct_largeur": 67
+  },
+  {
+   "id": "cisco-isr-1111-8p",
+   "u": 1,
+   "pct_largeur": 68
+  },
+  {
+   "id": "extreme-networks-x620-10x",
+   "u": 1,
+   "pct_largeur": 70
+  },
+  {
+   "id": "huawei-s5735-l8p4s-a-v2",
+   "u": 1,
+   "pct_largeur": 70
+  },
+  {
+   "id": "netgear-prosafe-gs510tpp",
+   "u": 1,
+   "pct_largeur": 70
+  },
+  {
+   "id": "arista-dcs-7050sx-128-f",
+   "u": 2,
+   "pct_largeur": 72
+  },
+  {
+   "id": "arista-dcs-7050sx-128-r",
+   "u": 2,
+   "pct_largeur": 72
+  },
+  {
+   "id": "arista-dcs-7050sx2-128-f",
+   "u": 2,
+   "pct_largeur": 72
+  },
+  {
+   "id": "arista-dcs-7050sx2-128-r",
+   "u": 2,
+   "pct_largeur": 72
+  },
+  {
+   "id": "ubiquiti-unifi-dream-machine-pro-max",
+   "u": 1,
+   "pct_largeur": 73
+  },
+  {
+   "id": "smc-networks-smcgs8p-smart",
+   "u": 1,
+   "pct_largeur": 74
+  },
+  {
+   "id": "cisco-isr-1121x-8p",
+   "u": 1,
+   "pct_largeur": 74
+  },
+  {
+   "id": "ubiquiti-unifi-pro-max-16-poe",
+   "u": 1,
+   "pct_largeur": 76
+  },
+  {
+   "id": "avaya-ers-3526t-pwr-plus",
+   "u": 1,
+   "pct_largeur": 78
+  },
+  {
+   "id": "f5-big-ip-i7800",
+   "u": 1,
+   "pct_largeur": 78
+  },
+  {
+   "id": "vertiv-sa1-01002",
+   "u": 1,
+   "pct_largeur": 78
+  },
+  {
+   "id": "nb-mikrotik-crs418-8p-8g-2s-plus-rm",
+   "u": 1,
+   "pct_largeur": 81
+  },
+  {
+   "id": "mikrotik-crs418-8p-8g-2s-plus-rm",
+   "u": 1,
+   "pct_largeur": 81
+  },
+  {
+   "id": "nb-cisco-c8300-1n1s-4t2x",
+   "u": 1,
+   "pct_largeur": 82
+  },
+  {
+   "id": "cisco-c8300-1n1s-4t2x",
+   "u": 1,
+   "pct_largeur": 82
+  },
+  {
+   "id": "commscope-sd-1u",
+   "u": 1,
+   "pct_largeur": 83
+  },
+  {
+   "id": "nb-commscope-sd-1u",
+   "u": 1,
+   "pct_largeur": 83
+  },
+  {
+   "id": "hikvision-ds-7616nxi-k2-1u",
+   "u": 1,
+   "pct_largeur": 83
+  },
+  {
+   "id": "juniper-ex4650-48y-afo",
+   "u": 1,
+   "pct_largeur": 83
+  },
+  {
+   "id": "juniper-mx204",
+   "u": 1,
+   "pct_largeur": 83
+  },
+  {
+   "id": "sangoma-pbxact-400",
+   "u": 1,
+   "pct_largeur": 84
+  },
+  {
+   "id": "sangoma-pbxact-400-2ps",
+   "u": 1,
+   "pct_largeur": 84
+  },
+  {
+   "id": "sangoma-pbxact-60",
+   "u": 1,
+   "pct_largeur": 84
+  }
+ ],
+ "introuvables": [],
+ "illisibles": []
+}

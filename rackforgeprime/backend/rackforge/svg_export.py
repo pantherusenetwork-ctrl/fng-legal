@@ -18,7 +18,15 @@ from xml.sax.saxutils import escape
 from .models import EquipmentType, Project, Rack, rack_stats, type_index
 
 # --- Constantes d'échelle (le frontend utilise les mêmes valeurs) -----------
-U_PX = 22           # hauteur d'1U à l'écran et à l'export
+# ÉCHELLE RÉELLE, GRAVÉE AU MM (EIA-310) : la façade 19" fait 482,6 mm,
+# 1U fait 44,45 mm. Avec RACK_W = 440 px pour 482,6 mm, l'échelle est
+# 0,9117 px/mm et 1U = 40,5 px : le slot a le VRAI ratio d'une baie —
+# une image de façade le remplit SANS déformation, un boîtier compact
+# (width_mm) s'affiche à sa largeur exacte. Ne jamais revenir à un U
+# « esthétique » : c'est ce qui forçait à étirer ou rapetisser les photos.
+MM_19_POUCES = 482.6
+MM_PER_U = 44.45
+U_PX = 40.5         # hauteur d'1U = MM_PER_U × (RACK_W / MM_19_POUCES)
 RACK_W = 440        # largeur intérieure 19" utile
 RAIL_W = 26         # montant (rail) de chaque côté, graduations comprises
 FRAME_PAD = 14      # cadre extérieur de la baie
@@ -105,23 +113,25 @@ def _port_banks(n: int, color: str, x: int, y: int, w: int, h: int,
         return s
     rows = 2 if n > 12 else 1
     cols = -(-n // rows)  # ceil
-    pw, gapx, group, ggap = 7, 2, 6, 4
-    ph = 6 if rows == 2 else 8
+    # Dimensions à l'échelle U_PX=40.5 (48 ports 2 rangées = 256 px,
+    # tient pile dans la zone après cartouche).
+    pw, gapx, group, ggap = 8, 2, 6, 6
+    ph = 10 if rows == 2 else 14
     groups = -(-cols // group)
     total_w = cols * (pw + gapx) - gapx + (groups - 1) * ggap
     x0 = x + w - 46 - total_w
-    block_h = rows * ph + (rows - 1) * 3
+    block_h = rows * ph + (rows - 1) * 4
     y0 = y + (h - block_h) / 2
     for i in range(n):
         r, c = i % rows, i // rows
         px = x0 + c * (pw + gapx) + (c // group) * ggap
-        py = y0 + r * (ph + 3)
+        py = y0 + r * (ph + 4)
         s.append(f'<rect x="{px:.1f}" y="{py:.1f}" width="{pw}" height="{ph}" '
                  f'rx="1" fill="{p["port_fill"]}" stroke="{color}" '
-                 f'stroke-width="0.7"/>')
+                 f'stroke-width="0.8"/>')
         # Languette RJ45 : le détail qui fait « connecteur » et plus « pixel ».
-        s.append(f'<rect x="{px + 2:.1f}" y="{py + ph - 1.6:.1f}" width="3" '
-                 f'height="1.6" fill="{color}" fill-opacity="0.85"/>')
+        s.append(f'<rect x="{px + 2:.1f}" y="{py + ph - 2.4:.1f}" width="4" '
+                 f'height="2.4" fill="{color}" fill-opacity="0.85"/>')
     return s
 
 
@@ -132,7 +142,7 @@ def _category_decor(t: EquipmentType, x: int, y: int, w: int, h: int,
     s: list[str] = []
     if t.category == "server":
         # Baies disques verticales, LED d'activité en tête.
-        bw, gap, count = 13, 3, 10
+        bw, gap, count = 17, 4, 10
         x0 = x + w - 46 - count * (bw + gap)
         for i in range(count):
             bx = x0 + i * (bw + gap)
@@ -143,20 +153,20 @@ def _category_decor(t: EquipmentType, x: int, y: int, w: int, h: int,
                      f'r="1.3" fill="{t.color}"/>')
     elif t.category == "ups":
         # Écran LCD + grille d'aération.
-        s.append(f'<rect x="{x + w - 200}" y="{y + h / 2 - 8:.1f}" width="30" '
-                 f'height="16" rx="2" fill="{p["lcd"]}" stroke="{t.color}" '
-                 f'stroke-width="0.8"/>')
+        s.append(f'<rect x="{x + w - 210}" y="{y + h / 2 - 12:.1f}" width="40" '
+                 f'height="24" rx="3" fill="{p["lcd"]}" stroke="{t.color}" '
+                 f'stroke-width="1"/>')
         for i in range(24):
-            vx = x + w - 155 + i * 5
-            s.append(f'<rect x="{vx}" y="{y + h / 2 - 6:.1f}" width="2" '
-                     f'height="12" rx="1" fill="{p["decor_fill"]}"/>')
+            vx = x + w - 155 + i * 6
+            s.append(f'<rect x="{vx}" y="{y + h / 2 - 10:.1f}" width="3" '
+                     f'height="20" rx="1.5" fill="{p["decor_fill"]}"/>')
     elif t.category == "cable-mgmt":
         # Anneaux passe-câbles (à droite du libellé, avant la pastille U).
         for i in range(4):
             rx0 = x + 200 + i * 50
-            s.append(f'<rect x="{rx0}" y="{y + 3}" width="30" '
-                     f'height="{h - 6}" rx="4" fill="none" '
-                     f'stroke="{p["ring"]}" stroke-width="2"/>')
+            s.append(f'<rect x="{rx0}" y="{y + 4}" width="30" '
+                     f'height="{h - 8}" rx="6" fill="none" '
+                     f'stroke="{p["ring"]}" stroke-width="3"/>')
     return s
 
 
@@ -164,11 +174,11 @@ def _u_pill(t: EquipmentType, x: int, yc: float, w: int,
             p: dict[str, str]) -> list[str]:
     """Pastille de hauteur U — le même badge sur photo et sur dessin."""
     return [
-        f'<rect x="{x + w - 34}" y="{yc - 7:.1f}" width="26" height="14" '
-        f'rx="7" fill="{p["face"]}" fill-opacity="0.85" '
+        f'<rect x="{x + w - 44}" y="{yc - 9.5:.1f}" width="36" height="19" '
+        f'rx="9" fill="{p["face"]}" fill-opacity="0.85" '
         f'stroke="{p["pill"]}" stroke-width="1"/>',
-        f'<text x="{x + w - 21}" y="{yc + 3:.1f}" text-anchor="middle" '
-        f'font-family="{FONT_MONO}" font-size="8.5" fill="{p["dim"]}">'
+        f'<text x="{x + w - 26}" y="{yc + 4.5:.1f}" text-anchor="middle" '
+        f'font-family="{FONT_MONO}" font-size="13" fill="{p["dim"]}">'
         f'{t.u_height}U</text>',
     ]
 
@@ -180,12 +190,14 @@ _LABEL_W = 138
 
 def _name_plate(label: str, x: float, y: float, ih: float,
                 color: str, p: dict) -> list[str]:
-    txt = label if len(label) <= 21 else label[:20] + "…"
+    # Polices À L'ÉCHELLE du dessin (U_PX=40.5) : lisibles à l'écran ET
+    # une fois la page PDF réduite — jamais les tailles de l'ancien U 22.
+    txt = label if len(label) <= 15 else label[:14] + "…"
     return [
         f'<rect x="{x + 4}" y="{y + 2}" width="{_LABEL_W - 6}" '
         f'height="{ih - 4}" rx="3" fill="{p["band"]}"/>',
-        f'<text x="{x + 12}" y="{y + ih / 2 + 3.5:.1f}" '
-        f'font-family="{FONT}" font-size="9.5" font-weight="bold" '
+        f'<text x="{x + 12}" y="{y + ih / 2 + 5:.1f}" '
+        f'font-family="{FONT}" font-size="15" font-weight="bold" '
         f'fill="#f1f5f9">{escape(txt)}</text>',
     ]
 
@@ -245,12 +257,12 @@ def render_rack(rack: Rack, types: dict[str, EquipmentType],
              f'fill="{p["frame"]}" stroke="{p["face_stroke"]}" '
              f'stroke-width="1.5"/>')
     # Bandeau : nom + localisation.
-    s.append(f'<text x="{w / 2:.0f}" y="24" text-anchor="middle" '
-             f'font-family="{FONT}" font-size="15" font-weight="bold" '
+    s.append(f'<text x="{w / 2:.0f}" y="22" text-anchor="middle" '
+             f'font-family="{FONT}" font-size="19" font-weight="bold" '
              f'fill="{p["text"]}">{escape(rack.name)}</text>')
     if rack.location:
         s.append(f'<text x="{w / 2:.0f}" y="{HEADER_H - 2}" text-anchor="middle" '
-                 f'font-family="{FONT}" font-size="9" fill="{p["dim"]}">'
+                 f'font-family="{FONT}" font-size="12" fill="{p["dim"]}">'
                  f'{escape(rack.location)}</text>')
     # Zone U (fond en creux) + rails.
     zone_y = HEADER_H + FRAME_PAD
@@ -266,9 +278,9 @@ def render_rack(rack: Rack, types: dict[str, EquipmentType],
         s.append(f'<line x1="{inner_x}" y1="{y}" x2="{inner_x + RACK_W}" '
                  f'y2="{y}" stroke="{p["slot_line"]}" stroke-width="1"/>')
         for rx in (FRAME_PAD, FRAME_PAD + RAIL_W + RACK_W):
-            s.append(f'<text x="{rx + RAIL_W / 2:.0f}" y="{y + U_PX / 2 + 3:.1f}" '
+            s.append(f'<text x="{rx + RAIL_W / 2:.0f}" y="{y + U_PX / 2 + 5:.1f}" '
                      f'text-anchor="middle" font-family="{FONT_MONO}" '
-                     f'font-size="9.5" fill="{p["dim"]}">{u}</text>')
+                     f'font-size="14" fill="{p["dim"]}">{u}</text>')
             for k in range(3):
                 hy = y + 4 + k * ((U_PX - 8) / 2)
                 s.append(f'<rect x="{rx + 2}" y="{hy:.1f}" width="3" height="3" '
@@ -283,40 +295,61 @@ def render_rack(rack: Rack, types: dict[str, EquipmentType],
             continue
         top_u = item.position_u + t.u_height - 1
         y = _u_to_y(rack, top_u if not rack.desc_units else item.position_u)
-        label = item.meta.hostname or f"{t.vendor} {t.model}"
+        # RÈGLE : rien n'est écrit sur le dessin SAUF un hostname saisi
+        # PAR L'UTILISATEUR. Jamais de « constructeur modèle » auto-posé.
+        label = item.meta.hostname
         s.append(f'<g id="item-{escape(item.id)}">')
+        # Le nom complet vit au SURVOL (tooltip natif du SVG), toujours.
+        s.append(f'<title>{escape(label or f"{t.vendor} {t.model}")}'
+                 f'</title>')
         if t.faceplate_svg and rendu != "dessin":
             # SVG officiel : injecté tel quel, cadré à l'échelle U.
             s.append(f'<g transform="translate({inner_x},{y})">'
                      f'{t.faceplate_svg}</g>')
         elif t.faceplate_image and rendu != "dessin":
-            # Image officielle aux PROPORTIONS RESPECTÉES, et le NOM dans
-            # un CARTOUCHE À CÔTÉ (style Patchdocs) : plus jamais
-            # d'écriture posée sur l'équipement.
+            # Image officielle aux PROPORTIONS RESPECTÉES : en mode
+            # photos, AUCUN cartouche — le nom vit dans le <title> au
+            # survol. Un boîtier compact (width_mm renseigné) occupe SA
+            # largeur réelle, à l'échelle des 19 pouces (483 mm),
+            # centré — comme posé dans la vraie baie.
             ih = t.u_height * U_PX
-            lw = _LABEL_W if label else 0
-            s.append(f'<rect x="{inner_x}" y="{y + 1}" width="{RACK_W}" '
+            # Le slot est à l'ÉCHELLE RÉELLE : jamais d'étirement
+            # (« meet » toujours). Une façade 19" le remplit d'elle-même ;
+            # un boîtier compact (width_mm) est cadré à SA largeur, au mm.
+            iw = RACK_W
+            if t.width_mm:
+                iw = min(RACK_W, RACK_W * t.width_mm / MM_19_POUCES)
+            shared = t.width_mm and item.position_x_mm is not None
+            if shared:
+                # Position horizontale RÉELLE : plusieurs compacts
+                # cohabitent dans le même U, chacun à sa place au mm.
+                # L'habillage se limite à SON empreinte (le voisin vit
+                # juste à côté) ; pas de pastille U (fouillis à deux).
+                ix = inner_x + RACK_W * item.position_x_mm / MM_19_POUCES
+            else:
+                ix = inner_x + (RACK_W - iw) / 2
+            bx, bw = (ix, iw) if shared else (inner_x, RACK_W)
+            s.append(f'<rect x="{bx:.1f}" y="{y + 1}" width="{bw:.1f}" '
                      f'height="{ih - 2}" fill="{p["face"]}"/>')
-            if label:
-                s.extend(_name_plate(label, inner_x, y, ih, t.color, p))
-            s.append(f'<image x="{inner_x + lw}" y="{y + 1}" '
-                     f'width="{RACK_W - lw}" height="{ih - 2}" '
+            s.append(f'<image x="{ix:.1f}" y="{y + 1}" '
+                     f'width="{iw:.1f}" height="{ih - 2}" '
                      f'preserveAspectRatio="xMidYMid meet" '
                      f'href="{t.faceplate_image}" '
                      f'xlink:href="{t.faceplate_image}"/>')
-            s.append(f'<rect x="{inner_x}" y="{y + 1}" width="{RACK_W}" '
+            s.append(f'<rect x="{bx:.1f}" y="{y + 1}" width="{bw:.1f}" '
                      f'height="{ih - 2}" rx="2" fill="none" '
                      f'stroke="{p["face_stroke"]}" stroke-width="1"/>')
-            s.append(f'<rect x="{inner_x}" y="{y + 1}" width="4" '
+            s.append(f'<rect x="{bx:.1f}" y="{y + 1}" width="4" '
                      f'height="{ih - 2}" fill="{t.color}"/>')
-            s.extend(_u_pill(t, inner_x, y + ih / 2, RACK_W, p))
+            if not shared:
+                s.extend(_u_pill(t, inner_x, y + ih / 2, RACK_W, p))
         else:
             s.extend(_faceplate_placeholder(t, inner_x, y, RACK_W, label, p))
         s.append('</g>')
     # Pied : stats de la baie (esprit TSS — stats live aussi à l'export).
     st = rack_stats(rack, types)
     s.append(f'<text x="{w / 2:.0f}" y="{h - FOOTER_H / 2:.0f}" '
-             f'text-anchor="middle" font-family="{FONT_MONO}" font-size="11" '
+             f'text-anchor="middle" font-family="{FONT_MONO}" font-size="14" '
              f'fill="{p["accent"]}">{st["u_used"]}U occupés · '
              f'{st["u_free"]}U libres · {st["power_w"]:g} W</text>')
     s.append('</g>')
@@ -342,7 +375,7 @@ def render_project_svg(project: Project, theme: str = "sombre",
         f'<rect x="0" y="0" width="{total_w}" height="{total_h}" fill="{p["bg"]}"/>',
         f'<text x="20" y="28" font-family="{FONT}" font-size="16" '
         f'font-weight="bold" fill="{p["text"]}">{escape(project.name)}</text>',
-        f'<text x="20" y="44" font-family="{FONT_MONO}" font-size="9" '
+        f'<text x="20" y="46" font-family="{FONT_MONO}" font-size="12" '
         f'fill="{p["dim"]}">RackForgePrime — élévation générée depuis le '
         f'JSON du projet</text>',
     ]

@@ -12,12 +12,12 @@ import sys
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
-from rackforge import storage
+from rackforge import backup, storage
 from rackforge.catalog import BUILTIN_TYPES, ROLE_COLORS
 from rackforge.catalog_images import (apply_official_images, image_data_uri,
                                       official_image_path)
@@ -275,6 +275,58 @@ def project_save(name: str, payload: dict) -> dict:
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return {"saved": True, "path": str(path)}
+
+
+@app.get("/api/backup/config")
+def backup_config() -> dict:
+    """Pré-remplissage de l'UI : dossier de l'app + dernier dossier libre."""
+    return {"dossier_app": str(backup.local_dir()),
+            "dernier_dossier": backup.get_last_custom_dir()}
+
+
+@app.post("/api/backup")
+def backup_run(payload: dict):
+    """Sauvegarde — l'utilisateur choisit quoi, en quel format, où.
+
+    dest « telecharger » renvoie le fichier au navigateur (« Enregistrer
+    sous » : l'utilisateur choisit lui-même l'endroit) ; les autres
+    destinations écrivent côté serveur (dossier de l'app, chemin libre)."""
+    scope = payload.get("scope", "projet")
+    fmt = payload.get("format", "zip")
+    dest = payload.get("dest", "pc")
+    if scope not in ("projet", "projets", "workspace"):
+        raise HTTPException(422, "Portée invalide : projet, projets ou workspace")
+    if fmt not in ("json", "zip"):
+        raise HTTPException(422, "Format invalide : json ou zip")
+    if dest not in ("pc", "dossier", "deux", "telecharger"):
+        raise HTTPException(422,
+                            "Destination invalide : pc, dossier, deux ou telecharger")
+    try:
+        if dest == "telecharger":
+            name, data, mime = backup.make_archive(scope, fmt,
+                                                   payload.get("project"))
+            return Response(content=data, media_type=mime, headers={
+                "Content-Disposition": f'attachment; filename="{name}"'})
+        return backup.run_backup(scope, fmt, dest, payload.get("project"),
+                                 str(payload.get("dir") or ""))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+
+
+@app.post("/api/backup/fichier")
+async def backup_write_file(request: Request, dir: str, name: str) -> dict:
+    """Dépose un export déjà généré (PDF, SVG, PNG, draw.io…) dans un
+    dossier choisi — le corps de la requête est le fichier lui-même."""
+    data = await request.body()
+    if not data:
+        raise HTTPException(422, "Fichier vide")
+    try:
+        return backup.write_file(dir, name, data)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    except OSError as exc:
+        raise HTTPException(502, f"Dossier injoignable : {dir} "
+                                 f"({exc.__class__.__name__})")
 
 
 # --- Frontend ---------------------------------------------------------------
