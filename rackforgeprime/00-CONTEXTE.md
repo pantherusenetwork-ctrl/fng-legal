@@ -435,3 +435,58 @@ Avant/Arrière sur le vrai workspace ; (2) enchaîner sur le **plan
 d'étage** (gros chantier voulu par Panther) ou le **budget PoE**.
 Toujours en attente de Panther : 24/48 ports du stack 2930, photo du vrai
 STORI, panneau cuivre Belden v2.
+
+## 🌉 Pont d'Hemingway — 03/09/2026 (22h30) — plan d'étage, flux, PoE, VSDX
+
+**Ordre de Panther** : « ne t'arrête pas avant d'avoir mis à jour l'app point
+par point ». Deux sessions Claude ont travaillé EN PARALLÈLE sur ce dépôt
+(coordination par messages inter-sessions, fichiers séparés, jamais les mêmes
+en même temps) : l'autre a livré la **vue arrière** (4898977), celle-ci le lot
+296ed4a :
+
+- **Vue PLAN (4e onglet)** : parcours ville → bâtiment → salle → baies.
+  Modèle `Project.sites[].buildings[].rooms[]` (Room : plan_image data URI,
+  plan_opacity, plan_w/h px, mm_per_px, racks posés {rack_id,x,y,rotation},
+  points {ap/prise/camera/equipement/note, radius = couverture Wi-Fi,
+  equipment_id}). Validation : baie inconnue ou posée sur 2 plans = 422.
+  Moteur `svg_plan.py` (écran = export ; emprise réelle 600×1000 mm, trait
+  épais = face avant, liens inter-baies agrégés avec compteur, cercle de
+  couverture). Frontend : cartes de navigation, fil d'Ariane, glisser les
+  baies/points (transform live, modèle au relâchement), clic droit partout
+  (poser une baie ici, borne/prise/caméra/note, image du plan, réglages),
+  image de plan réduite à 1 600 px JPEG, curseur d'opacité, dialogue point
+  (couverture en mètres), dialogue salle (taille, échelle mm/px).
+  API : `view=plan&room=<id>` sur /api/export/svg et /pdf.
+- **Matrice de flux** (bouton « Flux ») : `Project.flows[]` (src, dst, proto,
+  ports, action ""|allow|deny|nat, via, comment), lignes éditables, vue
+  matrice zones × zones (cellule = action la plus restrictive), « Proposer
+  depuis le projet » (`flows.py` : paires VLAN↔VLAN via pare-feu/routeur +
+  Internet↔VLAN si usage WAN — **action toujours vide**, jamais inventée),
+  CSV `/api/flows.csv`, page « Matrice de flux » dans le dossier.
+- **Budget PoE** (`energy.py`) : `PortUsage.poe_w` (W tirés, boutons af/at/bt
+  dans l'éditeur de port), budget = `ItemMeta.poe_budget_w` (saisi sur la fiche,
+  ✎ sur la tuile) sinon `EquipmentType.poe_budget_w`, sinon « à renseigner »
+  (jamais deviné). Tuile « PoE tiré / budget (%) » colorée (alerte ≥ 80 %,
+  dépassement), `/api/poe`, page « Budget PoE » du dossier.
+- **Export Visio .vsdx** (`vsdx_export.py`, menu Exporter) : paquet OPC écrit
+  à la main (document, pages Élévation + Logique, formes nommées, unités
+  pouces, Y inversé). ⚠️ Validé structurellement (4 tests) mais **pas ouvert
+  dans un vrai Visio** (absent du poste) — [à vérifier par Panther].
+- Dossier PDF : + pages Plan (une par salle garnie), Matrice de flux, Budget PoE.
+- `salle-olympe.json` (2 copies md5 4ed73ee3…) : sites posés — « Ville [à
+  vérifier] › Bâtiment [à vérifier] › OLYMPE » (4 baies) et « Local technique
+  [étage à vérifier] » (A6KVC). Positions dans la salle [à vérifier].
+- Tests : **76 verts** (47 + 12 vue arrière + 17 ce lot). Exe recompilé depuis
+  ce commit et déployé dans RackForgePrime-PC (ancien → SAUVEGARDES
+  `-ancien-2026-09-03-a.exe`).
+
+**Restent au backlog** : câbles v2 (cordons dans l'export SVG/PDF, ancrage au
+port, filtre VLAN), appariement en masse panneau↔switch, multi-sélection +
+Ctrl+C/V, connecteurs éditables, re-photos des ~50 rackables en angle, état
+vide Diagramme illustré, sauvegarde auto périodique.
+
+**Prochaine étape exacte** : Panther ouvre l'onglet **Plan**, descend Ville →
+Bâtiment → OLYMPE, glisse les baies à leur vraie place, charge la photo/plan de
+la salle (bouton « Image du plan »), règle l'échelle (Réglages, mm/px). Puis
+ouvre un .vsdx dans Visio et dit si ça s'ouvre. Toujours en attente : 24/48 ports
+du stack 2930, photo STORI, Belden v2, test LANCER-PHONE.

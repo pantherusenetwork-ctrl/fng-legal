@@ -9,11 +9,13 @@ réseau (élévation 42U à l'échelle réelle EIA-310, vue logique, brassage, e
    « Prochaine étape exacte ». Ne jamais repartir de zéro.
 2. Vérifier `git status` et `git log -3` : la branche de travail est
    `claude/rackforgeprimes-foundations-y41pt4` (dépôt = dossier parent `fng-legal`).
-3. Lancer les tests : `python -m pytest tests -q` (47 tests attendus verts).
+3. Lancer les tests : `python -m pytest tests -q` (76 tests attendus verts au 03/09/2026).
 
 ## Repères
 - Code : ce dossier (`backend/`, `frontend/`, `tests/`, `docs/`).
-- Serveur de dev : `run.py`, port 8138, avec `PYTHONIOENCODING=utf-8`.
+- Serveur de dev : `run.py --port 8138 --no-browser` (run.py écoute 8137 par
+  défaut = le port de l'exe), avec `PYTHONIOENCODING=utf-8`. Vérifier `netstat -ano | findstr 813` :
+  plusieurs sessions Claude peuvent tourner en même temps (8138, 8139, 8141 vus le 03/09).
 - Exe déployé : `..\..\RackForgePrime-PC\RackForgePrime.exe` (port 8137),
   workspace `..\..\RackForgePrime-PC\RackForgePrime-Workspace\`.
   Avant de recompiler : fermer l'app (fichier verrouillé sinon).
