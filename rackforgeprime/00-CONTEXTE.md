@@ -360,3 +360,21 @@ et le travail de nuit) ; (2) relancer Claude Code DANS ce dossier
 (`cd ...\fng-legal\rackforgeprime` puis `claude`) ; (3) reprendre la section
 02/09 2h45 : Panther vérifie les cordons (bouton Câbles) puis v2 câbles.
 Toujours en attente : 24/48 ports du stack 2930, photo du vrai STORI, Belden v2.
+
+## 🌉 Pont d'Hemingway — 03/09/2026 (soir) — reprise, tout dans CITADEL
+
+**Fait** : reprise après perte de session. État vérifié : git propre (0bab269 du
+02/09 16h58 contient tout le travail de nuit), exe `RackForgePrime-PC` = sources
+(JS servi 140 818 octets identique, v1.1.0, câbles/cohabitation/échelle présents),
+relancé sur 8137. Rangement (ordre Panther « tout dans CITADEL, rien ne traîne ») :
+3 originaux Hikvision/Panduit/Belden déplacés dans
+`RackForgePrime-PC\RackForgePrime-Workspace\catalogue\bibliotheque\` ; sauvetage
+RAZOR LOCK copié dans `SAUVEGARDES\SAUVETAGE-RACKFORGE-2026-09-01\` (10 921 = 10 921) ;
+résidus (coquille vide racine, caches Python, 18 exe périmés — gardé `-2026-09-02-e`)
+→ `RAZOR LOCK\POUBELLE-A-VALIDER-2026-09-03\` avec 00-LISTE ; ancien workspace en
+poubelle 09-01 vérifié : 0 fichier unique. Raccourci menu Démarrer recréé.
+Racine = CLAUDE.md + PC/Web/Phone/SAUVEGARDES/fng-legal, rien d'autre.
+
+**Prochaine étape exacte** : Panther confirme la version à l'écran, puis choisit
+le chantier (A câbles v2 / B plan d'étage / C vue arrière / D PoE / E VSDX…).
+Toujours en attente : 24/48 ports stack 2930, photo STORI, Belden v2, test PHONE.
