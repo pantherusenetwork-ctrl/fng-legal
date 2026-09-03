@@ -52,6 +52,10 @@ class EquipmentType(BaseModel):
     # dans la réalité, au lieu d'être cadré sur les 19 pouces.
     # None = pleine largeur rack (équipement rackable standard).
     width_mm: Optional[float] = Field(default=None, gt=0, le=483)
+    # Budget PoE total délivrable par le switch (W, datasheet). None =
+    # pas de PoE ou inconnu — le budget cumulé le signale alors comme
+    # « à renseigner » au lieu d'inventer une valeur.
+    poe_budget_w: Optional[float] = Field(default=None, ge=0, le=5000)
     # SVG officiel constructeur (inline) — None => placeholder fidèle à l'échelle U.
     faceplate_svg: Optional[str] = None
     # Image raster (PNG/JPEG) en data URI — « Remplacer par image officielle ».
@@ -75,6 +79,9 @@ class PortUsage(BaseModel):
     vlan: str = ""
     usage: str = ""
     etat: str = ""    # "" (non renseigné) | up | down | reserve
+    # Puissance PoE tirée par l'équipement branché (W) — alimente le
+    # budget PoE cumulé du switch (0 = pas de PoE / non renseigné).
+    poe_w: float = Field(default=0, ge=0, le=100)
 
 
 class ItemMeta(BaseModel):
@@ -87,6 +94,9 @@ class ItemMeta(BaseModel):
     notes: str = ""
     mgmt_ip: str = ""   # IP de management — l'attente pro n°1 (Packet Pushers)
     asset: str = ""     # asset tag / n° d'inventaire
+    # Budget PoE saisi pour CET équipement (W) — prime sur celui du type
+    # (utile pour un switch du catalogue dont le budget n'est pas connu).
+    poe_budget_w: Optional[float] = Field(default=None, ge=0, le=5000)
 
 
 class RackItem(BaseModel):
@@ -188,6 +198,80 @@ class Revision(BaseModel):
     objet: str = ""
 
 
+class Flow(BaseModel):
+    """Ligne de la matrice de flux (pratique DAT : qui parle à qui, sur
+    quel port, et ce que le pare-feu en fait)."""
+    id: str
+    src: str = ""        # zone, VLAN ou hôte source (ex : « VLAN 20 USERS »)
+    dst: str = ""        # zone, VLAN ou hôte destination
+    proto: str = ""      # tcp / udp / icmp / any
+    ports: str = ""      # « 443, 8443 » — libre, tel que documenté
+    action: Literal["", "allow", "deny", "nat"] = ""
+    via: str = ""        # équipement qui filtre (hostname)
+    comment: str = ""
+
+
+class PlanRack(BaseModel):
+    """Une baie posée sur le plan d'une salle (px du plan, rotation)."""
+    rack_id: str
+    x: float = Field(allow_inf_nan=False)
+    y: float = Field(allow_inf_nan=False)
+    rotation: Literal[0, 90, 180, 270] = 0
+
+
+class PlanPoint(BaseModel):
+    """Élément posé sur le plan hors baie : borne Wi-Fi (avec rayon de
+    couverture), prise murale, caméra, équipement libre, note."""
+    id: str
+    kind: Literal["ap", "prise", "camera", "equipement", "note"] = "note"
+    label: str = ""
+    x: float = Field(allow_inf_nan=False)
+    y: float = Field(allow_inf_nan=False)
+    # Rayon de couverture (px du plan) — bornes Wi-Fi ; 0 = pas de cercle.
+    radius: float = Field(default=0, ge=0, allow_inf_nan=False)
+    # Équipement de baie relié (id d'item) : la ligne se dessine sur le plan.
+    equipment_id: str = ""
+    color: str = ""
+
+
+class Room(BaseModel):
+    """Salle : porte le plan d'étage (image) et ce qui est posé dessus."""
+    id: str
+    name: str
+    # Image du plan (data URI PNG/JPG) — fond du dessin, opacité réglable.
+    plan_image: Optional[str] = None
+    plan_opacity: float = Field(default=0.6, ge=0, le=1)
+    # Taille du plan en px (repère de tout ce qui est posé dessus).
+    plan_w: float = Field(default=1200, gt=0, le=20000)
+    plan_h: float = Field(default=800, gt=0, le=20000)
+    # Échelle : millimètres réels par pixel de plan (emprise des baies).
+    mm_per_px: float = Field(default=10, gt=0, le=1000)
+    racks: list[PlanRack] = []
+    points: list[PlanPoint] = []
+
+    @field_validator("plan_image")
+    @classmethod
+    def _plan_is_data_uri(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not v.startswith("data:image/"):
+            raise ValueError("plan_image doit être un data URI (data:image/…)")
+        return v
+
+
+class Building(BaseModel):
+    id: str
+    name: str
+    rooms: list[Room] = []
+
+
+class Site(BaseModel):
+    """Ville / site : le premier niveau du parcours ville → bâtiment →
+    salle → baies."""
+    id: str
+    name: str
+    address: str = ""
+    buildings: list[Building] = []
+
+
 class Project(BaseModel):
     schema_version: int = SCHEMA_VERSION
     id: str
@@ -202,6 +286,33 @@ class Project(BaseModel):
     # « Suivi des versions » du dossier).
     revision: str = "1"
     revisions: list[Revision] = []
+    # Hiérarchie de site (ville → bâtiment → salle) et plans d'étage.
+    sites: list[Site] = []
+    # Matrice de flux (page du dossier + CSV).
+    flows: list[Flow] = []
+
+    @model_validator(mode="after")
+    def _validate_plans(self) -> "Project":
+        """Une baie posée sur un plan doit exister, et une seule fois."""
+        rack_ids = {r.id for r in self.racks}
+        item_ids = {i.id for r in self.racks for i in r.items}
+        seen: set[str] = set()
+        errors: list[str] = []
+        for site in self.sites:
+            for b in site.buildings:
+                for room in b.rooms:
+                    for pr in room.racks:
+                        if pr.rack_id not in rack_ids:
+                            errors.append(f"{room.name} : baie inconnue « {pr.rack_id} » sur le plan")
+                        elif pr.rack_id in seen:
+                            errors.append(f"{room.name} : la baie « {pr.rack_id} » est posée sur deux plans")
+                        seen.add(pr.rack_id)
+                    for pt in room.points:
+                        if pt.equipment_id and pt.equipment_id not in item_ids:
+                            errors.append(f"{room.name} / {pt.label or pt.id} : équipement inconnu « {pt.equipment_id} »")
+        if errors:
+            raise ValueError(" ; ".join(errors))
+        return self
 
     @field_validator("schema_version")
     @classmethod

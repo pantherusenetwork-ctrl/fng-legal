@@ -72,6 +72,7 @@
       <button id="btn-view-physical" class="active">Physique</button>
       <button id="btn-view-logical">Logique</button>
       <button id="btn-view-diagram">Diagramme</button>
+      <button id="btn-view-plan" title="Plan d'étage : ville → bâtiment → salle → baies posées sur le plan">Plan</button>
     </nav>
     <div id="topbar-actions">
       <span class="tb-group" aria-label="Édition">
@@ -159,10 +160,30 @@
           </span>
         </span>
       </span>
+      <span class="tb-group plan-only" aria-label="Plan d'étage">
+        <span id="plan-crumb" title="Cliquez un niveau pour y revenir"></span>
+        <button id="btn-plan-add" title="Créer le niveau suivant : ville, bâtiment ou salle">+ Ville</button>
+        <button id="btn-plan-rack" title="Poser une baie du projet sur le plan de cette salle">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="1.5" width="10" height="13" rx="1.5"></rect><path d="M5.5 5h5 M5.5 8h5 M5.5 11h5"></path></svg>
+          Poser une baie
+        </button>
+        <button id="btn-plan-point" title="Ajouter une borne Wi-Fi (avec couverture), une prise, une caméra, une note">+ Point</button>
+        <label id="btn-plan-image" class="import-btn" title="Image du plan (PNG/JPG) en fond de la salle — réduite à 1600 px de large">
+          Image du plan<input type="file" accept=".png,.jpg,.jpeg" hidden>
+        </label>
+        <label id="plan-opacity-wrap" title="Opacité de l'image du plan">
+          <input type="range" id="plan-opacity" min="0" max="100" value="60">
+        </label>
+        <button id="btn-plan-settings" title="Réglages de la salle : nom, taille du plan, échelle (mm par pixel)">Réglages</button>
+      </span>
       <span class="tb-group" aria-label="Livrables">
         <button id="btn-patch-table" title="Tableau de brassage généré depuis les métadonnées">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"></rect><path d="M1.5 6h13 M6 6v7.5 M10.5 6v7.5"></path></svg>
           Brassage
+        </button>
+        <button id="btn-flows" title="Matrice de flux : qui parle à qui, ports, action du pare-feu — proposée depuis les VLANs, complétée par vous">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4h12 M2 8h12 M2 12h12 M5 2v12 M9 2v12"></path></svg>
+          Flux
         </button>
         <button id="btn-export-dossier" class="primary"
                 title="Livrable complet : élévation + logique + brassage + nomenclature, avec cartouche">
@@ -181,6 +202,7 @@
             <button id="btn-export-png">PNG <small>image à imprimer / coller en baie</small></button>
             <button id="btn-export-labels">Étiquettes <small>planche A4 TIA-606 du brassage</small></button>
             <button id="btn-export-drawio">draw.io <small>rééditable — élévation + logique</small></button>
+            <button id="btn-export-vsdx">Visio (.vsdx) <small>format d'échange entreprise — élévation + logique</small></button>
             <button id="btn-new-version">Nouvelle version <small>fige V suivante — historique dans le dossier</small></button>
             <button id="btn-backup">Sauvegarder <small>copie datée — PC et/ou NAS, au choix</small></button>
           </span>
@@ -314,6 +336,12 @@
         <label>Prise murale <input name="outlet" autocomplete="off"></label>
         <label>VLAN <input name="vlan" autocomplete="off"></label>
         <label>Usage <input name="usage" autocomplete="off"></label>
+        <label>PoE tiré (W)
+          <span class="poe-field"><input name="poe_w" type="number" min="0" max="100" step="0.1" placeholder="0">
+          <button type="button" class="poe-class" data-w="15.4" title="802.3af — 15,4 W">af</button>
+          <button type="button" class="poe-class" data-w="30" title="802.3at — 30 W">at</button>
+          <button type="button" class="poe-class" data-w="60" title="802.3bt type 3 — 60 W">bt</button></span>
+        </label>
         <label>État
           <select name="etat">
             <option value="">—</option>
@@ -404,6 +432,67 @@
       <div class="inspector-actions">
         <button value="ok">Enregistrer</button>
         <button value="delete" id="btn-link-delete" class="danger" formnovalidate hidden>Supprimer</button>
+        <button value="cancel" formnovalidate>Annuler</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Matrice de flux : lignes éditables + vue croisée -->
+  <dialog id="flows-dialog">
+    <h2>Matrice de flux</h2>
+    <p class="dialog-hint">Qui parle à qui, sur quels ports, et ce qu'en fait le pare-feu. « Proposer » déduit les paires
+      VLAN ↔ VLAN et Internet ↔ VLAN du projet, <b>sans jamais choisir l'action à votre place</b>.</p>
+    <div id="flows-table-wrap"><table id="flows-table"><thead><tr>
+      <th>Source</th><th>Destination</th><th>Proto</th><th>Ports</th><th>Action</th><th>Via</th><th>Commentaire</th><th></th>
+    </tr></thead><tbody></tbody></table></div>
+    <div id="flows-matrix" hidden></div>
+    <div class="patch-actions">
+      <button id="btn-flows-add">+ Ligne</button>
+      <button id="btn-flows-propose" title="Déduit les paires manquantes des VLANs, du pare-feu et du WAN documentés">Proposer depuis le projet</button>
+      <button id="btn-flows-matrix">Vue matrice</button>
+      <button id="btn-flows-csv" class="export">Exporter CSV</button>
+      <span id="flows-msg" class="dialog-hint"></span>
+      <button id="btn-close-flows" style="margin-left:auto">Fermer</button>
+    </div>
+  </dialog>
+
+  <!-- Point posé sur le plan (borne, prise, caméra, note) -->
+  <dialog id="point-dialog">
+    <h2 id="point-dialog-title">Point sur le plan</h2>
+    <form id="point-form" method="dialog">
+      <label>Type
+        <select name="kind">
+          <option value="ap">Borne Wi-Fi</option>
+          <option value="prise">Prise murale</option>
+          <option value="camera">Caméra</option>
+          <option value="equipement">Équipement</option>
+          <option value="note">Note</option>
+        </select>
+      </label>
+      <label>Libellé <input name="label" placeholder="ex : AP-RDC-01"></label>
+      <label>Couverture (m) <input name="radius_m" type="number" min="0" step="0.5" placeholder="bornes Wi-Fi seulement"></label>
+      <label>Relié à <select name="equipment_id"><option value="">—</option></select></label>
+      <label>Couleur <input name="color" type="color" value="#22d3ee"></label>
+      <div class="inspector-actions">
+        <button value="ok">Enregistrer</button>
+        <button value="delete" id="btn-point-delete" class="danger" formnovalidate hidden>Supprimer</button>
+        <button value="cancel" formnovalidate>Annuler</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Réglages de la salle (plan) -->
+  <dialog id="room-dialog">
+    <h2>Réglages de la salle</h2>
+    <form id="room-form" method="dialog">
+      <label>Nom <input name="name" required></label>
+      <label>Largeur du plan (px) <input name="plan_w" type="number" min="200" max="20000" required></label>
+      <label>Hauteur du plan (px) <input name="plan_h" type="number" min="200" max="20000" required></label>
+      <label>Échelle : millimètres par pixel <input name="mm_per_px" type="number" min="0.1" max="1000" step="0.1" required></label>
+      <p class="dialog-hint">Une baie fait 600 × 1000 mm : à 10 mm/px elle occupe 60 × 100 px sur le plan.</p>
+      <div class="inspector-actions">
+        <button value="ok">Enregistrer</button>
+        <button value="noimage" id="btn-room-noimage" formnovalidate>Retirer l'image</button>
         <button value="cancel" formnovalidate>Annuler</button>
       </div>
     </form>

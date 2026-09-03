@@ -16,9 +16,12 @@ from reportlab.lib.pagesizes import A4, landscape
 from reportlab.pdfgen import canvas as pdf_canvas
 from svglib.svglib import svg2rlg
 
+from .energy import poe_rows
+from .flows import flows_rows
 from .models import Project, patch_table, type_index
 from .svg_export import render_project_svg
 from .svg_logical import render_diagram_svg, render_logical_svg
+from .svg_plan import render_plan_svg
 
 # Palettes du dossier par thème (sombre = écran, clair = impression DAT).
 _PDF_PALETTES = {
@@ -67,7 +70,8 @@ def render_project_pdf(project: Project, view: str = "physical",
                        layers=None,
                        theme: str = "sombre",
                        rendu: str = "photos",
-                       face: str = "front") -> bytes:
+                       face: str = "front",
+                       room: str | None = None) -> bytes:
     """Projet -> PDF (bytes). Le SVG est la source, le PDF une vue.
 
     ``view`` : « physical » (élévation de baies) ou « logical » (VLANs/liens).
@@ -105,6 +109,8 @@ def render_project_pdf(project: Project, view: str = "physical",
 
     if view == "logical":
         svg = render_logical_svg(project, theme=theme, layers=layers)
+    elif view == "plan":
+        svg = render_plan_svg(project, room, theme=theme)
     else:
         svg = render_diagram_svg(project, theme=theme)
     drawing = svg2rlg(io.StringIO(svg))
@@ -440,7 +446,15 @@ def render_project_dossier_pdf(project: Project, theme: str = "sombre",
         render_logical_svg(project, theme=theme)))
     n_logical = (_logical_slices(logical_drawing, *landscape(A4))
                  if logical_drawing is not None else 0)
-    total = (len(project.racks) + n_logical + len(patch_pages)
+    # Plans d'étage : une page par salle qui porte quelque chose.
+    plan_rooms = [room for site in project.sites for b in site.buildings
+                  for room in b.rooms if room.racks or room.points]
+    flow_pages = _paginate(flows_rows(project)) if project.flows else []
+    types = type_index(project)
+    poe_table = poe_rows(project, types)
+    poe_pages = _paginate(poe_table) if poe_table else []
+    total = (len(project.racks) + n_logical + len(plan_rooms)
+             + len(patch_pages) + len(flow_pages) + len(poe_pages)
              + len(bom_pages) + (1 if has_revs else 0))
 
     buf = io.BytesIO()
@@ -494,6 +508,15 @@ def render_project_dossier_pdf(project: Project, theme: str = "sombre",
             c.showPage()
             page_no += 1
 
+    # Plans d'étage (après la logique : du réseau à la salle).
+    for room in plan_rooms:
+        _page_frame(c, page_w, page_h, project, f"Plan — {room.name}",
+                    page_no, total, pal)
+        _draw_svg_page(c, render_plan_svg(project, room.id, theme=theme),
+                       page_w, page_h)
+        c.showPage()
+        page_no += 1
+
     for chunk in patch_pages:
         _page_frame(c, page_w, page_h, project, "Tableau de brassage",
                     page_no, total, pal)
@@ -505,7 +528,29 @@ def render_project_dossier_pdf(project: Project, theme: str = "sombre",
         c.showPage()
         page_no += 1
 
-    types = type_index(project)
+    for chunk in flow_pages:
+        _page_frame(c, page_w, page_h, project, "Matrice de flux",
+                    page_no, total, pal)
+        _draw_table_page(
+            c, page_w, page_h, "Matrice de flux — action vide = à définir",
+            ["Source", "Destination", "Proto", "Ports", "Action", "Via",
+             "Commentaire"],
+            [18, 18, 7, 10, 10, 14, 23], chunk, pal)
+        c.showPage()
+        page_no += 1
+
+    for chunk in poe_pages:
+        _page_frame(c, page_w, page_h, project, "Budget PoE",
+                    page_no, total, pal)
+        _draw_table_page(
+            c, page_w, page_h,
+            "Budget PoE par switch — alerte à 80 %, jamais une valeur devinée",
+            ["Baie", "U", "Switch", "Budget", "Tiré", "Ports PoE", "Taux",
+             "État"],
+            [10, 5, 22, 12, 10, 9, 8, 16], chunk, pal)
+        c.showPage()
+        page_no += 1
+
     total_w_charge = sum(
         types[i.type_id].power_w
         for r in project.racks for i in r.items if i.type_id in types)

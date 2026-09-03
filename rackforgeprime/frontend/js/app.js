@@ -823,9 +823,34 @@ function openDeviceSheet(itemId) {
     ["Libres", ports.length - used],
     ["Consommation", `${t.power_w} W`],
   ];
-  $("#device-tiles").innerHTML = tiles.map(([k, v]) =>
-    `<div class="tile"><div class="tile-k">${k}</div>` +
-    `<div class="tile-v">${v}</div></div>`).join("");
+  /* Budget PoE : tiré (somme des ports) / budget (saisi sur l'équipement,
+     sinon datasheet du type, sinon « ? » — jamais deviné). */
+  const poeDrawn = (item.meta.port_usage || [])
+    .reduce((a, pu) => a + (parseFloat(pu.poe_w) || 0), 0);
+  const poeBudget = item.meta.poe_budget_w ?? t.poe_budget_w ?? null;
+  let poeCls = "";
+  if (poeBudget) {
+    const taux = poeDrawn / poeBudget;
+    poeCls = taux > 1 ? " tile-poe-depassement" : taux >= 0.8 ? " tile-poe-alerte" : "";
+  }
+  if (isPoE(t) || poeBudget || poeDrawn)
+    tiles.push(["PoE tiré / budget",
+      `${+poeDrawn.toFixed(1)} / ${poeBudget ? poeBudget + " W" : "?"}` +
+      (poeBudget ? ` (${Math.round(100 * poeDrawn / poeBudget)} %)` : ""), poeCls]);
+  $("#device-tiles").innerHTML = tiles.map(([k, v, cls]) =>
+    `<div class="tile${cls || ""}"><div class="tile-k">${k}` +
+    (k.startsWith("PoE") ? ' <span class="tile-edit" title="Saisir le budget PoE (datasheet)">✎</span>' : "") +
+    `</div><div class="tile-v">${v}</div></div>`).join("");
+  $("#device-tiles .tile-edit")?.addEventListener("click", async () => {
+    const v = await askText("Budget PoE de cet équipement (W)",
+      "Valeur datasheet (ex : 370 pour un 2930F-48G-PoE+ 370 W). Vide = inconnu.",
+      poeBudget ? String(poeBudget) : "");
+    if (v === null) return;
+    const n = parseFloat(String(v).replace(",", "."));
+    item.meta.poe_budget_w = Number.isFinite(n) && n >= 0 ? n : null;
+    saveLocal();
+    openDeviceSheet(deviceItemId);
+  });
 
   /* Grille façon switch réel : impairs en haut, pairs en bas. */
   const grid = $("#device-grid");
@@ -995,6 +1020,7 @@ function openPortEditor(item, port) {
   f.elements.vlan.value = pu.vlan || "";
   f.elements.usage.value = pu.usage || "";
   f.elements.etat.value = pu.etat || "";
+  f.elements.poe_w.value = pu.poe_w ? pu.poe_w : "";
   f.hidden = false;
   f.elements.outlet.focus();
 }
@@ -1014,9 +1040,16 @@ $("#device-port-form").addEventListener("submit", (e) => {
   pu.vlan = f.elements.vlan.value.trim();
   pu.usage = f.elements.usage.value.trim();
   pu.etat = f.elements.etat.value;
+  const poe = parseFloat(String(f.elements.poe_w.value).replace(",", "."));
+  pu.poe_w = Number.isFinite(poe) && poe > 0 ? Math.min(poe, 100) : 0;
   renderAll();
   openDeviceSheet(deviceItemId);
 });
+/* Boutons de classe 802.3 : af 15,4 W · at 30 W · bt 60 W — un clic, pas de table à retenir. */
+document.querySelectorAll(".poe-class").forEach((b) =>
+  b.addEventListener("click", () => {
+    $("#device-port-form").elements.poe_w.value = b.dataset.w;
+  }));
 $("#dpf-cable").addEventListener("click", (e) => {
   if (!editingPort) return;
   startCabling(e, editingPort.item, editingPort.port);
@@ -1492,6 +1525,7 @@ document.addEventListener("keydown", (e) => {
 function renderAll() {
   if (viewMode === "logical") { renderLogical(); return; }
   if (viewMode === "diagram") { renderDiagram(); return; }
+  if (viewMode === "plan") { renderPlan(); return; }
   ensureProjectImages();
   const canvas = $("#canvas");
   canvas.innerHTML = "";
@@ -1970,13 +2004,15 @@ async function postForBlob(url, filename) {
  * vois est ce que tu livres. */
 function viewSuffix() {
   if (viewMode === "physical") return rackFace === "rear" ? "-arriere" : "";
-  return { logical: "-logique", diagram: "-diagramme" }[viewMode] || "";
+  return { logical: "-logique", diagram: "-diagramme", plan: "-plan" }[viewMode] || "";
 }
 function exportQuery(view) {
   const q = new URLSearchParams();
   const v = view ||
-    ({ logical: "logical", diagram: "diagram" }[viewMode] || "physical");
+    ({ logical: "logical", diagram: "diagram", plan: "plan" }[viewMode] || "physical");
   q.set("view", v);
+  /* Plan d'étage : la salle affichée est celle exportée. */
+  if (v === "plan" && planNav.roomId) q.set("room", planNav.roomId);
   q.set("theme", theme);
   q.set("rendu", renderMode);
   /* Ce que tu vois est ce que tu livres : l'élévation exportée est celle
@@ -2003,6 +2039,8 @@ $("#btn-export-labels").addEventListener("click", () =>
               currentProject().id + "-etiquettes.pdf"));
 $("#btn-export-drawio").addEventListener("click", () =>
   postForBlob("/api/export/drawio", currentProject().id + ".drawio"));
+$("#btn-export-vsdx").addEventListener("click", () =>
+  postForBlob("/api/export/vsdx", currentProject().id + ".vsdx"));
 
 /* PNG : le SVG d'export rasterisé en local (à imprimer, scotcher sur la
  * baie — la demande NetBox n°1182 jamais servie). Échelle 2x. */
@@ -2058,6 +2096,8 @@ $("#btn-import-json input").addEventListener("change", async (e) => {
     project = data;
     if (!project.equipment_types) project.equipment_types = [];
     if (!project.logical) project.logical = { vlans: [], links: [], positions: {} };
+    if (!project.sites) project.sites = [];
+    if (!project.flows) project.flows = [];
     refreshTypes();
     renderPalette($("#palette-filter").value);
     $("#project-name").value = project.name || "Sans nom";
@@ -3047,12 +3087,14 @@ function setView(mode) {
   $("#btn-view-physical").classList.toggle("active", mode === "physical");
   $("#btn-view-logical").classList.toggle("active", mode === "logical");
   $("#btn-view-diagram").classList.toggle("active", mode === "diagram");
+  $("#btn-view-plan").classList.toggle("active", mode === "plan");
   closeInspector();
   renderAll();
 }
 $("#btn-view-physical").addEventListener("click", () => setView("physical"));
 $("#btn-view-logical").addEventListener("click", () => setView("logical"));
 $("#btn-view-diagram").addEventListener("click", () => setView("diagram"));
+$("#btn-view-plan").addEventListener("click", () => setView("plan"));
 
 /* =====================================================================
  * Imports de modèles — YAML NetBox, PDF datasheet, image/SVG custom.
@@ -3486,6 +3528,8 @@ function demoProject() {
   if (!project.equipment_types) project.equipment_types = [];
   if (!project.logical) project.logical = { vlans: [], links: [], positions: {} };
   if (!project.diagram) project.diagram = { annotations: [] };
+  if (!project.sites) project.sites = [];
+  if (!project.flows) project.flows = [];
   document.body.dataset.view = viewMode;
   refreshTypes();
   renderPalette("");
@@ -3493,7 +3537,537 @@ function demoProject() {
     (e) => renderPalette(e.target.value));
   $("#project-name").value = project.name;
   /* ?view=logical|diagram ouvre directement la vue voulue. */
-  if (["logical", "diagram"].includes(qs.get("view"))) setView(qs.get("view"));
+  if (["logical", "diagram", "plan"].includes(qs.get("view"))) setView(qs.get("view"));
   else renderAll();
   renderStatus("Prêt");
 })();
+
+/* =====================================================================
+ * Vue PLAN D'ÉTAGE — le parcours voulu : ville → bâtiment → salle → baies.
+ * Le SVG de la salle est rendu par le BACKEND (svg_plan.py : ce qu'on
+ * voit est ce qu'on exporte) ; le frontend pose la navigation et
+ * l'interactivité : glisser les baies et les points, menus contextuels,
+ * image de plan, opacité, échelle.
+ * =================================================================== */
+
+const PLAN_OX = 20, PLAN_OY = 64;   // translate() du groupe plan (miroir svg_plan)
+let planNav = { siteId: null, buildingId: null, roomId: null };
+try { planNav = Object.assign(planNav, JSON.parse(localStorage.getItem("rfp-plan-nav") || "{}")); }
+catch { /* défaut */ }
+
+const uid = (prefix) => prefix + "-" + Math.random().toString(36).slice(2, 8);
+function planSite() { return (project.sites || []).find((s) => s.id === planNav.siteId) || null; }
+function planBuilding() {
+  const s = planSite();
+  return s ? (s.buildings || []).find((b) => b.id === planNav.buildingId) || null : null;
+}
+function planRoom() {
+  const b = planBuilding();
+  return b ? (b.rooms || []).find((r) => r.id === planNav.roomId) || null : null;
+}
+function savePlanNav() { localStorage.setItem("rfp-plan-nav", JSON.stringify(planNav)); }
+function allRooms() {
+  const out = [];
+  for (const s of project.sites || [])
+    for (const b of s.buildings || [])
+      for (const r of b.rooms || []) out.push({ site: s, building: b, room: r });
+  return out;
+}
+/* Baies du projet non encore posées sur un plan (une baie = un seul plan). */
+function unplacedRacks() {
+  const placed = new Set();
+  for (const { room } of allRooms()) for (const pr of room.racks || []) placed.add(pr.rack_id);
+  return project.racks.filter((r) => !placed.has(r.id));
+}
+
+function renderPlanCrumb() {
+  const el = $("#plan-crumb");
+  const parts = ['<span class="crumb" data-lvl="0">Villes</span>'];
+  const s = planSite(), b = planBuilding(), r = planRoom();
+  if (s) parts.push(`<span class="crumb" data-lvl="1">${esc(s.name)}</span>`);
+  if (b) parts.push(`<span class="crumb" data-lvl="2">${esc(b.name)}</span>`);
+  if (r) parts.push(`<span class="crumb current" data-lvl="3">${esc(r.name)}</span>`);
+  el.innerHTML = parts.join('<span class="sep">›</span>');
+  el.querySelectorAll(".crumb").forEach((c) => c.addEventListener("click", () => {
+    const lvl = +c.dataset.lvl;
+    if (lvl < 3) planNav.roomId = null;
+    if (lvl < 2) planNav.buildingId = null;
+    if (lvl < 1) planNav.siteId = null;
+    savePlanNav();
+    renderAll();
+  }));
+  const add = $("#btn-plan-add");
+  add.textContent = !s ? "+ Ville" : !b ? "+ Bâtiment" : "+ Salle";
+  /* Les outils de salle n'ont de sens que dans une salle. */
+  for (const id of ["#btn-plan-rack", "#btn-plan-point", "#btn-plan-image",
+                    "#plan-opacity-wrap", "#btn-plan-settings"])
+    $(id).style.display = r ? "" : "none";
+  if (r) $("#plan-opacity").value = Math.round((r.plan_opacity ?? 0.6) * 100);
+}
+
+async function planAddLevel() {
+  const s = planSite(), b = planBuilding();
+  if (!s) {
+    const name = await askText("Nouvelle ville / site", "ex : Paris, Lyon, Siège…", "");
+    if (!name) return;
+    project.sites.push({ id: uid("site"), name: name.trim(), address: "", buildings: [] });
+  } else if (!b) {
+    const name = await askText(`Nouveau bâtiment à ${s.name}`, "ex : Bâtiment A, Entrepôt…", "");
+    if (!name) return;
+    s.buildings.push({ id: uid("bat"), name: name.trim(), rooms: [] });
+  } else {
+    const name = await askText(`Nouvelle salle dans ${b.name}`, "ex : OLYMPE, Local technique RDC…", "");
+    if (!name) return;
+    const room = { id: uid("salle"), name: name.trim(), plan_image: null,
+                   plan_opacity: 0.6, plan_w: 1200, plan_h: 800, mm_per_px: 10,
+                   racks: [], points: [] };
+    b.rooms.push(room);
+    planNav.roomId = room.id;
+    savePlanNav();
+  }
+  pushHistory();
+  renderAll();
+}
+$("#btn-plan-add").addEventListener("click", planAddLevel);
+
+/* Cartes de navigation (niveau ville / bâtiment / salle). */
+function renderPlanNav(canvas) {
+  const s = planSite(), b = planBuilding();
+  let items, title, hint, sub, onOpen, addLabel;
+  if (!s) {
+    items = project.sites; title = "Villes / sites";
+    hint = "Cliquez une ville pour descendre vers ses bâtiments, puis ses salles. Clic droit : renommer, supprimer.";
+    sub = (x) => `${(x.buildings || []).length} bâtiment(s)`;
+    onOpen = (x) => { planNav.siteId = x.id; }; addLabel = "Ville";
+  } else if (!b) {
+    items = s.buildings; title = `${s.name} — bâtiments`;
+    hint = "Un bâtiment regroupe des salles (locaux techniques, salles serveurs).";
+    sub = (x) => `${(x.rooms || []).length} salle(s)`;
+    onOpen = (x) => { planNav.buildingId = x.id; }; addLabel = "Bâtiment";
+  } else {
+    items = b.rooms; title = `${s.name} › ${b.name} — salles`;
+    hint = "Ouvrez une salle pour poser ses baies sur le plan d'étage.";
+    sub = (x) => `${(x.racks || []).length} baie(s) · ${(x.points || []).length} point(s)` +
+                 (x.plan_image ? " · plan chargé" : "");
+    onOpen = (x) => { planNav.roomId = x.id; }; addLabel = "Salle";
+  }
+  const wrap = document.createElement("div");
+  wrap.className = "plan-nav";
+  wrap.innerHTML = `<h3>${esc(title)}</h3><div class="plan-hint">${esc(hint)}</div>`;
+  for (const x of items) {
+    const card = document.createElement("div");
+    card.className = "plan-card";
+    card.innerHTML = `<div class="pc-name">${esc(x.name)}</div><div class="pc-sub">${esc(sub(x))}</div>`;
+    card.addEventListener("click", () => { onOpen(x); savePlanNav(); renderAll(); });
+    card.addEventListener("contextmenu", (e) => _logicalMenu(e, x.name, [
+      ["Ouvrir", () => { onOpen(x); savePlanNav(); renderAll(); }],
+      ["Renommer…", async () => {
+        const n = await askText("Renommer", "", x.name);
+        if (n && n.trim()) { x.name = n.trim(); pushHistory(); renderAll(); }
+      }],
+      ["Supprimer…", async () => {
+        const n = countUnder(x);
+        if (!await askConfirm(`Supprimer « ${x.name} » ?`,
+          n ? `${n} élément(s) posé(s) dessous seront retirés des plans — les baies restent dans le projet (Ctrl+Z pour annuler).`
+            : "Rien n'est posé dessous (Ctrl+Z pour annuler).")) return;
+        const idx = items.indexOf(x);
+        if (idx >= 0) items.splice(idx, 1);
+        pushHistory();
+        renderAll();
+      }, "danger"],
+    ]));
+    wrap.appendChild(card);
+  }
+  const add = document.createElement("div");
+  add.className = "plan-card pc-add";
+  add.title = "Ajouter";
+  add.innerHTML = `+ <small style="font-size:12px;margin-left:6px">${addLabel}</small>`;
+  add.addEventListener("click", planAddLevel);
+  wrap.appendChild(add);
+  canvas.appendChild(wrap);
+}
+function countUnder(x) {
+  if (x.buildings) return x.buildings.reduce((a, b) => a + countUnder(b), 0);
+  if (x.rooms) return x.rooms.reduce((a, r) => a + countUnder(r), 0);
+  return (x.racks || []).length + (x.points || []).length;
+}
+
+async function renderPlan() {
+  const canvas = $("#canvas");
+  canvas.innerHTML = "";
+  if (!planSite()) planNav.siteId = null;
+  if (!planBuilding()) planNav.buildingId = null;
+  if (!planRoom()) planNav.roomId = null;
+  renderPlanCrumb();
+  const room = planRoom();
+  if (!room) { renderPlanNav(canvas); renderStatus(); saveLocal(); return; }
+  const res = await fetch("/api/export/svg?view=plan&theme=" + theme +
+                          "&room=" + encodeURIComponent(room.id), {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(currentProject()),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    renderStatus(`<span class="stat-err">Plan indisponible : ${esc(JSON.stringify(err.detail))}</span>`);
+    return;
+  }
+  canvas.innerHTML = await res.text();
+  wirePlan(canvas.querySelector("svg"), room);
+  renderStatus(`${room.name} : ${room.racks.length} baie(s) posée(s), ` +
+    `${unplacedRacks().length} à poser — glissez, clic droit pour les options`);
+  saveLocal();
+  requestAnimationFrame(updateMinimap);
+}
+
+/* Interactivité sur le SVG rendu par le backend. */
+function wirePlan(svg, room) {
+  if (!svg) return;
+  const planPt = (e) => {
+    const p = svgPoint(svg, e);
+    return { x: p.x - PLAN_OX, y: p.y - PLAN_OY };
+  };
+  const clamp = (v, max) => Math.max(0, Math.min(max, v));
+  /* Glisser une baie ou un point : transform mis à jour en direct,
+     modèle mis à jour au relâchement, puis re-rendu (un seul moteur). */
+  const startDrag = (g, e, getXY, setXY) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const start = planPt(e), from = getXY();
+    const base = g.getAttribute("transform") || "";
+    let moved = false;
+    g.classList.add("plan-dragging");
+    const onMove = (ev) => {
+      const p = planPt(ev);
+      const dx = p.x - start.x, dy = p.y - start.y;
+      if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
+      g.setAttribute("transform", `translate(${dx},${dy}) ${base}`);
+    };
+    const onUp = (ev) => {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      g.classList.remove("plan-dragging");
+      if (!moved) { g.setAttribute("transform", base); return; }
+      const p = planPt(ev);
+      setXY(clamp(from.x + p.x - start.x, room.plan_w),
+            clamp(from.y + p.y - start.y, room.plan_h));
+      pushHistory();
+      renderPlan();
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  };
+  for (const pr of room.racks) {
+    const g = svg.querySelector(`[id="planrack-${CSS.escape(pr.rack_id)}"]`);
+    const rack = project.racks.find((r) => r.id === pr.rack_id);
+    if (!g || !rack) continue;
+    g.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      startDrag(g, e, () => ({ x: pr.x, y: pr.y }),
+                (x, y) => { pr.x = Math.round(x); pr.y = Math.round(y); });
+    });
+    g.addEventListener("dblclick", () => { setView("physical"); scrollToRack(rack.id); });
+    g.addEventListener("contextmenu", (e) => _logicalMenu(e, rack.name, [
+      ["Tourner de 90°", () => { pr.rotation = ((pr.rotation || 0) + 90) % 360; pushHistory(); renderPlan(); }],
+      ["Voir la baie (vue physique)", () => { setView("physical"); scrollToRack(rack.id); }],
+      ["Retirer du plan", () => {
+        room.racks = room.racks.filter((x) => x !== pr);
+        pushHistory(); renderPlan();
+      }, "danger"],
+    ]));
+  }
+  for (const pt of room.points) {
+    const g = svg.querySelector(`[id="planpoint-${CSS.escape(pt.id)}"]`);
+    if (!g) continue;
+    g.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      startDrag(g, e, () => ({ x: pt.x, y: pt.y }),
+                (x, y) => { pt.x = Math.round(x); pt.y = Math.round(y); });
+    });
+    g.addEventListener("dblclick", () => openPointDialog(room, pt));
+    g.addEventListener("contextmenu", (e) => _logicalMenu(e, pt.label || pt.kind, [
+      ["Modifier…", () => openPointDialog(room, pt)],
+      ["Supprimer", () => { room.points = room.points.filter((x) => x !== pt); pushHistory(); renderPlan(); }, "danger"],
+    ]));
+  }
+  /* Fond du plan : clic droit = tout ce qu'on peut poser ICI. */
+  svg.addEventListener("contextmenu", (e) => {
+    if (e.target.closest('[id^="planrack-"], [id^="planpoint-"]')) return;
+    const p = planPt(e);
+    const actions = [];
+    for (const r of unplacedRacks().slice(0, 8))
+      actions.push([`Poser la baie ${r.name} ici`, () => placeRack(room, r, p.x, p.y)]);
+    actions.push(["Borne Wi-Fi ici", () => addPoint(room, "ap", p)]);
+    actions.push(["Prise murale ici", () => addPoint(room, "prise", p)]);
+    actions.push(["Caméra ici", () => addPoint(room, "camera", p)]);
+    actions.push(["Note ici", () => addPoint(room, "note", p)]);
+    actions.push(["Image du plan…", () => $("#btn-plan-image input").click()]);
+    actions.push(["Réglages de la salle…", () => openRoomDialog(room)]);
+    _logicalMenu(e, `${room.name} — ${Math.round(p.x)}, ${Math.round(p.y)} px`, actions);
+  });
+}
+function scrollToRack(rackId) {
+  requestAnimationFrame(() =>
+    document.querySelector(`svg[data-rack-id="${CSS.escape(rackId)}"]`)
+      ?.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" }));
+}
+function placeRack(room, rack, x, y) {
+  const fw = 600 / room.mm_per_px, fd = 1000 / room.mm_per_px;
+  room.racks.push({ rack_id: rack.id, x: Math.round(Math.max(0, x - fw / 2)),
+                    y: Math.round(Math.max(0, y - fd / 2)), rotation: 0 });
+  pushHistory();
+  renderPlan();
+}
+function addPoint(room, kind, p) {
+  const pt = { id: uid("pt"), kind, label: "", x: Math.round(p.x), y: Math.round(p.y),
+               radius: kind === "ap" ? Math.round(10000 / room.mm_per_px) : 0,
+               equipment_id: "", color: "" };
+  room.points.push(pt);
+  pushHistory();
+  openPointDialog(room, pt, true);
+}
+
+/* Bandeau : poser une baie / ajouter un point (au centre du plan). */
+$("#btn-plan-rack").addEventListener("click", (e) => {
+  const room = planRoom();
+  if (!room) return;
+  const free = unplacedRacks();
+  if (!free.length) {
+    renderStatus("Toutes les baies du projet sont déjà posées sur un plan");
+    return;
+  }
+  _logicalMenu(e, "Poser une baie", free.map((r) =>
+    [r.name, () => placeRack(room, r, room.plan_w / 2, room.plan_h / 2)]));
+});
+$("#btn-plan-point").addEventListener("click", (e) => {
+  const room = planRoom();
+  if (!room) return;
+  const c = { x: room.plan_w / 2, y: room.plan_h / 2 };
+  _logicalMenu(e, "Ajouter un point", [
+    ["Borne Wi-Fi (couverture)", () => addPoint(room, "ap", c)],
+    ["Prise murale", () => addPoint(room, "prise", c)],
+    ["Caméra", () => addPoint(room, "camera", c)],
+    ["Équipement", () => addPoint(room, "equipement", c)],
+    ["Note", () => addPoint(room, "note", c)],
+  ]);
+});
+$("#plan-opacity").addEventListener("input", (e) => {
+  const room = planRoom();
+  if (!room) return;
+  room.plan_opacity = (+e.target.value) / 100;
+  const img = $("#canvas svg image");
+  if (img) img.setAttribute("opacity", room.plan_opacity);
+});
+$("#plan-opacity").addEventListener("change", () => { saveLocal(); });
+$("#btn-plan-settings").addEventListener("click", () => {
+  const room = planRoom();
+  if (room) openRoomDialog(room);
+});
+
+/* Image du plan : réduite à 1600 px de large (JPEG) pour rester légère
+   dans le JSON du projet ; la salle prend la taille de l'image. */
+$("#btn-plan-image input").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  const room = planRoom();
+  e.target.value = "";
+  if (!file || !room) return;
+  const uri = await fileToDataURI(file);
+  const img = new Image();
+  img.onload = () => {
+    const maxW = 1600;
+    const k = Math.min(1, maxW / img.width);
+    const cv = document.createElement("canvas");
+    cv.width = Math.round(img.width * k);
+    cv.height = Math.round(img.height * k);
+    cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+    room.plan_image = cv.toDataURL("image/jpeg", 0.85);
+    room.plan_w = cv.width;
+    room.plan_h = cv.height;
+    pushHistory();
+    renderPlan();
+    renderStatus(`Plan chargé : ${cv.width} × ${cv.height} px — réglez l'échelle (mm/px) dans Réglages`);
+  };
+  img.onerror = () => renderStatus('<span class="stat-err">Image illisible</span>');
+  img.src = uri;
+});
+
+/* Dialogue point (borne, prise, caméra, note). */
+let editingPoint = null;
+const POINT_COLORS = { ap: "#22d3ee", prise: "#3b82f6", camera: "#a78bfa",
+                       equipement: "#34d399", note: "#94a3b8" };
+function openPointDialog(room, pt, isNew) {
+  editingPoint = { room, pt, isNew: !!isNew };
+  const f = $("#point-form");
+  $("#point-dialog-title").textContent = isNew ? "Nouveau point" : (pt.label || "Point");
+  const sel = f.elements.equipment_id;
+  sel.innerHTML = '<option value="">—</option>' + project.racks.map((r) =>
+    r.items.map((it) => {
+      const t = typesById[it.type_id];
+      const lbl = it.meta.hostname || (t ? `${t.vendor} ${t.model}` : it.id);
+      return `<option value="${esc(it.id)}">${esc(r.name)} · U${it.position_u} · ${esc(lbl)}</option>`;
+    }).join("")).join("");
+  f.elements.kind.value = pt.kind;
+  f.elements.label.value = pt.label || "";
+  f.elements.radius_m.value = pt.radius ? +(pt.radius * room.mm_per_px / 1000).toFixed(1) : "";
+  f.elements.equipment_id.value = pt.equipment_id || "";
+  f.elements.color.value = pt.color || POINT_COLORS[pt.kind] || "#94a3b8";
+  $("#btn-point-delete").hidden = !!isNew;
+  $("#point-dialog").showModal();
+}
+$("#point-dialog").addEventListener("close", () => {
+  const ep = editingPoint;
+  editingPoint = null;
+  if (!ep) return;
+  const f = $("#point-form"), v = $("#point-dialog").returnValue;
+  const { room, pt, isNew } = ep;
+  if (v === "delete" || (v !== "ok" && isNew)) {
+    room.points = room.points.filter((x) => x !== pt);
+    pushHistory(); renderPlan(); return;
+  }
+  if (v !== "ok") return;
+  pt.kind = f.elements.kind.value;
+  pt.label = f.elements.label.value.trim();
+  const m = parseFloat(String(f.elements.radius_m.value).replace(",", "."));
+  pt.radius = Number.isFinite(m) && m > 0 ? Math.round(m * 1000 / room.mm_per_px) : 0;
+  pt.equipment_id = f.elements.equipment_id.value;
+  pt.color = f.elements.color.value;
+  pushHistory();
+  renderPlan();
+});
+
+/* Réglages de la salle. */
+let editingRoom = null;
+function openRoomDialog(room) {
+  editingRoom = room;
+  const f = $("#room-form");
+  f.elements.name.value = room.name;
+  f.elements.plan_w.value = room.plan_w;
+  f.elements.plan_h.value = room.plan_h;
+  f.elements.mm_per_px.value = room.mm_per_px;
+  $("#btn-room-noimage").hidden = !room.plan_image;
+  $("#room-dialog").showModal();
+}
+$("#room-dialog").addEventListener("close", () => {
+  const room = editingRoom;
+  editingRoom = null;
+  if (!room) return;
+  const f = $("#room-form"), v = $("#room-dialog").returnValue;
+  if (v === "noimage") { room.plan_image = null; pushHistory(); renderPlan(); return; }
+  if (v !== "ok") return;
+  room.name = f.elements.name.value.trim() || room.name;
+  room.plan_w = Math.max(200, +f.elements.plan_w.value || room.plan_w);
+  room.plan_h = Math.max(200, +f.elements.plan_h.value || room.plan_h);
+  room.mm_per_px = Math.max(0.1, +f.elements.mm_per_px.value || room.mm_per_px);
+  pushHistory();
+  renderPlan();
+});
+
+/* =====================================================================
+ * MATRICE DE FLUX — lignes éditables + vue croisée zones × zones.
+ * =================================================================== */
+const FLOW_ACTIONS = [["", "à définir"], ["allow", "Autorisé"], ["deny", "Refusé"], ["nat", "NAT"]];
+
+function renderFlowsTable() {
+  const tb = $("#flows-table tbody");
+  tb.innerHTML = "";
+  if (!project.flows.length) {
+    tb.innerHTML = '<tr><td colspan="8" class="dialog-hint">Aucun flux — « + Ligne » ou « Proposer depuis le projet ».</td></tr>';
+    return;
+  }
+  for (const fl of project.flows) {
+    const tr = document.createElement("tr");
+    const cell = (name, ph) => {
+      const td = document.createElement("td");
+      const inp = document.createElement("input");
+      inp.value = fl[name] || "";
+      inp.placeholder = ph || "";
+      inp.addEventListener("input", () => { fl[name] = inp.value; saveLocal(); });
+      td.appendChild(inp);
+      return td;
+    };
+    tr.appendChild(cell("src", "VLAN 20 — USERS"));
+    tr.appendChild(cell("dst", "Internet"));
+    tr.appendChild(cell("proto", "tcp"));
+    tr.appendChild(cell("ports", "443, 8443"));
+    const tdA = document.createElement("td");
+    const sel = document.createElement("select");
+    sel.innerHTML = FLOW_ACTIONS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+    sel.value = fl.action || "";
+    sel.className = "act-" + (fl.action || "none");
+    sel.addEventListener("change", () => {
+      fl.action = sel.value; sel.className = "act-" + (fl.action || "none"); saveLocal();
+    });
+    tdA.appendChild(sel);
+    tr.appendChild(tdA);
+    tr.appendChild(cell("via", "FW-01"));
+    tr.appendChild(cell("comment", ""));
+    const tdD = document.createElement("td");
+    const del = document.createElement("button");
+    del.className = "fl-del"; del.textContent = "✕"; del.title = "Supprimer la ligne";
+    del.addEventListener("click", () => {
+      project.flows = project.flows.filter((x) => x !== fl);
+      pushHistory(); renderFlowsTable();
+    });
+    tdD.appendChild(del);
+    tr.appendChild(tdD);
+    tb.appendChild(tr);
+  }
+}
+function renderFlowsMatrix() {
+  const zones = [];
+  const cells = {};
+  const rank = { "": 0, allow: 1, nat: 2, deny: 3 };
+  for (const f of project.flows) {
+    for (const z of [f.src, f.dst]) if (z && !zones.includes(z)) zones.push(z);
+    if (!f.src || !f.dst) continue;
+    const cur = (cells[f.src] || {})[f.dst] || "";
+    if (rank[f.action || ""] >= rank[cur]) (cells[f.src] = cells[f.src] || {})[f.dst] = f.action || "";
+  }
+  const lbl = Object.fromEntries(FLOW_ACTIONS);
+  const box = $("#flows-matrix");
+  if (!zones.length) { box.innerHTML = '<div class="dialog-hint">Aucune zone : ajoutez des lignes de flux.</div>'; return; }
+  box.innerHTML = "<table><thead><tr><th>source ↓ / destination →</th>" +
+    zones.map((z) => `<th>${esc(z)}</th>`).join("") + "</tr></thead><tbody>" +
+    zones.map((a) => `<tr><th class="rowhead">${esc(a)}</th>` + zones.map((b) => {
+      if (a === b) return '<td class="fm-self">—</td>';
+      const act = (cells[a] || {})[b];
+      if (act === undefined) return '<td class="fm-none">·</td>';
+      return `<td class="fm-${act || "none"}">${esc(lbl[act] || "à définir")}</td>`;
+    }).join("") + "</tr>").join("") + "</tbody></table>";
+}
+let flowsMatrixMode = false;
+function syncFlowsMode() {
+  $("#flows-table-wrap").hidden = flowsMatrixMode;
+  $("#flows-matrix").hidden = !flowsMatrixMode;
+  $("#btn-flows-matrix").textContent = flowsMatrixMode ? "Vue lignes" : "Vue matrice";
+  if (flowsMatrixMode) renderFlowsMatrix(); else renderFlowsTable();
+}
+$("#btn-flows").addEventListener("click", () => {
+  $("#flows-msg").textContent = "";
+  syncFlowsMode();
+  $("#flows-dialog").showModal();
+});
+$("#btn-close-flows").addEventListener("click", () => { $("#flows-dialog").close(); renderAll(); });
+$("#btn-flows-matrix").addEventListener("click", () => { flowsMatrixMode = !flowsMatrixMode; syncFlowsMode(); });
+$("#btn-flows-add").addEventListener("click", () => {
+  project.flows.push({ id: uid("fl"), src: "", dst: "", proto: "", ports: "", action: "", via: "", comment: "" });
+  flowsMatrixMode = false; syncFlowsMode();
+  $("#flows-table tbody tr:last-child input")?.focus();
+});
+$("#btn-flows-propose").addEventListener("click", async () => {
+  const res = await fetch("/api/flows/propose", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(currentProject()),
+  });
+  if (!res.ok) { $("#flows-msg").textContent = "Projet invalide — proposition impossible"; return; }
+  const { flows } = await res.json();
+  if (!flows.length) {
+    $("#flows-msg").textContent = "Rien à proposer : déclarez des VLANs (vue Logique) ou un port WAN.";
+    return;
+  }
+  project.flows.push(...flows);
+  pushHistory();
+  $("#flows-msg").textContent = `${flows.length} ligne(s) proposée(s) — action « à définir » : à vous de trancher.`;
+  flowsMatrixMode = false; syncFlowsMode();
+});
+$("#btn-flows-csv").addEventListener("click", () =>
+  postForBlob("/api/flows.csv", currentProject().id + "-flux.csv"));

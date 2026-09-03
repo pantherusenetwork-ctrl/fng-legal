@@ -168,12 +168,20 @@ body[data-view="logical"] g[id^="link-"] { cursor: pointer; }
 }
 
 /* Modales lien / VLAN : mêmes styles que la proposition */
-#link-dialog, #vlan-dialog {
+#link-dialog, #vlan-dialog, #flows-dialog, #point-dialog, #room-dialog {
   background: var(--panel); color: var(--text);
   border: 1px solid var(--line); border-radius: 10px; padding: 18px; width: 340px;
 }
-#link-dialog::backdrop, #vlan-dialog::backdrop { background: rgba(0, 0, 0, .6); }
-#link-dialog h2, #vlan-dialog h2 { margin-top: 0; font-size: 15px; }
+#link-dialog::backdrop, #vlan-dialog::backdrop, #flows-dialog::backdrop,
+#point-dialog::backdrop, #room-dialog::backdrop { background: rgba(0, 0, 0, .6); }
+#link-dialog h2, #vlan-dialog h2, #flows-dialog h2, #point-dialog h2, #room-dialog h2 {
+  margin-top: 0; font-size: 15px; }
+#point-form label, #room-form label {
+  display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px;
+  color: var(--text-dim); font-size: 11.5px; }
+#point-form input, #point-form select, #room-form input {
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 8px; font-size: 13px; }
 #link-form label, #vlan-form label { display: block; margin-bottom: 9px; font-size: 12px; color: var(--text-dim); }
 #link-form input, #link-form select, #vlan-form input {
   width: 100%; margin-top: 3px; background: var(--panel-2);
@@ -815,3 +823,69 @@ body[data-theme="nuit"] .dropdown-menu, body[data-theme="nuit"] #search-overlay 
   background: rgba(6, 9, 14, .8);
 }
 body[data-theme="nuit"] #canvas svg image { filter: brightness(.8) saturate(.85); }
+
+/* ---- Vue Plan d'étage (ville → bâtiment → salle) ---- */
+body:not([data-view="plan"]) .plan-only { display: none !important; }
+body[data-view="plan"] .physical-only,
+body[data-view="plan"] .logical-only,
+body[data-view="plan"] #palette { display: none; }
+body[data-view="plan"] #canvas { justify-content: center; }
+#plan-crumb { font-family: var(--mono); font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+#plan-crumb .crumb { cursor: pointer; }
+#plan-crumb .crumb:hover, #plan-crumb .crumb.current { color: var(--accent); }
+#plan-crumb .sep { margin: 0 4px; opacity: .6; }
+#plan-opacity-wrap { display: inline-flex; align-items: center; }
+#plan-opacity { width: 70px; accent-color: var(--accent); }
+.plan-nav {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px; padding: 24px; width: min(900px, 100%); align-self: flex-start;
+}
+.plan-nav h3 { grid-column: 1 / -1; margin: 0 0 4px; font-size: 15px; color: var(--text); }
+.plan-nav .plan-hint { grid-column: 1 / -1; color: var(--text-dim); font-size: 12.5px; margin: -4px 0 6px; }
+.plan-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px; cursor: pointer; min-height: 84px; display: flex; flex-direction: column; gap: 6px;
+  transition: border-color .12s, transform .12s;
+}
+.plan-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.plan-card .pc-name { font-weight: 600; font-size: 14px; }
+.plan-card .pc-sub { color: var(--text-dim); font-size: 12px; font-family: var(--mono); }
+.plan-card.pc-add { border-style: dashed; justify-content: center; align-items: center; color: var(--text-dim); font-size: 22px; }
+.plan-card.pc-add:hover { color: var(--accent); }
+#canvas svg [id^="planrack-"], #canvas svg [id^="planpoint-"] { cursor: grab; }
+#canvas svg .plan-dragging { opacity: .75; cursor: grabbing; }
+
+/* ---- Matrice de flux ---- */
+#flows-dialog { width: min(1100px, 96vw); }
+#flows-table-wrap { overflow: auto; max-height: 52vh; margin-bottom: 10px; }
+#flows-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+#flows-table th { text-align: left; color: var(--text-dim); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--line); font-size: 11.5px; }
+#flows-table td { padding: 2px 3px; border-bottom: 1px solid var(--line); }
+#flows-table input, #flows-table select {
+  width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid transparent;
+  border-radius: 4px; padding: 4px 6px; font-size: 12.5px; font-family: var(--sans);
+}
+#flows-table input:focus, #flows-table select:focus { border-color: var(--accent); outline: none; }
+#flows-table .fl-del { color: #f87171; background: none; border: none; cursor: pointer; font-size: 14px; }
+#flows-table select.act-allow { color: #22c55e; } #flows-table select.act-deny { color: #ef4444; }
+#flows-table select.act-nat { color: #eab308; }
+#flows-matrix { overflow: auto; max-height: 52vh; margin-bottom: 10px; }
+#flows-matrix table { border-collapse: collapse; font-size: 12px; }
+#flows-matrix th, #flows-matrix td { border: 1px solid var(--line); padding: 5px 8px; text-align: center; min-width: 64px; }
+#flows-matrix th { color: var(--text-dim); font-weight: 600; background: var(--panel-2); }
+#flows-matrix th.rowhead { text-align: left; }
+#flows-matrix td.fm-allow { background: rgba(34, 197, 94, .22); color: #22c55e; }
+#flows-matrix td.fm-deny { background: rgba(239, 68, 68, .22); color: #ef4444; }
+#flows-matrix td.fm-nat { background: rgba(234, 179, 8, .22); color: #eab308; }
+#flows-matrix td.fm-none { color: var(--text-dim); }
+#flows-matrix td.fm-self { background: var(--panel-2); }
+
+/* ---- PoE ---- */
+.poe-field { display: flex; gap: 4px; align-items: center; }
+.poe-field input { flex: 1; min-width: 60px; }
+.poe-class { padding: 3px 7px; font-size: 11px; font-family: var(--mono); }
+.tile.tile-poe-alerte .tile-v { color: #eab308; }
+.tile.tile-poe-depassement .tile-v { color: #ef4444; }
+.tile .tile-edit { cursor: pointer; }
+.tile .tile-edit:hover { color: var(--accent); }
+#point-dialog, #room-dialog { width: min(440px, 92vw); }

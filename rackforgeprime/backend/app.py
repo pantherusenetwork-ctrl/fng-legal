@@ -26,7 +26,11 @@ from rackforge.importers import import_netbox_yaml, parse_datasheet_pdf
 from rackforge.models import (Project, patch_table, patch_table_csv,
                               rack_stats, type_index)
 from rackforge.drawio_export import render_drawio
+from rackforge.energy import poe_report
+from rackforge.flows import flows_csv, propose_flows
 from rackforge.formes import forme_svg, list_formes
+from rackforge.svg_plan import render_plan_svg
+from rackforge.vsdx_export import render_vsdx
 from rackforge.pdf_export import (render_labels_pdf,
                                   render_project_dossier_pdf,
                                   render_project_pdf)
@@ -181,11 +185,14 @@ async def import_datasheet(file: UploadFile = File(...)) -> dict:
 
 @app.post("/api/export/svg")
 def export_svg(payload: dict,
-               view: Literal["physical", "logical", "diagram"] = "physical",
+               view: Literal["physical", "logical", "diagram",
+                             "plan"] = "physical",
                theme: Theme = "sombre", rendu: Rendu = "photos",
-               layers: str | None = None, face: Face = "front") -> Response:
+               layers: str | None = None, face: Face = "front",
+               room: str | None = None) -> Response:
     """``view=physical`` : élévation ; ``logical`` : VLANs/liens ;
-    ``diagram`` : page de dessin libre.
+    ``diagram`` : page de dessin libre ; ``plan`` : plan d'étage d'une
+    salle (``room`` = id de la salle, vide = la première).
     ``theme`` : sombre/clair/kaki/nuit. ``rendu`` : photos ou dessin.
     ``layers`` : calques logiques à dessiner (csv), vide = tous.
     ``face`` : front (défaut) ou rear — la vue arrière de l'élévation."""
@@ -195,10 +202,13 @@ def export_svg(payload: dict,
                                  layers=_parse_layers(layers))
     elif view == "diagram":
         svg = render_diagram_svg(project, theme=theme)
+    elif view == "plan":
+        svg = render_plan_svg(project, room or None, theme=theme)
     else:
         svg = render_project_svg(project, theme=theme, rendu=rendu,
                                  face=face)
-    suffix = {"logical": "-logique", "diagram": "-diagramme"}.get(view, "")
+    suffix = {"logical": "-logique", "diagram": "-diagramme",
+              "plan": "-plan"}.get(view, "")
     if view == "physical" and face == "rear":
         suffix = "-arriere"
     return Response(
@@ -210,12 +220,14 @@ def export_svg(payload: dict,
 
 @app.post("/api/export/pdf")
 def export_pdf(payload: dict,
-               view: Literal["physical", "logical", "diagram",
+               view: Literal["physical", "logical", "diagram", "plan",
                              "dossier"] = "physical",
                theme: Theme = "sombre", rendu: Rendu = "photos",
-               layers: str | None = None, face: Face = "front") -> Response:
-    """``view`` : physical, logical, diagram, ou ``dossier`` (livrable DAT
-    complet : élévation + logique + brassage + nomenclature, cartouche).
+               layers: str | None = None, face: Face = "front",
+               room: str | None = None) -> Response:
+    """``view`` : physical, logical, diagram, plan, ou ``dossier``
+    (livrable DAT complet : élévation + logique + plans + brassage +
+    flux + PoE + nomenclature, cartouche).
     ``theme`` : sombre/clair/kaki/nuit. ``rendu`` : photos ou dessin."""
     project = _parse_project(payload)
     if view == "dossier":
@@ -223,8 +235,10 @@ def export_pdf(payload: dict,
         suffix = "-dossier"
     else:
         pdf = render_project_pdf(project, view=view, theme=theme, rendu=rendu,
-                                 layers=_parse_layers(layers), face=face)
-        suffix = {"logical": "-logique", "diagram": "-diagramme"}.get(view, "")
+                                 layers=_parse_layers(layers), face=face,
+                                 room=room or None)
+        suffix = {"logical": "-logique", "diagram": "-diagramme",
+                  "plan": "-plan"}.get(view, "")
         if view == "physical" and face == "rear":
             suffix = "-arriere"
     return Response(
@@ -232,6 +246,50 @@ def export_pdf(payload: dict,
         headers={"Content-Disposition":
                  f'attachment; filename="{project.id}{suffix}.pdf"'},
     )
+
+
+@app.post("/api/export/vsdx")
+def export_vsdx(payload: dict) -> Response:
+    """Fichier Visio .vsdx (2 pages : élévation + logique), construit
+    en local d'après la spécification OPC/Visio 2012."""
+    project = _parse_project(payload)
+    data = render_vsdx(project)
+    return Response(
+        content=data,
+        media_type="application/vnd.ms-visio.drawing.main+xml",
+        headers={"Content-Disposition":
+                 f'attachment; filename="{project.id}.vsdx"'},
+    )
+
+
+# --- Matrice de flux et budget PoE -----------------------------------------
+
+@app.post("/api/flows/propose")
+def flows_propose(payload: dict) -> dict:
+    """Lignes de flux PROPOSÉES d'après les VLANs, le pare-feu et le
+    WAN documentés — action vide : l'ingénieur décide, jamais l'outil."""
+    project = _parse_project(payload)
+    return {"flows": [f.model_dump()
+                      for f in propose_flows(project, type_index(project))]}
+
+
+@app.post("/api/flows.csv")
+def flows_csv_export(payload: dict) -> Response:
+    project = _parse_project(payload)
+    return Response(
+        content="﻿" + flows_csv(project),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition":
+                 f'attachment; filename="{project.id}-flux.csv"'},
+    )
+
+
+@app.post("/api/poe")
+def poe(payload: dict) -> dict:
+    """Budget PoE cumulé par switch : budget (datasheet ou saisi), tiré,
+    ports, taux, état (ok / alerte ≥ 80 % / dépassement / à renseigner)."""
+    project = _parse_project(payload)
+    return {"rows": poe_report(project, type_index(project))}
 
 
 @app.post("/api/export/drawio")
