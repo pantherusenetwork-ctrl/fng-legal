@@ -66,7 +66,8 @@ def _pdf_palette(theme: str) -> dict:
 def render_project_pdf(project: Project, view: str = "physical",
                        layers=None,
                        theme: str = "sombre",
-                       rendu: str = "photos") -> bytes:
+                       rendu: str = "photos",
+                       face: str = "front") -> bytes:
     """Projet -> PDF (bytes). Le SVG est la source, le PDF une vue.
 
     ``view`` : « physical » (élévation de baies) ou « logical » (VLANs/liens).
@@ -85,7 +86,8 @@ def render_project_pdf(project: Project, view: str = "physical",
         margin = 24
         for rack in project.racks:
             sub = project.model_copy(update={"racks": [rack]})
-            svg = render_project_svg(sub, theme=theme, rendu=rendu)
+            svg = render_project_svg(sub, theme=theme, rendu=rendu,
+                                     face=face)
             drawing = svg2rlg(io.StringIO(svg))
             if drawing is None:
                 raise RuntimeError(

@@ -83,6 +83,12 @@ let project = null;
 let selectedItemId = null;
 /* Vue active : "physical" (baies) ou "logical" (VLANs / liens). */
 let viewMode = "physical";
+/* Face regardée dans la vue physique : "front" ou "rear".
+ * La vue arrière n'est PAS une seconde baie à redessiner (le piège
+ * Visio) : c'est LA MÊME donnée vue de l'autre côté — la baie passe en
+ * miroir, les U ne bougent pas, et un équipement monté en façade y
+ * montre son dos. Miroir exact du backend (svg_export.py). */
+let rackFace = localStorage.getItem("rfp-face") === "rear" ? "rear" : "front";
 /* Numéros U visibles (toggle façon Visio « Hide U sizes »). */
 let showUNumbers = localStorage.getItem("rfp-show-u") !== "0";
 /* Rendu des faceplates : "photos" (images officielles) ou "dessin"
@@ -353,6 +359,67 @@ function drawNamePlate(g, label, x, y, h) {
   }, txt));
 }
 
+/* Empreinte réelle de l'équipement dans la façade 19", au mm — déjà mise
+ * en MIROIR quand la baie est regardée par l'arrière. La donnée
+ * (position_x_mm) ne bouge jamais : seule sa projection change.
+ * Miroir exact de _item_box() côté Python. */
+function itemBox(t, item, x) {
+  const iw = t.width_mm
+    ? Math.min(RACK_W, RACK_W * t.width_mm / MM_19_POUCES) : RACK_W;
+  const shared = !!(t.width_mm && item && item.position_x_mm != null);
+  let ix;
+  if (shared) {
+    let xmm = item.position_x_mm;
+    if (rackFace === "rear") xmm = MM_19_POUCES - xmm - t.width_mm;
+    ix = x + RACK_W * xmm / MM_19_POUCES;
+  } else {
+    ix = x + (RACK_W - iw) / 2;
+  }
+  return { ix, iw, shared };
+}
+
+/* Dos d'un équipement — dessiné NEUTRE, jamais inventé. La sérigraphie
+ * arrière réelle des types du catalogue n'est pas connue : on ne la
+ * fabrique pas. On montre ce que TOUT rackable a (grille d'aération +
+ * prise secteur) et les repères de lecture passés en miroir.
+ * Miroir exact de _rear_faceplate() côté Python. */
+function drawRearFaceplate(g, t, x, y, w, label, selected) {
+  const h = t.u_height * U_PX;
+  const yc = y + h / 2;
+  const lw = (label && w > LABEL_W + 70) ? LABEL_W : 0;
+  g.appendChild(svgEl("rect", { x, y: y + 1, width: w, height: h - 2, rx: 3,
+    fill: C.decorFill || C.face, stroke: selected ? C.accent : C.faceStroke,
+    "stroke-width": selected ? 1.6 : 1 }));
+  g.appendChild(svgEl("rect", { x, y: y + 1, width: w, height: h - 2, rx: 3,
+    fill: t.color, "fill-opacity": 0.05 }));
+  /* Liseré de rôle à DROITE : le miroir exact de celui de la façade. */
+  g.appendChild(svgEl("rect", { x: x + w - 4, y: y + 1, width: 4,
+    height: h - 2, fill: t.color, "fill-opacity": 0.5 }));
+  const vx0 = x + 52, vx1 = x + w - lw - 14;
+  for (let vx = vx0; vx < vx1 - 40; vx += 7)
+    /* Filet de contour : sans lui, les fentes se confondent avec le
+       corps sur les thèmes sombres (hole ≈ decorFill). */
+    g.appendChild(svgEl("rect", { x: vx, y: y + 5, width: 3, height: h - 10,
+      rx: 1.5, fill: C.hole, stroke: C.faceStroke, "stroke-width": 0.5 }));
+  if (vx1 - vx0 > 40) {
+    g.appendChild(svgEl("rect", { x: vx1 - 32, y: yc - 7, width: 24,
+      height: 14, rx: 2, fill: C.portFill || C.slot,
+      stroke: C.decorStroke || C.faceStroke, "stroke-width": 1 }));
+    for (let k = 0; k < 3; k++)
+      g.appendChild(svgEl("rect", { x: vx1 - 27 + k * 6, y: yc - 3,
+        width: 2.4, height: 6, rx: 1, fill: t.color, "fill-opacity": 0.7 }));
+  }
+  if (lw) drawNamePlate(g, label, x + w - LABEL_W, y, h);
+  if (w > 60) {
+    g.appendChild(svgEl("rect", { x: x + 8, y: yc - 9.5, width: 36,
+      height: 19, rx: 9, fill: C.face, "fill-opacity": 0.85,
+      stroke: C.pill, "stroke-width": 1 }));
+    g.appendChild(svgEl("text", { x: x + 26, y: yc + 4.5,
+      "text-anchor": "middle", "font-size": 13, fill: C.dim,
+      "font-family": "monospace" }, t.u_height + "U"));
+  }
+}
+
 /* Faceplate placeholder — même dessin que _faceplate_placeholder() côté Python. */
 function drawFaceplate(g, t, x, y, label, selected, item) {
   const h = t.u_height * U_PX;
@@ -364,11 +431,7 @@ function drawFaceplate(g, t, x, y, label, selected, item) {
        compact (width_mm) est cadré à SA largeur, au mm — et s'il a une
        position_x_mm, il cohabite côte à côte avec ses voisins du même U
        (deux FGT 60F collés, comme en vrai). Miroir Python. */
-    const iw = t.width_mm
-      ? Math.min(RACK_W, RACK_W * t.width_mm / MM_19_POUCES) : RACK_W;
-    const shared = !!(t.width_mm && item && item.position_x_mm != null);
-    const ix = shared ? x + RACK_W * item.position_x_mm / MM_19_POUCES
-                      : x + (RACK_W - iw) / 2;
+    const { ix, iw, shared } = itemBox(t, item, x);
     const bx = shared ? ix : x, bw = shared ? iw : RACK_W;
     g.appendChild(svgEl("rect", { x: bx, y: y + 1, width: bw, height: h - 2, fill: C.face }));
     const img = svgEl("image", {
@@ -580,6 +643,15 @@ function renderRackSVG(rack) {
     e.preventDefault();
     openRackMenu(e, rack);
   });
+  /* Badge de face : impossible de confondre les deux vues, à l'écran
+     comme sur un export imprimé. */
+  if (rackFace === "rear") {
+    svg.appendChild(svgEl("rect", { x: w - 104, y: 7, width: 96, height: 18,
+      rx: 9, fill: C.accent, "fill-opacity": 0.16, stroke: C.accent,
+      "stroke-width": 1 }));
+    svg.appendChild(svgEl("text", { x: w - 56, y: 20, "text-anchor": "middle",
+      "font-size": 11, "font-weight": "bold", fill: C.accent }, "VUE ARRIÈRE"));
+  }
   /* Localisation (salle, adresse) sous le nom — comme à l'export. */
   if (rack.location)
     svg.appendChild(svgEl("text", { x: w / 2, y: 37, "text-anchor": "middle",
@@ -620,7 +692,15 @@ function renderRackSVG(rack) {
        L'UTILISATEUR — jamais de « constructeur modèle » auto-posé (le
        survol, lui, donne toujours la fiche complète). */
     const label = item.meta.hostname || "";
-    drawFaceplate(g, t, innerX, y, label, item.id === selectedItemId, item);
+    /* On voit la FAÇADE d'un équipement quand la face regardée est celle
+       sur laquelle il est monté ; sinon on voit son dos. */
+    if ((item.face || "front") === rackFace) {
+      drawFaceplate(g, t, innerX, y, label, item.id === selectedItemId, item);
+    } else {
+      const b = itemBox(t, item, innerX);
+      drawRearFaceplate(g, t, b.shared ? b.ix : innerX, y,
+        b.shared ? b.iw : RACK_W, label, item.id === selectedItemId);
+    }
     /* Clic = inspection ; pointerdown long = déplacement (géré globalement). */
     g.addEventListener("pointerdown", (e) => startItemDrag(e, rack, item));
     /* Survol = surlignage des équipements connectés (esprit PATCHBOX). */
@@ -1293,6 +1373,15 @@ function openItemMenu(e, rack, item) {
       $("#btn-start-connection").click();
     }],
     ["Ouvrir les métadonnées", () => selectItem(item.id)],
+    [(item.face || "front") === "rear"
+      ? "Monter en façade (avant)" : "Monter à l'arrière de la baie",
+     () => {
+       item.face = (item.face || "front") === "rear" ? "front" : "rear";
+       renderAll();
+       renderStatus(item.face === "rear"
+         ? "Monté à l'arrière — visible en vue arrière, de dos en vue avant"
+         : "Monté en façade — visible en vue avant, de dos en vue arrière");
+     }],
     ["Supprimer", () => {
       rack.items = rack.items.filter((i) => i.id !== item.id);
       if (selectedItemId === item.id) { selectedItemId = null; closeInspector(); }
@@ -1367,7 +1456,7 @@ function openSlotPopover(evt, rack, u) {
           return;
         }
         rack.items.push({
-          id: nextItemId(), type_id: t.id, position_u: u, face: "front",
+          id: nextItemId(), type_id: t.id, position_u: u, face: rackFace,
           meta: { hostname: "", role: t.category, vlan: "", wall_outlet: "",
                   port_usage: [], serial: "", notes: "" },
         });
@@ -1722,7 +1811,7 @@ document.addEventListener("pointerup", (e) => {
   } else {
     /* Nouveau depuis la palette. */
     rack.items.push({
-      id: nextItemId(), type_id: d.type.id, position_u: u, face: "front",
+      id: nextItemId(), type_id: d.type.id, position_u: u, face: rackFace,
       position_x_mm: shareX,
       meta: { hostname: "", role: d.type.category, vlan: "", wall_outlet: "",
               port_usage: [], serial: "", notes: "" },
@@ -1880,6 +1969,7 @@ async function postForBlob(url, filename) {
 /* Les exports suivent la vue active ET le thème affiché : ce que tu
  * vois est ce que tu livres. */
 function viewSuffix() {
+  if (viewMode === "physical") return rackFace === "rear" ? "-arriere" : "";
   return { logical: "-logique", diagram: "-diagramme" }[viewMode] || "";
 }
 function exportQuery(view) {
@@ -1889,6 +1979,9 @@ function exportQuery(view) {
   q.set("view", v);
   q.set("theme", theme);
   q.set("rendu", renderMode);
+  /* Ce que tu vois est ce que tu livres : l'élévation exportée est celle
+     de la face regardée. */
+  if (v === "physical") q.set("face", rackFace);
   /* Les calques masqués à l'écran le sont aussi à l'export. */
   if (v === "logical" && hiddenLayers.size)
     q.set("layers", ALL_LAYERS.filter((l) => !hiddenLayers.has(l)).join(","));
@@ -2206,6 +2299,25 @@ $("#btn-cables").addEventListener("click", () => {
     : "Cordons masqués");
 });
 syncCablesBtn();
+
+/* ---- Face avant / arrière : bouton bandeau, état mémorisé ----------
+ * La vue arrière est DÉRIVÉE du projet, pas un second dessin : rien à
+ * maintenir en double, elle ne peut donc pas diverger. */
+function syncFaceBtn() {
+  const lbl = $("#btn-face-label");
+  if (lbl) lbl.textContent = rackFace === "rear" ? "Arrière" : "Avant";
+  $("#btn-face").classList.toggle("actif", rackFace === "rear");
+}
+$("#btn-face").addEventListener("click", () => {
+  rackFace = rackFace === "rear" ? "front" : "rear";
+  localStorage.setItem("rfp-face", rackFace);
+  syncFaceBtn();
+  renderAll();
+  renderStatus(rackFace === "rear"
+    ? "Vue arrière — baie en miroir, dos des équipements montés en façade ; les U ne bougent pas"
+    : "Vue avant");
+});
+syncFaceBtn();
 
 /* ---- Fond du plan : 5 options, mémorisé, cyclé depuis le bandeau ---- */
 const CANVAS_BGS = ["points", "carreaux", "ruche", "lignes", "uni"];

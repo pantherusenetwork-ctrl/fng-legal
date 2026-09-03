@@ -50,6 +50,8 @@ app = FastAPI(title="RackForgePrime", version=VERSION, docs_url="/api/docs")
 # silence sur le défaut — l'appelant sait tout de suite qu'il s'est trompé.
 Theme = Literal["sombre", "clair", "kaki", "nuit"]
 Rendu = Literal["photos", "dessin"]
+# Face regardée : avant (défaut) ou arrière — même projet, vue dérivée.
+Face = Literal["front", "rear"]
 
 
 def _parse_layers(layers: str | None):
@@ -181,11 +183,12 @@ async def import_datasheet(file: UploadFile = File(...)) -> dict:
 def export_svg(payload: dict,
                view: Literal["physical", "logical", "diagram"] = "physical",
                theme: Theme = "sombre", rendu: Rendu = "photos",
-               layers: str | None = None) -> Response:
+               layers: str | None = None, face: Face = "front") -> Response:
     """``view=physical`` : élévation ; ``logical`` : VLANs/liens ;
     ``diagram`` : page de dessin libre.
     ``theme`` : sombre/clair/kaki/nuit. ``rendu`` : photos ou dessin.
-    ``layers`` : calques logiques à dessiner (csv), vide = tous."""
+    ``layers`` : calques logiques à dessiner (csv), vide = tous.
+    ``face`` : front (défaut) ou rear — la vue arrière de l'élévation."""
     project = _parse_project(payload)
     if view == "logical":
         svg = render_logical_svg(project, theme=theme,
@@ -193,8 +196,11 @@ def export_svg(payload: dict,
     elif view == "diagram":
         svg = render_diagram_svg(project, theme=theme)
     else:
-        svg = render_project_svg(project, theme=theme, rendu=rendu)
+        svg = render_project_svg(project, theme=theme, rendu=rendu,
+                                 face=face)
     suffix = {"logical": "-logique", "diagram": "-diagramme"}.get(view, "")
+    if view == "physical" and face == "rear":
+        suffix = "-arriere"
     return Response(
         content=svg, media_type="image/svg+xml",
         headers={"Content-Disposition":
@@ -207,7 +213,7 @@ def export_pdf(payload: dict,
                view: Literal["physical", "logical", "diagram",
                              "dossier"] = "physical",
                theme: Theme = "sombre", rendu: Rendu = "photos",
-               layers: str | None = None) -> Response:
+               layers: str | None = None, face: Face = "front") -> Response:
     """``view`` : physical, logical, diagram, ou ``dossier`` (livrable DAT
     complet : élévation + logique + brassage + nomenclature, cartouche).
     ``theme`` : sombre/clair/kaki/nuit. ``rendu`` : photos ou dessin."""
@@ -217,8 +223,10 @@ def export_pdf(payload: dict,
         suffix = "-dossier"
     else:
         pdf = render_project_pdf(project, view=view, theme=theme, rendu=rendu,
-                                 layers=_parse_layers(layers))
+                                 layers=_parse_layers(layers), face=face)
         suffix = {"logical": "-logique", "diagram": "-diagramme"}.get(view, "")
+        if view == "physical" and face == "rear":
+            suffix = "-arriere"
     return Response(
         content=pdf, media_type="application/pdf",
         headers={"Content-Disposition":

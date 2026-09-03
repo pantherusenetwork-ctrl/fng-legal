@@ -15,7 +15,8 @@ from __future__ import annotations
 
 from xml.sax.saxutils import escape
 
-from .models import EquipmentType, Project, Rack, rack_stats, type_index
+from .models import (EquipmentType, Project, Rack, RackItem, rack_stats,
+                     type_index)
 
 # --- Constantes d'échelle (le frontend utilise les mêmes valeurs) -----------
 # ÉCHELLE RÉELLE, GRAVÉE AU MM (EIA-310) : la façade 19" fait 482,6 mm,
@@ -170,14 +171,19 @@ def _category_decor(t: EquipmentType, x: int, y: int, w: int, h: int,
     return s
 
 
-def _u_pill(t: EquipmentType, x: int, yc: float, w: int,
-            p: dict[str, str]) -> list[str]:
-    """Pastille de hauteur U — le même badge sur photo et sur dessin."""
+def _u_pill(t: EquipmentType, x: float, yc: float, w: float,
+            p: dict[str, str], align: str = "right") -> list[str]:
+    """Pastille de hauteur U — le même badge sur photo et sur dessin.
+
+    ``align="left"`` : vue arrière — tout est en miroir, la pastille
+    passe donc du côté opposé pour rester en face du même montant.
+    """
+    px = x + 8 if align == "left" else x + w - 44
     return [
-        f'<rect x="{x + w - 44}" y="{yc - 9.5:.1f}" width="36" height="19" '
+        f'<rect x="{px:.1f}" y="{yc - 9.5:.1f}" width="36" height="19" '
         f'rx="9" fill="{p["face"]}" fill-opacity="0.85" '
         f'stroke="{p["pill"]}" stroke-width="1"/>',
-        f'<text x="{x + w - 26}" y="{yc + 4.5:.1f}" text-anchor="middle" '
+        f'<text x="{px + 18:.1f}" y="{yc + 4.5:.1f}" text-anchor="middle" '
         f'font-family="{FONT_MONO}" font-size="13" fill="{p["dim"]}">'
         f'{t.u_height}U</text>',
     ]
@@ -239,13 +245,102 @@ def _faceplate_placeholder(t: EquipmentType, x: int, y: int, w: int,
     return s
 
 
+
+# ---------------------------------------------------------------------------
+# Vue arrière — LA MÊME donnée regardée de l'autre côté
+# ---------------------------------------------------------------------------
+# Le piège Visio, c'est de redessiner une deuxième baie à la main : deux
+# dessins qui divergent dès la première modification. Ici la vue arrière
+# est DÉRIVÉE du projet, donc toujours juste :
+#   - la baie passe en miroir horizontal (ce qui est à gauche de face est
+#     à droite de dos) — mais aucun texte n'est retourné, tout est
+#     recalculé ;
+#   - un équipement monté en façade (``item.face == "front"``) montre son
+#     DOS quand on regarde par l'arrière, et inversement ;
+#   - les U, eux, ne bougent pas : U1 reste U1 des deux côtés.
+
+
+def _item_box(t: EquipmentType, item: RackItem, inner_x: float,
+              face: str = "front") -> tuple[float, float, bool]:
+    """Empreinte réelle de l'équipement dans la façade 19", au mm.
+
+    Renvoie ``(x, largeur, cohabite)`` déjà mis en miroir quand la baie
+    est regardée par l'arrière : la donnée (``position_x_mm``) ne bouge
+    jamais, seule sa projection à l'écran change.
+    """
+    iw = RACK_W
+    if t.width_mm:
+        iw = min(RACK_W, RACK_W * t.width_mm / MM_19_POUCES)
+    shared = bool(t.width_mm and item.position_x_mm is not None)
+    if shared:
+        x_mm = item.position_x_mm
+        if face == "rear":
+            x_mm = MM_19_POUCES - x_mm - t.width_mm
+        ix = inner_x + RACK_W * x_mm / MM_19_POUCES
+    else:
+        ix = inner_x + (RACK_W - iw) / 2
+    return ix, iw, shared
+
+
+def _rear_faceplate(t: EquipmentType, x: float, y: float, w: float,
+                    label: str, p: dict[str, str]) -> list[str]:
+    """Dos d'un équipement — dessiné NEUTRE, jamais inventé.
+
+    La sérigraphie arrière réelle des types du catalogue n'est pas connue :
+    on ne la fabrique donc pas. Le dos montre ce que TOUT rackable a — une
+    grille d'aération et une prise secteur — plus les repères de lecture
+    (cartouche de nom, pastille U, liseré de rôle) passés en miroir.
+    """
+    h = t.u_height * U_PX
+    yc = y + h / 2
+    lw = _LABEL_W if (label and w > _LABEL_W + 70) else 0
+    s: list[str] = [
+        f'<rect x="{x:.1f}" y="{y + 1}" width="{w:.1f}" height="{h - 2}" '
+        f'rx="3" fill="{p["decor_fill"]}" stroke="{p["face_stroke"]}" '
+        f'stroke-width="1"/>',
+        f'<rect x="{x:.1f}" y="{y + 1}" width="{w:.1f}" height="{h - 2}" '
+        f'rx="3" fill="{t.color}" fill-opacity="0.05"/>',
+        # Liseré de rôle à DROITE : le miroir exact de celui de la façade.
+        f'<rect x="{x + w - 4:.1f}" y="{y + 1}" width="4" height="{h - 2}" '
+        f'fill="{t.color}" fill-opacity="0.5"/>',
+    ]
+    # Grille d'aération, entre la pastille U (à gauche) et la prise secteur.
+    vx0, vx1 = x + 52, x + w - lw - 14
+    vx = vx0
+    while vx < vx1 - 40:
+        # Filet de contour : sans lui, les fentes se confondent avec le
+        # corps sur les thèmes sombres (hole ≈ decor_fill).
+        s.append(f'<rect x="{vx:.1f}" y="{y + 5:.1f}" width="3" '
+                 f'height="{h - 10:.1f}" rx="1.5" fill="{p["hole"]}" '
+                 f'stroke="{p["face_stroke"]}" stroke-width="0.5"/>')
+        vx += 7
+    # Prise secteur IEC : le repère qui dit « c'est bien un dos ».
+    if vx1 - vx0 > 40:
+        s.append(f'<rect x="{vx1 - 32:.1f}" y="{yc - 7:.1f}" width="24" '
+                 f'height="14" rx="2" fill="{p["port_fill"]}" '
+                 f'stroke="{p["decor_stroke"]}" stroke-width="1"/>')
+        for k in range(3):
+            s.append(f'<rect x="{vx1 - 27 + k * 6:.1f}" y="{yc - 3:.1f}" '
+                     f'width="2.4" height="6" rx="1" fill="{t.color}" '
+                     f'fill-opacity="0.7"/>')
+    if lw:
+        s.extend(_name_plate(label, x + w - _LABEL_W, y, h, t.color, p))
+    if w > 60:
+        s.extend(_u_pill(t, x, yc, w, p, align="left"))
+    return s
+
+
 def render_rack(rack: Rack, types: dict[str, EquipmentType],
                 offset_x: int = 0, offset_y: int = 0,
-                theme: str = "sombre", rendu: str = "photos") -> str:
+                theme: str = "sombre", rendu: str = "photos",
+                face: str = "front") -> str:
     """Rend une baie complète dans un <g> nommé.
 
     ``rendu="dessin"`` ignore les images officielles : toute la baie en
     faceplates dessinées — un seul langage visuel.
+    ``face="rear"`` : la même baie vue de derrière (miroir horizontal,
+    dos des équipements montés en façade, façade de ceux montés à
+    l'arrière).
     """
     p = palette(theme)
     w, h = _rack_size(rack)
@@ -264,6 +359,15 @@ def render_rack(rack: Rack, types: dict[str, EquipmentType],
         s.append(f'<text x="{w / 2:.0f}" y="{HEADER_H - 2}" text-anchor="middle" '
                  f'font-family="{FONT}" font-size="12" fill="{p["dim"]}">'
                  f'{escape(rack.location)}</text>')
+    # Badge de face : impossible de confondre les deux vues sur un
+    # export imprimé (l'erreur classique du DAT fait à la main).
+    if face == "rear":
+        s.append(f'<rect x="{w - 104}" y="7" width="96" height="18" rx="9" '
+                 f'fill="{p["accent"]}" fill-opacity="0.16" '
+                 f'stroke="{p["accent"]}" stroke-width="1"/>')
+        s.append(f'<text x="{w - 56}" y="20" text-anchor="middle" '
+                 f'font-family="{FONT}" font-size="11" font-weight="bold" '
+                 f'fill="{p["accent"]}">VUE ARRIÈRE</text>')
     # Zone U (fond en creux) + rails.
     zone_y = HEADER_H + FRAME_PAD
     zone_h = rack.u_height * U_PX
@@ -298,11 +402,21 @@ def render_rack(rack: Rack, types: dict[str, EquipmentType],
         # RÈGLE : rien n'est écrit sur le dessin SAUF un hostname saisi
         # PAR L'UTILISATEUR. Jamais de « constructeur modèle » auto-posé.
         label = item.meta.hostname
+        ih = t.u_height * U_PX
+        # Empreinte au mm, déjà mise en miroir si on regarde par l'arrière.
+        ix, iw, shared = _item_box(t, item, inner_x, face)
+        bx, bw = (ix, iw) if shared else (inner_x, RACK_W)
+        # On voit la FAÇADE d'un équipement quand la face regardée est
+        # celle sur laquelle il est monté ; sinon on voit son dos.
+        facade = (item.face == face)
         s.append(f'<g id="item-{escape(item.id)}">')
         # Le nom complet vit au SURVOL (tooltip natif du SVG), toujours.
         s.append(f'<title>{escape(label or f"{t.vendor} {t.model}")}'
-                 f'</title>')
-        if t.faceplate_svg and rendu != "dessin":
+                 f'{"" if facade else " — vu de dos"}</title>')
+        if not facade:
+            # Dos : neutre et honnête, jamais de ports arrière inventés.
+            s.extend(_rear_faceplate(t, bx, y, bw, label, p))
+        elif t.faceplate_svg and rendu != "dessin":
             # SVG officiel : injecté tel quel, cadré à l'échelle U.
             s.append(f'<g transform="translate({inner_x},{y})">'
                      f'{t.faceplate_svg}</g>')
@@ -312,23 +426,9 @@ def render_rack(rack: Rack, types: dict[str, EquipmentType],
             # survol. Un boîtier compact (width_mm renseigné) occupe SA
             # largeur réelle, à l'échelle des 19 pouces (483 mm),
             # centré — comme posé dans la vraie baie.
-            ih = t.u_height * U_PX
             # Le slot est à l'ÉCHELLE RÉELLE : jamais d'étirement
             # (« meet » toujours). Une façade 19" le remplit d'elle-même ;
             # un boîtier compact (width_mm) est cadré à SA largeur, au mm.
-            iw = RACK_W
-            if t.width_mm:
-                iw = min(RACK_W, RACK_W * t.width_mm / MM_19_POUCES)
-            shared = t.width_mm and item.position_x_mm is not None
-            if shared:
-                # Position horizontale RÉELLE : plusieurs compacts
-                # cohabitent dans le même U, chacun à sa place au mm.
-                # L'habillage se limite à SON empreinte (le voisin vit
-                # juste à côté) ; pas de pastille U (fouillis à deux).
-                ix = inner_x + RACK_W * item.position_x_mm / MM_19_POUCES
-            else:
-                ix = inner_x + (RACK_W - iw) / 2
-            bx, bw = (ix, iw) if shared else (inner_x, RACK_W)
             s.append(f'<rect x="{bx:.1f}" y="{y + 1}" width="{bw:.1f}" '
                      f'height="{ih - 2}" fill="{p["face"]}"/>')
             s.append(f'<image x="{ix:.1f}" y="{y + 1}" '
@@ -357,8 +457,12 @@ def render_rack(rack: Rack, types: dict[str, EquipmentType],
 
 
 def render_project_svg(project: Project, theme: str = "sombre",
-                       rendu: str = "photos") -> str:
-    """SVG complet : toutes les baies du projet côte à côte."""
+                       rendu: str = "photos", face: str = "front") -> str:
+    """SVG complet : toutes les baies du projet côte à côte.
+
+    ``face="rear"`` rend la vue arrière — dérivée du même JSON, jamais
+    un second dessin à maintenir.
+    """
     p = palette(theme)
     types = type_index(project)
     racks = project.racks
@@ -376,13 +480,14 @@ def render_project_svg(project: Project, theme: str = "sombre",
         f'<text x="20" y="28" font-family="{FONT}" font-size="16" '
         f'font-weight="bold" fill="{p["text"]}">{escape(project.name)}</text>',
         f'<text x="20" y="46" font-family="{FONT_MONO}" font-size="12" '
-        f'fill="{p["dim"]}">RackForgePrime — élévation générée depuis le '
+        f'fill="{p["dim"]}">RackForgePrime — élévation '
+        f'{"arrière" if face == "rear" else "avant"} générée depuis le '
         f'JSON du projet</text>',
     ]
     x = 20
     for rack, (w, _h) in zip(racks, sizes):
         parts.append(render_rack(rack, types, offset_x=x, offset_y=52,
-                                 theme=theme, rendu=rendu))
+                                 theme=theme, rendu=rendu, face=face))
         x += w + GAP_X
     parts.append('</svg>')
     return "\n".join(parts)
