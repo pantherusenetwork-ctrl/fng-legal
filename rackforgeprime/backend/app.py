@@ -9,6 +9,7 @@ de validation : un projet qui viole le snap U ou chevauche deux
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 from typing import Literal
 
@@ -46,7 +47,7 @@ else:
 
 # Version de l'application — à mettre à jour en même temps que le badge
 # affiché dans l'UI (frontend/index.html, #brand-version).
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 app = FastAPI(title="RackForgePrime", version=VERSION, docs_url="/api/docs")
 
@@ -72,6 +73,16 @@ def _parse_layers(layers: str | None):
     return asked
 
 
+def _check_rack(project: Project, rack: str | None) -> str | None:
+    """``rack=<id>`` : la baie doit exister — 422 lisible sinon."""
+    if not rack:
+        return None
+    if all(r.id != rack for r in project.racks):
+        raise HTTPException(status_code=422,
+                            detail=[f"Baie inconnue : {rack}"])
+    return rack
+
+
 def _parse_project(payload: dict) -> Project:
     """Valide un projet reçu du frontend ; 422 lisible en français sinon."""
     try:
@@ -88,6 +99,29 @@ def _parse_project(payload: dict) -> Project:
             loc = ".".join(str(p) for p in e.get("loc", ()))
             msgs.append(f"{loc} : {msg}" if loc else msg)
         raise HTTPException(status_code=422, detail=msgs)
+
+
+# --- Vie de l'application de bureau ----------------------------------------
+# La fenêtre envoie un battement toutes les 5 s ; run.py arrête le serveur
+# quand la fenêtre a disparu (« bye » au pagehide, ou silence prolongé).
+# Sans ça, fermer la fenêtre laissait un processus fantôme sur le port.
+app.state.last_ping = 0.0
+app.state.bye_at = 0.0
+
+
+@app.get("/api/ping")
+def ping() -> dict:
+    app.state.last_ping = time.time()
+    app.state.bye_at = 0.0
+    return {"ok": True, "version": VERSION, "app": "RackForgePrime"}
+
+
+@app.post("/api/bye")
+def bye() -> dict:
+    """La fenêtre se ferme (pagehide). Un rechargement renvoie un ping
+    dans la foulée et annule l'arrêt."""
+    app.state.bye_at = time.time()
+    return {"ok": True}
 
 
 # --- Catalogue --------------------------------------------------------------
@@ -189,8 +223,9 @@ def export_svg(payload: dict,
                              "plan"] = "physical",
                theme: Theme = "sombre", rendu: Rendu = "photos",
                layers: str | None = None, face: Face = "front",
-               room: str | None = None) -> Response:
-    """``view=physical`` : élévation ; ``logical`` : VLANs/liens ;
+               room: str | None = None, rack: str | None = None) -> Response:
+    """``view=physical`` : élévation ; ``logical`` : VLANs/liens
+    (``rack=<id>`` : vue logique de cette seule baie) ;
     ``diagram`` : page de dessin libre ; ``plan`` : plan d'étage d'une
     salle (``room`` = id de la salle, vide = la première).
     ``theme`` : sombre/clair/kaki/nuit. ``rendu`` : photos ou dessin.
@@ -199,7 +234,8 @@ def export_svg(payload: dict,
     project = _parse_project(payload)
     if view == "logical":
         svg = render_logical_svg(project, theme=theme,
-                                 layers=_parse_layers(layers))
+                                 layers=_parse_layers(layers),
+                                 rack=_check_rack(project, rack))
     elif view == "diagram":
         svg = render_diagram_svg(project, theme=theme)
     elif view == "plan":
@@ -211,6 +247,8 @@ def export_svg(payload: dict,
               "plan": "-plan"}.get(view, "")
     if view == "physical" and face == "rear":
         suffix = "-arriere"
+    if view == "logical" and rack:
+        suffix += "-" + rack
     return Response(
         content=svg, media_type="image/svg+xml",
         headers={"Content-Disposition":
@@ -224,7 +262,7 @@ def export_pdf(payload: dict,
                              "dossier"] = "physical",
                theme: Theme = "sombre", rendu: Rendu = "photos",
                layers: str | None = None, face: Face = "front",
-               room: str | None = None) -> Response:
+               room: str | None = None, rack: str | None = None) -> Response:
     """``view`` : physical, logical, diagram, plan, ou ``dossier``
     (livrable DAT complet : élévation + logique + plans + brassage +
     flux + PoE + nomenclature, cartouche).
@@ -236,11 +274,14 @@ def export_pdf(payload: dict,
     else:
         pdf = render_project_pdf(project, view=view, theme=theme, rendu=rendu,
                                  layers=_parse_layers(layers), face=face,
-                                 room=room or None)
+                                 room=room or None,
+                                 rack=_check_rack(project, rack))
         suffix = {"logical": "-logique", "diagram": "-diagramme",
                   "plan": "-plan"}.get(view, "")
         if view == "physical" and face == "rear":
             suffix = "-arriere"
+        if view == "logical" and rack:
+            suffix += "-" + rack
     return Response(
         content=pdf, media_type="application/pdf",
         headers={"Content-Disposition":

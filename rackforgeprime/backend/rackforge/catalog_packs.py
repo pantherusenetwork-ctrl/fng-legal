@@ -34,15 +34,24 @@ def packs_dir() -> Path | None:
     return d if d.is_dir() else None
 
 
+_PACK_CACHE: dict = {"sig": None, "types": []}
+
+
 def load_pack_types() -> list[EquipmentType]:
     """Tous les types des packs, dans l'ordre des fichiers (tri par nom).
 
     Un fichier illisible ou une entrée invalide est ignoré silencieusement :
     un pack cassé ne doit jamais empêcher l'application de démarrer.
+    En cache tant que les fichiers de packs ne changent pas (1 162 entrées
+    à revalider à chaque appel de /api/catalog coûtaient ~0,3 s).
     """
     d = packs_dir()
     if d is None:
         return []
+    sig = tuple((p.name, p.stat().st_mtime_ns, p.stat().st_size)
+                for p in sorted(d.glob("*.json")))
+    if _PACK_CACHE["sig"] == sig:
+        return list(_PACK_CACHE["types"])
     out: list[EquipmentType] = []
     for path in sorted(d.glob("*.json")):
         try:
@@ -56,6 +65,8 @@ def load_pack_types() -> list[EquipmentType]:
                 out.append(EquipmentType.model_validate(entry))
             except ValidationError:
                 continue
+    _PACK_CACHE["sig"] = sig
+    _PACK_CACHE["types"] = list(out)
     return out
 
 

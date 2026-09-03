@@ -118,14 +118,40 @@ def _node_glyph(category: str, x: float, y: float, color: str) -> list[str]:
     return s
 
 
-def _collect_nodes(project: Project, types: dict[str, EquipmentType]) -> list[dict]:
-    """Tous les équipements posés, avec leur libellé et leur baie/U."""
+def _scope(project: Project, rack_id: str | None) -> tuple[set[str], set[str]]:
+    """(équipements DE la baie, voisins directs dans d'autres baies) —
+    vide/vide quand on regarde tout le projet."""
+    if rack_id is None:
+        return set(), set()
+    inside = {i.id for r in project.racks if r.id == rack_id for i in r.items}
+    neighbours: set[str] = set()
+    for link in project.logical.links:
+        a, b = link.from_.equipment_id, link.to.equipment_id
+        if a in inside and b not in inside:
+            neighbours.add(b)
+        if b in inside and a not in inside:
+            neighbours.add(a)
+    return inside, neighbours
+
+
+def _collect_nodes(project: Project, types: dict[str, EquipmentType],
+                   rack_id: str | None = None) -> list[dict]:
+    """Tous les équipements posés, avec leur libellé et leur baie/U.
+
+    ``rack_id`` : vue logique D'UNE BAIE — ses équipements, plus leurs
+    voisins directs des autres baies en « fantômes » (pointillés), pour
+    ne jamais couper un lien qui sort de la baie."""
     nodes = []
+    inside, neighbours = _scope(project, rack_id)
     for rack in project.racks:
         for item in rack.items:
             t = types.get(item.type_id)
             if t is None or t.category in ("blank", "cable-mgmt"):
                 continue  # les obturateurs n'existent pas logiquement
+            if rack_id is not None and item.id not in inside \
+                    and item.id not in neighbours:
+                continue
+            ghost = rack_id is not None and item.id not in inside
             # Sous-titre sur DEUX lignes : localisation, puis adressage —
             # une IP + VLAN sur la même ligne déborde de la carte.
             sub2 = " · ".join(x for x in (
@@ -134,19 +160,21 @@ def _collect_nodes(project: Project, types: dict[str, EquipmentType]) -> list[di
             nodes.append({
                 "id": item.id,
                 "label": item.meta.hostname or f"{t.vendor} {t.model}",
-                "sub": f"{rack.name} · U{item.position_u}",
+                "sub": f"{rack.name} · U{item.position_u}"
+                       + (" — autre baie" if ghost else ""),
                 "sub2": sub2,
                 "category": t.category,
                 "color": t.color,
+                "ghost": ghost,
             })
     return nodes
 
 
-def layout_nodes(project: Project, types: dict[str, EquipmentType]
-                 ) -> dict[str, tuple[float, float]]:
+def layout_nodes(project: Project, types: dict[str, EquipmentType],
+                 rack_id: str | None = None) -> dict[str, tuple[float, float]]:
     """Positions des nœuds : celles posées à la main, sinon auto-layout
     en couches (le frontend applique exactement le même algorithme)."""
-    nodes = _collect_nodes(project, types)
+    nodes = _collect_nodes(project, types, rack_id)
     layers: dict[int, list[dict]] = {}
     for n in nodes:
         layers.setdefault(LAYER_RANK.get(n["category"], 5), []).append(n)
@@ -446,17 +474,20 @@ LOGICAL_LAYERS = ("zones", "liens", "etiquettes", "noeuds", "dessin")
 
 
 def render_logical_svg(project: Project, theme: str = "sombre",
-                       layers=None) -> str:
-    """Schéma logique complet du projet -> SVG.
+                       layers=None, rack: str | None = None) -> str:
+    """Schéma logique du projet -> SVG.
 
     ``layers`` : sous-ensemble de LOGICAL_LAYERS à dessiner (None = tout).
+    ``rack`` : id d'une baie — vue logique DE CETTE BAIE (ses équipements,
+    voisins externes en pointillés). None = toute l'architecture.
     Ce que l'écran masque, l'export le masque aussi — un seul moteur.
     """
     _set_theme(theme)
     L = set(LOGICAL_LAYERS) if layers is None else set(layers)
     types = type_index(project)
-    nodes = _collect_nodes(project, types)
-    pos = layout_nodes(project, types)
+    nodes = _collect_nodes(project, types, rack)
+    pos = layout_nodes(project, types, rack)
+    rack_name = next((r.name for r in project.racks if r.id == rack), None)
     vlan_colors = {v.vid: v.color for v in project.logical.vlans}
 
     max_x = max((x for x, _ in pos.values()), default=0) + NODE_W + MARGIN
@@ -483,8 +514,14 @@ def render_logical_svg(project: Project, theme: str = "sombre",
         f'font-family="{FONT}">',
         f'<rect x="0" y="0" width="{total_w}" height="{total_h}" fill="{C_BG}"/>',
         f'<text x="{MARGIN}" y="28" font-size="18" font-weight="bold" '
-        f'fill="{C_TEXT}">{escape(project.name)} — schéma logique</text>',
+        f'fill="{C_TEXT}">{escape(project.name)} — schéma logique'
+        f'{" — baie " + escape(rack_name) if rack_name else ""}</text>',
     ]
+    if rack_name:
+        s.append(f'<text x="{MARGIN}" y="46" font-size="11" '
+                 f'font-family="{FONT_MONO}" fill="{C_TEXT_DIM}">'
+                 f'vue de la baie : ses équipements, voisins des autres '
+                 f'baies en pointillés</text>')
 
     # Dessin libre : les zones utilisateur passent sous tout le reste.
     annot_under, annot_over = (_render_annotations(project.logical.annotations)
@@ -574,10 +611,14 @@ def render_logical_svg(project: Project, theme: str = "sombre",
     # Nœuds.
     for n in nodes if "noeuds" in L else []:
         x, y = pos[n["id"]]
-        s.append(f'<g id="lnode-{escape(n["id"])}">')
+        ghost = n.get("ghost", False)
+        g_attr = ' opacity="0.62"' if ghost else ""
+        dash = ' stroke-dasharray="5,4"' if ghost else ""
+        s.append(f'<g id="lnode-{escape(n["id"])}"{g_attr}>')
         s.append(f'<rect x="{x:.0f}" y="{y:.0f}" width="{NODE_W}" '
-                 f'height="{NODE_H}" rx="6" fill="{C_NODE}" '
-                 f'stroke="{C_LINE}" stroke-width="1"/>')
+                 f'height="{NODE_H}" rx="6" fill="{C_BG if ghost else C_NODE}" '
+                 f'stroke="{C_TEXT_DIM if ghost else C_LINE}" '
+                 f'stroke-width="1"{dash}/>')
         s.append(f'<rect x="{x:.0f}" y="{y:.0f}" width="4" height="{NODE_H}" '
                  f'rx="2" fill="{n["color"]}"/>')
         s.extend(_node_glyph(n["category"], x + 8, y, n["color"]))

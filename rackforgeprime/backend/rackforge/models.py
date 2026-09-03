@@ -8,6 +8,7 @@ les mêmes règles pour l'ergonomie, mais c'est ce module qui fait autorité.
 
 from __future__ import annotations
 
+import os
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -335,6 +336,53 @@ class Project(BaseModel):
 # Moteur de placement — le cœur : snap U, collisions, bornes de baie.
 # ---------------------------------------------------------------------------
 
+def _catalog_signature() -> tuple:
+    """Empreinte du catalogue sur disque (packs + images) : un fichier
+    ajouté, retiré ou modifié change la signature → le cache se recharge.
+    ~1 200 stat() ≈ 20 ms, contre 2 s pour tout relire."""
+    from .catalog_images import images_dir
+    from .catalog_packs import packs_dir
+
+    sig: list = []
+    d = packs_dir()
+    if d is not None:
+        for p in sorted(d.glob("*.json")):
+            st = p.stat()
+            sig.append((p.name, st.st_mtime_ns, st.st_size))
+    di = images_dir()
+    if di is not None:
+        n, total = 0, 0
+        with os.scandir(di) as it:
+            for e in it:
+                if e.is_file():
+                    n += 1
+                    total += e.stat().st_mtime_ns
+        sig.append(("images", n, total))
+    return tuple(sig)
+
+
+_BASE_CACHE: dict = {"sig": None, "index": {}}
+
+
+def base_type_index() -> dict[str, EquipmentType]:
+    """Index du catalogue (intégré + packs + images officielles), EN CACHE.
+
+    Relire 1 162 types et 1 162 images à CHAQUE requête coûtait 2 s —
+    ouvrir un projet, l'enregistrer, rendre une vue : tout attendait.
+    Le cache est invalidé dès qu'un fichier du catalogue change."""
+    # Imports locaux pour éviter le cycle models <-> catalog.
+    from .catalog import BUILTIN_TYPES
+    from .catalog_images import apply_official_images
+    from .catalog_packs import merged_catalog
+
+    sig = _catalog_signature()
+    if _BASE_CACHE["sig"] != sig:
+        _BASE_CACHE["index"] = {
+            t.id: t for t in apply_official_images(merged_catalog(BUILTIN_TYPES))}
+        _BASE_CACHE["sig"] = sig
+    return _BASE_CACHE["index"]
+
+
 def type_index(project: Project, extra_types: list[EquipmentType] | None = None
                ) -> dict[str, EquipmentType]:
     """Index id -> type : catalogue intégré + types custom du projet.
@@ -342,13 +390,7 @@ def type_index(project: Project, extra_types: list[EquipmentType] | None = None
     Les images officielles du workspace sont appliquées ici aussi : l'export
     SVG/PDF montre les mêmes faceplates que l'écran.
     """
-    # Imports locaux pour éviter le cycle models <-> catalog.
-    from .catalog import BUILTIN_TYPES
-    from .catalog_images import apply_official_images
-    from .catalog_packs import merged_catalog
-
-    index = {t.id: t
-             for t in apply_official_images(merged_catalog(BUILTIN_TYPES))}
+    index = dict(base_type_index())
     for t in project.equipment_types:
         index[t.id] = t
     for t in extra_types or []:

@@ -71,7 +71,8 @@ def render_project_pdf(project: Project, view: str = "physical",
                        theme: str = "sombre",
                        rendu: str = "photos",
                        face: str = "front",
-                       room: str | None = None) -> bytes:
+                       room: str | None = None,
+                       rack: str | None = None) -> bytes:
     """Projet -> PDF (bytes). Le SVG est la source, le PDF une vue.
 
     ``view`` : « physical » (élévation de baies) ou « logical » (VLANs/liens).
@@ -108,7 +109,8 @@ def render_project_pdf(project: Project, view: str = "physical",
         return buf.getvalue()
 
     if view == "logical":
-        svg = render_logical_svg(project, theme=theme, layers=layers)
+        svg = render_logical_svg(project, theme=theme, layers=layers,
+                                 rack=rack)
     elif view == "plan":
         svg = render_plan_svg(project, room, theme=theme)
     else:

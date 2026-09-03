@@ -889,3 +889,14 @@ body[data-view="plan"] #canvas { justify-content: center; }
 .tile .tile-edit { cursor: pointer; }
 .tile .tile-edit:hover { color: var(--accent); }
 #point-dialog, #room-dialog { width: min(440px, 92vw); }
+
+/* ---- Périmètre de la vue logique (baie) + menu Projets ---- */
+#logical-rack {
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
+  border-radius: 7px; padding: 5px 8px; font-size: 12.5px; max-width: 200px;
+}
+#logical-rack:focus { outline: 1px solid var(--accent); }
+#btn-projects { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+#projects-count { font-family: var(--mono); font-size: 10.5px; color: var(--text-dim); }
+#item-menu .menu-item.menu-current { color: var(--accent); font-weight: 600; }
+#item-menu .menu-item.menu-sep { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 8px; }

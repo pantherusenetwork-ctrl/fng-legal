@@ -89,6 +89,14 @@ let viewMode = "physical";
  * miroir, les U ne bougent pas, et un équipement monté en façade y
  * montre son dos. Miroir exact du backend (svg_export.py). */
 let rackFace = localStorage.getItem("rfp-face") === "rear" ? "rear" : "front";
+/* Baie « active » (dernière touchée en vue physique) : c'est elle que la
+   vue Logique montre quand on bascule — la vue logique DE LA BAIE. */
+let focusRackId = null;
+/* Périmètre de la vue logique : null = toute l'architecture, sinon id de baie. */
+let logicalRack = null;
+/* Nom du projet dans l'espace de travail (fichier projets/<nom>.json) —
+   null = projet local non encore enregistré. */
+let workspaceName = localStorage.getItem("rfp-ws-name") || null;
 /* Numéros U visibles (toggle façon Visio « Hide U sizes »). */
 let showUNumbers = localStorage.getItem("rfp-show-u") !== "0";
 /* Rendu des faceplates : "photos" (images officielles) ou "dessin"
@@ -615,6 +623,7 @@ function renderRackSVG(rack) {
   const innerX = FRAME_PAD + RAIL_W;
   const svg = svgEl("svg", { width: w, height: h, viewBox: `0 0 ${w} ${h}` });
   svg.dataset.rackId = rack.id;
+  svg.addEventListener("pointerdown", () => { focusRackId = rack.id; }, true);
   const slotPat = makeSlotPattern(rack.id);
   if (slotPat) {
     const defs = svgEl("defs", {});
@@ -1280,6 +1289,7 @@ function openRackMenu(e, rack) {
     '<label class="rk-field">Hauteur (U)<input name="u" type="number" min="6" max="60" value="' + rack.u_height + '"></label>' +
     '<label class="rk-field">Localisation<input name="loc" value="' + esc(rack.location || "") + '"></label>' +
     '<div class="rk-actions"><button class="rk-apply">Appliquer</button>' +
+    '<button class="rk-add-right" title="Nouvelle baie vide, posée juste à droite de celle-ci">+ Baie à droite</button>' +
     '<button class="rk-duplicate">Dupliquer</button>' +
     '<button class="rk-empty menu-danger">Vider</button>' +
     '<button class="rk-delete menu-danger">Supprimer</button></div>' +
@@ -1304,6 +1314,10 @@ function openRackMenu(e, rack) {
     rack.location = menu.querySelector('input[name="loc"]').value.trim();
     closeRackMenu();
     renderAll();
+  });
+  menu.querySelector(".rk-add-right").addEventListener("click", () => {
+    closeRackMenu();
+    addRack(rack);
   });
   menu.querySelector(".rk-duplicate").addEventListener("click", () => {
     const copy = JSON.parse(JSON.stringify(rack));
@@ -2004,7 +2018,8 @@ async function postForBlob(url, filename) {
  * vois est ce que tu livres. */
 function viewSuffix() {
   if (viewMode === "physical") return rackFace === "rear" ? "-arriere" : "";
-  return { logical: "-logique", diagram: "-diagramme", plan: "-plan" }[viewMode] || "";
+  if (viewMode === "logical") return "-logique" + (logicalRack ? "-" + logicalRack : "");
+  return { diagram: "-diagramme", plan: "-plan" }[viewMode] || "";
 }
 function exportQuery(view) {
   const q = new URLSearchParams();
@@ -2018,6 +2033,7 @@ function exportQuery(view) {
   /* Ce que tu vois est ce que tu livres : l'élévation exportée est celle
      de la face regardée. */
   if (v === "physical") q.set("face", rackFace);
+  if (v === "logical" && logicalRack) q.set("rack", logicalRack);
   /* Les calques masqués à l'écran le sont aussi à l'export. */
   if (v === "logical" && hiddenLayers.size)
     q.set("layers", ALL_LAYERS.filter((l) => !hiddenLayers.has(l)).join(","));
@@ -2115,9 +2131,26 @@ $("#btn-import-json input").addEventListener("change", async (e) => {
  * pose l'interactivité par-dessus : drag des nœuds, clic sur les liens.
  * =================================================================== */
 
+function rackQuery() {
+  if (logicalRack && !project.racks.some((r) => r.id === logicalRack)) logicalRack = null;
+  return logicalRack ? "&rack=" + encodeURIComponent(logicalRack) : "";
+}
+function syncLogicalRackSelect() {
+  const sel = $("#logical-rack");
+  if (!sel) return;
+  if (logicalRack && !project.racks.some((r) => r.id === logicalRack)) logicalRack = null;
+  sel.innerHTML = '<option value="">Toute l\'architecture</option>' +
+    project.racks.map((r) => `<option value="${esc(r.id)}">Baie ${esc(r.name)}</option>`).join("");
+  sel.value = logicalRack || "";
+}
+$("#logical-rack").addEventListener("change", (e) => {
+  logicalRack = e.target.value || null;
+  renderAll();
+});
 async function renderLogical() {
+  syncLogicalRackSelect();
   const res = await fetch("/api/export/svg?view=logical&theme=" + theme
-                          + layersQuery(), {
+                          + layersQuery() + rackQuery(), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify(currentProject()),
   });
@@ -2129,7 +2162,14 @@ async function renderLogical() {
   }
   canvas.innerHTML = await res.text();
   wireLogical(canvas.querySelector("svg"));
-  renderStatus();
+  if (logicalRack) {
+    const rk = project.racks.find((r) => r.id === logicalRack);
+    const n = canvas.querySelectorAll('g[id^="lnode-"]').length;
+    const ghosts = canvas.querySelectorAll('g[id^="lnode-"][opacity]').length;
+    renderStatus(`Logique — baie ${rk ? rk.name : ""} : ${n - ghosts} équipement(s)` +
+      (ghosts ? `, ${ghosts} voisin(s) d'autres baies en pointillés` : "") +
+      " — « Toute l'architecture » dans la liste pour le projet entier");
+  } else renderStatus();
   saveLocal();
   requestAnimationFrame(updateMinimap);
 }
@@ -3082,6 +3122,10 @@ $("#vlan-form").addEventListener("submit", (e) => {
 /* ---- Bascule de vue ---- */
 
 function setView(mode) {
+  if (mode === "logical" && viewMode === "physical" && focusRackId &&
+      project.racks.some((r) => r.id === focusRackId))
+    logicalRack = focusRackId;
+  if (mode === "logical") syncLogicalRackSelect();
   viewMode = mode;
   document.body.dataset.view = mode;
   $("#btn-view-physical").classList.toggle("active", mode === "physical");
@@ -3265,11 +3309,27 @@ $("#btn-toggle-u").addEventListener("click", () => {
   renderAll();
 });
 
-$("#btn-add-rack").addEventListener("click", () => {
-  const letter = String.fromCharCode(65 + project.racks.length); // A, B, C…
-  project.racks.push(newRack(letter));
-  renderAll();
-});
+/* Ajouter une baie — TOUJOURS dit où elle va : « à droite de X » (après
+   la baie donnée) ou tout à droite (bouton du bandeau / tuile « + Baie »).
+   La lettre suivante est la première libre (A, B, C… sans doublon). */
+function addRack(afterRack) {
+  const used = new Set(project.racks.map((r) => r.id));
+  let letter = "A";
+  while (used.has("rack-" + letter.toLowerCase()) && letter < "Z")
+    letter = String.fromCharCode(letter.charCodeAt(0) + 1);
+  const rack = newRack(letter);
+  if (used.has(rack.id)) rack.id = "rack-" + Date.now().toString(36);
+  const idx = afterRack ? project.racks.indexOf(afterRack) + 1 : project.racks.length;
+  project.racks.splice(idx, 0, rack);
+  focusRackId = rack.id;
+  if (viewMode !== "physical") setView("physical"); else renderAll();
+  scrollToRack(rack.id);
+  const where = afterRack ? `à droite de ${afterRack.name}` : "tout à droite du plan";
+  renderStatus(`Baie ${esc(rack.name)} ajoutée ${where} — glissez-y des équipements, ` +
+    "clic sur son nom pour la renommer, clic droit pour la supprimer");
+  return rack;
+}
+$("#btn-add-rack").addEventListener("click", () => addRack(null));
 
 /* ---- Tableau de brassage ---- */
 $("#btn-patch-table").addEventListener("click", async () => {
@@ -3399,7 +3459,132 @@ function saveLocal() {
     catch { /* stockage plein ou bloqué : non bloquant */ }
   }
   pushHistory();
+  /* Projet de l'espace de travail : enregistré en différé (1,5 s après
+     le dernier geste) — basculer de projet en projet ne perd rien. */
+  if (workspaceName && !qs.has("demo")) scheduleWorkspaceSave();
 }
+
+/* =====================================================================
+ * Projets de l'espace de travail — basculer de l'un à l'autre, fluide :
+ * le courant est enregistré, l'autre est chargé, aucun rechargement.
+ * =================================================================== */
+let _wsTimer = null;
+function scheduleWorkspaceSave() {
+  clearTimeout(_wsTimer);
+  _wsTimer = setTimeout(() => saveToWorkspace(), 1500);
+}
+function slugName(name) {
+  const s = (name || "projet").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w\- ]+/g, "-").replace(/-{2,}/g, "-").replace(/^-+|-+$/g, "").trim();
+  return (s || "projet").slice(0, 60);
+}
+async function saveToWorkspace(name) {
+  const target = name || workspaceName;
+  if (!target) return false;
+  clearTimeout(_wsTimer);
+  const res = await fetch("/api/projects/" + encodeURIComponent(target), {
+    method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(currentProject()),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    renderStatus(`<span class="stat-err">Non enregistré (${esc(target)}) : ${esc(JSON.stringify(err.detail))}</span>`);
+    return false;
+  }
+  workspaceName = target;
+  localStorage.setItem("rfp-ws-name", target);
+  return true;
+}
+async function listWorkspaceProjects() {
+  try {
+    const res = await fetch("/api/projects");
+    return res.ok ? (await res.json()).projects : [];
+  } catch { return []; }
+}
+function _installProject(data, name) {
+  project = data;
+  if (!project.equipment_types) project.equipment_types = [];
+  if (!project.logical) project.logical = { vlans: [], links: [], positions: {} };
+  if (!project.diagram) project.diagram = { annotations: [] };
+  if (!project.sites) project.sites = [];
+  if (!project.flows) project.flows = [];
+  workspaceName = name;
+  if (name) localStorage.setItem("rfp-ws-name", name);
+  else localStorage.removeItem("rfp-ws-name");
+  selectedItemId = null; focusRackId = null; logicalRack = null;
+  planNav = { siteId: null, buildingId: null, roomId: null };
+  history.stack = []; history.index = -1;
+  refreshTypes();
+  renderPalette($("#palette-filter").value);
+  $("#project-name").value = project.name || "Sans nom";
+  closeInspector();
+  /* L'URL suit le projet ouvert (F5 rouvre le même). NB : `history` est
+     l'undo de l'app — l'historique du navigateur est window.history. */
+  const url = new URL(location.href);
+  if (name) url.searchParams.set("projet", name); else url.searchParams.delete("projet");
+  url.searchParams.delete("demo");
+  window.history.replaceState(null, "", url);
+  renderAll();
+  updateUndoButtons();
+}
+async function switchProject(name) {
+  if (name === workspaceName) return;
+  /* 1. le projet courant est enregistré (sous son nom, ou un nom dérivé
+     s'il n'en a pas encore et qu'il n'est pas vide). */
+  if (workspaceName) await saveToWorkspace();
+  else if (project.racks.some((r) => r.items.length))
+    await saveToWorkspace(slugName(currentProject().name));
+  /* 2. l'autre est chargé. */
+  const res = await fetch("/api/projects/" + encodeURIComponent(name));
+  if (!res.ok) {
+    renderStatus(`<span class="stat-err">Projet « ${esc(name)} » illisible</span>`);
+    return;
+  }
+  _installProject(await res.json(), name);
+  renderStatus(`Projet « ${esc(name)} » ouvert — enregistré automatiquement dans l'espace de travail`);
+}
+async function openProjectsMenu(e) {
+  const names = await listWorkspaceProjects();
+  $("#projects-count").textContent = names.length ? String(names.length) : "";
+  const actions = names.map((n) => [
+    (n === workspaceName ? "● " : "") + n, () => switchProject(n),
+    n === workspaceName ? "current" : ""]);
+  actions.push(["＋ Nouveau projet", async () => {
+    if (workspaceName) await saveToWorkspace();
+    else if (project.racks.some((r) => r.items.length))
+      await saveToWorkspace(slugName(currentProject().name));
+    _installProject(newProject(), null);
+    renderStatus("Nouveau projet — « Projets › Enregistrer » lui donne un nom dans l'espace de travail");
+  }, "sep"]);
+  actions.push([workspaceName ? `Enregistrer maintenant (${workspaceName})`
+                              : "Enregistrer dans l'espace de travail…", async () => {
+    let name = workspaceName;
+    if (!name) {
+      name = await askText("Nom du projet dans l'espace de travail",
+        "Lettres, chiffres, tirets, espaces — devient projets/<nom>.json",
+        slugName(currentProject().name));
+      if (!name) return;
+      name = slugName(name);
+    }
+    if (await saveToWorkspace(name)) {
+      renderStatus(`Enregistré : ${esc(name)}.json — puis à chaque geste, automatiquement`);
+      const url = new URL(location.href); url.searchParams.set("projet", name);
+      window.history.replaceState(null, "", url);
+    }
+  }]);
+  if (workspaceName)
+    actions.push(["Détacher (ne plus enregistrer automatiquement)", () => {
+      workspaceName = null; localStorage.removeItem("rfp-ws-name");
+      const url = new URL(location.href); url.searchParams.delete("projet");
+      window.history.replaceState(null, "", url);
+      renderStatus("Projet détaché de l'espace de travail (localStorage seulement)");
+    }]);
+  _logicalMenu(e, "Projets de l'espace de travail", actions);
+}
+$("#btn-projects").addEventListener("click", openProjectsMenu);
+listWorkspaceProjects().then((names) => {
+  $("#projects-count").textContent = names.length ? String(names.length) : "";
+});
 
 /* =====================================================================
  * Undo / redo — instantanés du projet (la source de vérité est un JSON,
@@ -3522,7 +3707,17 @@ function demoProject() {
                               encodeURIComponent(qs.get("projet")));
       project = res.ok ? await res.json() : null;
     } catch { project = null; }
+    workspaceName = project ? qs.get("projet") : null;
+  } else if (workspaceName && !qs.has("demo")) {
+    /* Dernier projet de l'espace de travail ouvert : on le rouvre.
+       (Un exe fraîchement lancé arrive ici sans ?projet=.) */
+    try {
+      const res = await fetch("/api/projects/" + encodeURIComponent(workspaceName));
+      project = res.ok ? await res.json() : null;
+    } catch { project = null; }
+    if (!project) { workspaceName = null; localStorage.removeItem("rfp-ws-name"); }
   }
+  if (qs.has("demo")) workspaceName = null;
   if (!project)
     project = qs.has("demo") ? demoProject() : (loadLocal() || newProject());
   if (!project.equipment_types) project.equipment_types = [];
@@ -3796,6 +3991,11 @@ function wirePlan(svg, room) {
     const actions = [];
     for (const r of unplacedRacks().slice(0, 8))
       actions.push([`Poser la baie ${r.name} ici`, () => placeRack(room, r, p.x, p.y)]);
+    actions.push(["＋ Nouvelle baie ici (créée dans le projet)", () => {
+      const rack = addRackSilently();
+      placeRack(room, rack, p.x, p.y);
+      renderStatus(`Baie ${esc(rack.name)} créée et posée ici — double-clic dessus pour la remplir en vue physique`);
+    }]);
     actions.push(["Borne Wi-Fi ici", () => addPoint(room, "ap", p)]);
     actions.push(["Prise murale ici", () => addPoint(room, "prise", p)]);
     actions.push(["Caméra ici", () => addPoint(room, "camera", p)]);
@@ -3804,6 +4004,16 @@ function wirePlan(svg, room) {
     actions.push(["Réglages de la salle…", () => openRoomDialog(room)]);
     _logicalMenu(e, `${room.name} — ${Math.round(p.x)}, ${Math.round(p.y)} px`, actions);
   });
+}
+function addRackSilently() {
+  const used = new Set(project.racks.map((r) => r.id));
+  let letter = "A";
+  while (used.has("rack-" + letter.toLowerCase()) && letter < "Z")
+    letter = String.fromCharCode(letter.charCodeAt(0) + 1);
+  const rack = newRack(letter);
+  if (used.has(rack.id)) rack.id = "rack-" + Date.now().toString(36);
+  project.racks.push(rack);
+  return rack;
 }
 function scrollToRack(rackId) {
   requestAnimationFrame(() =>
@@ -3831,12 +4041,14 @@ $("#btn-plan-rack").addEventListener("click", (e) => {
   const room = planRoom();
   if (!room) return;
   const free = unplacedRacks();
-  if (!free.length) {
-    renderStatus("Toutes les baies du projet sont déjà posées sur un plan");
-    return;
-  }
-  _logicalMenu(e, "Poser une baie", free.map((r) =>
-    [r.name, () => placeRack(room, r, room.plan_w / 2, room.plan_h / 2)]));
+  const actions = free.map((r) =>
+    [r.name, () => placeRack(room, r, room.plan_w / 2, room.plan_h / 2)]);
+  actions.push(["＋ Nouvelle baie (créée dans le projet, posée au centre)", () => {
+    const rack = addRackSilently();
+    placeRack(room, rack, room.plan_w / 2, room.plan_h / 2);
+    renderStatus(`Baie ${esc(rack.name)} créée et posée au centre — glissez-la, double-clic pour la remplir`);
+  }, "sep"]);
+  _logicalMenu(e, free.length ? "Poser une baie" : "Toutes les baies sont posées", actions);
 });
 $("#btn-plan-point").addEventListener("click", (e) => {
   const room = planRoom();
@@ -4071,3 +4283,22 @@ $("#btn-flows-propose").addEventListener("click", async () => {
 });
 $("#btn-flows-csv").addEventListener("click", () =>
   postForBlob("/api/flows.csv", currentProject().id + "-flux.csv"));
+
+
+/* =====================================================================
+ * Application de bureau : la fenêtre dit « je suis là » toutes les 5 s,
+ * et « au revoir » quand elle se ferme — le serveur s'arrête alors
+ * (plus jamais de processus fantôme qui bloque le port au lancement
+ * suivant). Un rechargement (F5) renvoie un ping tout de suite.
+ * =================================================================== */
+(function heartbeat() {
+  const ping = () => fetch("/api/ping", { cache: "no-store" }).catch(() => {});
+  ping();
+  setInterval(ping, 5000);
+  window.addEventListener("pagehide", () => {
+    try {
+      if (navigator.sendBeacon) navigator.sendBeacon("/api/bye", "");
+      else fetch("/api/bye", { method: "POST", keepalive: true }).catch(() => {});
+    } catch { /* rien : le silence de 3 min fera le reste */ }
+  });
+})();
