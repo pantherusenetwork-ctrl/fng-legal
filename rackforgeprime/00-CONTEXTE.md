@@ -490,3 +490,45 @@ Bâtiment → OLYMPE, glisse les baies à leur vraie place, charge la photo/plan
 la salle (bouton « Image du plan »), règle l'échelle (Réglages, mm/px). Puis
 ouvre un .vsdx dans Visio et dit si ça s'ouvre. Toujours en attente : 24/48 ports
 du stack 2930, photo STORI, Belden v2, test LANCER-PHONE.
+
+## 🌉 Pont d'Hemingway — 03/09/2026 (23h30) — v1.3.0 : logique par baie, Projets, appli solide
+
+**Règles actées par Panther ce soir** : (1) **la version change à chaque exe
+déployé** (app.py VERSION + badge index.html, ensemble) ; (2) **vraie appli de
+bureau, solide, pas un lien HTML** ; (3) tout doit être **fluide**.
+
+**Livré en v1.3.0 (commit 98f902f)** :
+- **Vue logique DE LA BAIE** : en vue physique, la dernière baie touchée est
+  « active » ; cliquer Logique montre ses équipements + les voisins directs
+  des autres baies en pointillés (fantômes, opacité 0,62). Sélecteur
+  `#logical-rack` dans le bandeau (« Toute l'architecture » / Baie X), export
+  SVG/PDF suit (`rack=<id>`, suffixe `-logique-<id>`), 422 si baie inconnue.
+- **Menu Projets** (bouton à côté du nom) : liste de `projets/*.json`, un clic
+  = le courant est enregistré (PUT) puis l'autre chargé — sans rechargement,
+  URL `?projet=` suivie (F5 rouvre le même), dernier projet rouvert au
+  lancement (localStorage `rfp-ws-name`). **Enregistrement automatique** dans
+  l'espace de travail 1,5 s après chaque geste (`scheduleWorkspaceSave`),
+  « Nouveau projet », « Enregistrer dans l'espace de travail… », « Détacher ».
+- **Ajout de baie explicite** : `addRack(after)` dit toujours où elle va
+  (« à droite de X » / tout à droite), bouton « + Baie à droite » dans le menu
+  de baie, « ＋ Nouvelle baie ici » au clic droit sur le plan d'étage.
+- **Appli de bureau solide** (`run.py`) : instance unique (si RackForgePrime
+  répond déjà sur 8137 → on rouvre sa fenêtre, pas de 2e serveur muet) ; port
+  pris par autre chose → suivant libre ; **fermer la fenêtre = arrêt du
+  serveur** (battement `/api/ping` toutes les 5 s, `/api/bye` au pagehide,
+  chien de garde : bye + 4 s de silence, ou 180 s sans ping, ou 90 s sans
+  fenêtre) ; `--no-browser`, `--host` réseau ou `--keep-alive` = serveur
+  partagé jamais arrêté (éditions Web/Phone intactes).
+- **Fluidité** : le catalogue (1 162 types + images) était relu à CHAQUE
+  requête (2 s) — désormais en cache mémoire invalidé par signature des
+  fichiers (`models.base_type_index`, `catalog_packs._PACK_CACHE`) :
+  15 ms. Bascule de projet 3,6–5,9 s → 0,9–1,5 s.
+- Tests : **84 verts**. Exe v1.2.0 déployé 21h32 (plan/flux/PoE/VSDX/arrière),
+  v1.3.0 en cours de déploiement.
+
+**Prochaine étape exacte** : Panther teste (1) clic sur une baie puis Logique,
+(2) menu Projets salle-olympe ↔ reseau-maison, (3) fermer la fenêtre = le
+processus disparaît (vérifier `Get-Process RackForgePrime` vide). Backlog
+inchangé : câbles v2 (export + ancrage port), appariement panneau↔switch,
+multi-sélection/Ctrl+C-V, VSDX à ouvrir dans un vrai Visio, re-photos.
+Optimisation suivante : ne pas ré-enregistrer un projet inchangé à la bascule.
