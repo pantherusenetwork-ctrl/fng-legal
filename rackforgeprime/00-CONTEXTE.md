@@ -378,3 +378,60 @@ Racine = CLAUDE.md + PC/Web/Phone/SAUVEGARDES/fng-legal, rien d'autre.
 **Prochaine étape exacte** : Panther confirme la version à l'écran, puis choisit
 le chantier (A câbles v2 / B plan d'étage / C vue arrière / D PoE / E VSDX…).
 Toujours en attente : 24/48 ports stack 2930, photo STORI, Belden v2, test PHONE.
+
+## 🌉 Pont d'Hemingway — 03/09/2026 (21h) — vue arrière des baies
+
+**Fait** : la **vue arrière**, backlog redemandé 3 fois, livrée comme une
+vue **DÉRIVÉE** du même JSON — jamais un second dessin à maintenir (c'est
+exactement le piège Visio : deux baies dessinées à la main qui divergent
+dès la première modification). Trois règles gravées : (1) la baie passe en
+**miroir horizontal** — `position_x_mm` des compacts cohabitants recalculée
+au mm par `_item_box()` — et **les U ne bougent pas**, U1 reste U1 ; (2) un
+équipement montre sa **façade** quand la face regardée est celle sur
+laquelle il est monté (`RackItem.face`, présent au modèle depuis le début
+mais **jamais rendu** jusqu'ici), sinon son **dos** ; (3) le dos est
+**NEUTRE** — grille d'aération + prise secteur, **aucun port arrière
+inventé** : la sérigraphie arrière réelle des types du catalogue n'est pas
+connue, on ne la fabrique pas.
+
+Backend : `_item_box()`, `_rear_faceplate()`, `_u_pill(align=)`, badge
+`VUE ARRIÈRE` dans le bandeau de baie, paramètre `face` sur `render_rack` /
+`render_project_svg` / `render_project_pdf` et sur `/api/export/svg` et
+`/api/export/pdf` (face inconnue → 422, suffixe de fichier `-arriere`).
+Frontend : bouton **Avant / Arrière** du bandeau (mémorisé `rfp-face`),
+miroir JS strictement identique au Python, entrée de menu contextuel
+« Monter à l'arrière de la baie », un équipement posé **hérite de la face
+regardée**, et les exports suivent l'écran (ce que tu vois est ce que tu
+livres). ⚠️ Piège corrigé au passage : sur les 4 thèmes sombres `hole` et
+`decor_fill` sont à 1 point de luminance — les fentes d'aération étaient
+bien dessinées mais **invisibles** ; elles sont maintenant cernées d'un
+filet `face_stroke`.
+
+**Vérifié** : 59/59 tests (47 existants + 12 neufs dans
+`tests/test_face_arriere.py`) ; à l'écran sur `salle-olympe` — 61 items
+rendus de dos, **0 photo de façade** affichée en vue arrière, face avant
+**inchangée** ; exports réels `salle-olympe-arriere.svg` (387 Ko, 5 badges)
+et `salle-olympe-arriere.pdf` (238 Ko). Commit **4898977**, poussé.
+
+⚠️ **L'exe N'A PAS été recompilé** : `RackForgePrime.exe` tournait (PID
+33180, port 8137) et fermer l'application de Panther sans son accord n'est
+pas une décision d'agent. La vue arrière est donc dans le **code et le
+dépôt**, pas encore dans l'exe du Bureau.
+
+⚠️ **Une deuxième session Claude travaillait sur le dépôt en parallèle**
+(vsdx_export.py, flows.py, svg_plan.py). Répartition convenue par message
+inter-sessions : elle ne touchait pas mes 5 fichiers avant mon commit,
+elle reprend `app.py` / `app.js` / `index.html` ensuite. `models.py` n'a
+pas été modifié ici.
+
+⚠️ `run.py` bind **8137** par défaut, **pas 8138** comme l'annonce le
+`CLAUDE.md` du projet : en dev, passer `--port 8138` explicitement (sinon
+collision avec l'exe déjà lancé).
+
+**Prochaine étape exacte** : (1) Panther ferme l'app → recompiler l'exe
+(PyInstaller, `--add-data`/`--icon` en chemins ABSOLUS, archiver l'ancien
+dans `SAUVEGARDES\`) et le redéployer, puis vérifier le bouton
+Avant/Arrière sur le vrai workspace ; (2) enchaîner sur le **plan
+d'étage** (gros chantier voulu par Panther) ou le **budget PoE**.
+Toujours en attente de Panther : 24/48 ports du stack 2930, photo du vrai
+STORI, panneau cuivre Belden v2.
