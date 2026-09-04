@@ -1,105 +1,42 @@
 # RackForgePrime
 
-Application **locale** (zéro abonnement, zéro cloud) de schémas d'infrastructure
-pour ingénieurs réseau : **élévations de baies fidèles au terrain** (42U, snap U
-exact, collisions refusées) aujourd'hui, **schéma logique** (VLANs, flux, liens)
-demain. Le JSON du projet est la source de vérité ; SVG et PDF sont des vues
-générées.
+Application **de bureau, 100 % locale**, de schémas de baies réseau : élévation 42U à
+l'échelle réelle EIA-310 avec photos constructeurs, vue arrière dérivée, vue logique
+VLAN/liens (par baie ou complète), plan d'étage (ville › bâtiment › salle), brassage et
+étiquettes TIA-606 générés, matrice de flux, budget PoE, dossier DAT PDF, exports SVG / PNG /
+draw.io / Visio (.vsdx).
 
-## Démarrage
+**Version 1.5.2** — le DAT complet de l'application est dans
+[`docs/DAT-RACKFORGEPRIME.md`](docs/DAT-RACKFORGEPRIME.md) ; le journal de bord dans
+[`00-CONTEXTE.md`](00-CONTEXTE.md) (dernière section = état exact).
 
-### Exécutable Windows (recommandé sur le poste de travail)
+## Lancer
 
-L'exe est compilé automatiquement par GitHub Actions à chaque push :
-onglet **Actions** du dépôt → run « Build RackForgePrime Windows exe » →
-**Artifacts** → `RackForgePrime-Windows`. Dézippez où vous voulez et
-double-cliquez `RackForgePrime.exe` : le navigateur s'ouvre sur
-l'application, et l'**espace de travail** est créé à côté de l'exe au
-premier lancement :
+| Usage | Commande |
+|---|---|
+| Application (exe) | `RackForgePrime-PC\RackForgePrime.exe` — fenêtre dédiée, port 8137, fermer la fenêtre = quitter |
+| Navigateur / téléphone | `RackForgePrime-Web\LANCER-WEB.bat` · `RackForgePrime-Phone\LANCER-PHONE.bat` |
+| Développement | `set PYTHONIOENCODING=utf-8 && .venv\Scripts\python.exe run.py --port 8138 --no-browser` |
+| Tests | `.venv\Scripts\python.exe -m pytest tests -q` (88 verts au 04/09/2026) |
+| Compilation | recette PyInstaller au § 9 du DAT (chemins absolus, dossier de build court, version bumpée avant) |
+
+## Arborescence
 
 ```
-RackForgePrime-Workspace/
-├── projets/      ← les JSON de projets (source de vérité)
-├── exports/      ← vos SVG / PDF / CSV livrés
-├── catalogue/    ← YAML NetBox et faceplates custom à importer
-├── datasheets/   ← PDF constructeurs à importer
-└── LISEZMOI.txt
+rackforgeprime/
+├── run.py                  point d'entrée (workspace, instance unique, fenêtre, chien de garde)
+├── backend/app.py          FastAPI : API JSON + frontend statique
+├── backend/rackforge/      package pur Python : modèle, placement, moteurs SVG/PDF/draw.io/VSDX, flux, PoE, sauvegarde
+├── frontend/               index.html · css/app.css · js/app.js (vanilla, SVG natif) · assets/
+├── tests/                  pytest
+├── docs/                   DAT-RACKFORGEPRIME.md · SPEC.md · ARCHITECTURE.md · PLAN_DESIGN.md · RECHERCHE_VISUELLE.md
+├── assets/icon.ico
+└── RackForgePrime-Workspace/  (gitignoré) projets · catalogue (packs, images, bibliothèque, formes) · exports · sauvegardes
 ```
 
-Tout est local : le serveur n'écoute que sur 127.0.0.1, rien ne sort du poste.
+## Règles gravées
 
-### Depuis les sources (dev)
-
-```bash
-cd rackforgeprime
-pip install -r requirements.txt
-python run.py            # → http://127.0.0.1:8137, navigateur auto-ouvert
-python run.py --no-browser --port 9000   # variantes
-```
-
-## Le prototype fait déjà
-
-- Baie(s) 42U graduées en U (1U = 44,45 mm, échelle exacte partout).
-- Palette gauche par rôle (switch, firewall, patch panel, UPS, serveur,
-  obturateur, passe-câbles) filtrable ; catalogue modélisé sur du matériel réel
-  (Cisco, Fortinet, HPE/Aruba, Dell, APC).
-- **Drag-and-drop avec snap U** : fantôme cyan sur U libre, rouge + refus sur
-  collision. Déplacement d'équipements posés, y compris entre baies.
-- Multi-baies (bouton « + Baie »).
-- Métadonnées par équipement : hostname, rôle, VLAN, prise murale, brassage
-  (port/prise/VLAN/usage), n° de série, notes.
-- **Tableau de brassage généré** depuis les métadonnées.
-- Stats live par baie : U occupés/libres, watts cumulés.
-- **Exports SVG** (groupes nommés, rééditable draw.io/Inkscape), **PDF**
-  (conversion locale du SVG) et **JSON** (source régénérable). Ouverture d'un
-  JSON existant.
-- Le backend est l'autorité : un JSON qui chevauche deux équipements est
-  refusé avec un message précis, à la sauvegarde comme à l'export.
-
-## Tests
-
-```bash
-cd rackforgeprime
-python -m pytest tests/ -v
-```
-
-## Documentation
-
-- [`docs/RECHERCHE_VISUELLE.md`](docs/RECHERCHE_VISUELLE.md) — étude TSS /
-  PATCHBOX / NetBox / Visio / draw.io et DA retenue.
-- [`docs/SPEC.md`](docs/SPEC.md) — écrans, flux, data model JSON.
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — stack, arborescence, API.
-
-## Imports de modèles (phase 2 — livrée)
-
-- **YAML NetBox devicetype-library** : glissez un fichier de
-  `netbox-community/devicetype-library` → constructeur, modèle, hauteur U et
-  ports importés (0.5U arrondi au U supérieur, jamais en dessous du réel).
-- **PDF datasheet constructeur** : extraction heuristique (modèle, hauteur U,
-  conso, ports) ; les champs devinés sont marqués en ambre et **rien n'entre
-  dans la palette sans validation humaine**.
-- **Image / SVG custom** : une faceplate photo devient un modèle de palette ;
-  l'image vit en data URI dans le JSON du projet (auto-suffisant).
-- **« Remplacer par image officielle »** sur tout équipement posé : la photo
-  constructeur remplace le placeholder, à l'écran comme dans les exports
-  SVG et PDF.
-- **Export CSV du brassage** (séparateur `;`, BOM UTF-8 pour Excel FR).
-
-## Schéma logique (phase 3 — livrée)
-
-- Bascule **Physique / Logique** dans la barre supérieure.
-- Nœuds = les mêmes équipements que les baies (mêmes IDs) ; auto-layout en
-  couches façon DAT (firewall en haut → routeurs → cœur → brassage →
-  serveurs), positions réajustables à la souris et persistées dans le JSON.
-- Liens typés (trunk / access / uplink / HA) : coudes orthogonaux façon
-  Visio/Lucid, étiquette + ports au point médian, pastilles VLAN colorées.
-- Gestion des VLANs du projet (id, nom, couleur) + légende intégrée au dessin.
-- **Un seul moteur de rendu** : la vue à l'écran EST le SVG du backend ;
-  les boutons SVG/PDF exportent la vue active (physique ou logique).
-
-## Suite (dans l'ordre)
-
-1. Exports VSDX et XML draw.io.
-2. OCR des datasheets scannées.
-3. Matrice de flux générée depuis les liens.
-4. Packaging Windows (PyInstaller).
+- Échelle réelle au mm : `RACK_W = 440 px` pour 482,6 mm → `U_PX = 40.5` ; images jamais étirées.
+- Aucun nom sur le dessin sauf hostname saisi ; un dessin = une vraie photo de façade de face.
+- Le backend valide tout (422 en français) ; le JSON est la source de vérité.
+- La version change à chaque exe déployé ; rien n'est supprimé (poubelle à valider).
