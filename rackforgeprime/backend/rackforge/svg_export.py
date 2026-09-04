@@ -113,6 +113,11 @@ def _port_banks(n: int, color: str, x: int, y: int, w: int, h: int,
     if not n:
         return s
     rows = 2 if n > 12 else 1
+    # Boîtier compact : on ne dessine que les ports qui TIENNENT dans sa
+    # largeur (jamais de banque qui déborde du châssis).
+    pw_, gapx_ = 8, 2
+    cols_max = max(1, int((w - 54 + gapx_) / (pw_ + gapx_)) - 1)
+    n = min(n, cols_max * rows)
     cols = -(-n // rows)  # ceil
     # Dimensions à l'échelle U_PX=40.5 (48 ports 2 rangées = 256 px,
     # tient pile dans la zone après cartouche).
@@ -228,20 +233,24 @@ def _faceplate_placeholder(t: EquipmentType, x: int, y: int, w: int,
              f'rx="3" fill="{t.color}" fill-opacity="0.07"/>')
     s.append(f'<rect x="{x}" y="{y + 1}" width="4" height="{h - 2}" '
              f'fill="{t.color}"/>')
-    # Oreilles de fixation sur les rails (vis suggérées).
-    for ex in (x - RAIL_W + 6, x + w + RAIL_W - 12):
-        s.append(f'<circle cx="{ex + 3}" cy="{yc:.1f}" r="2.5" '
-                 f'fill="{p["hole"]}"/>')
+    # Oreilles de fixation sur les rails (vis suggérées) — seulement pour
+    # un châssis 19" ; un boîtier compact n'a pas d'équerres.
+    if w >= RACK_W - 1:
+        for ex in (x - RAIL_W + 6, x + w + RAIL_W - 12):
+            s.append(f'<circle cx="{ex + 3}" cy="{yc:.1f}" r="2.5" '
+                     f'fill="{p["hole"]}"/>')
     # Cartouche de nom À CÔTÉ, décor de l'équipement dans la zone
-    # restante : rien d'écrit sur le matériel.
-    lw = _LABEL_W if label else 0
-    if label:
+    # restante : rien d'écrit sur le matériel. Sur un boîtier trop étroit
+    # le nom vit au survol (<title>) — jamais un cartouche qui déborde.
+    lw = _LABEL_W if (label and w > _LABEL_W + 70) else 0
+    if lw:
         s.extend(_name_plate(label, x, y, h, t.color, p))
-    if t.category in ("server", "ups", "cable-mgmt"):
+    if t.category in ("server", "ups", "cable-mgmt") and w - lw > 200:
         s.extend(_category_decor(t, x + lw, y, w - lw, h, p))
     elif t.ports:
         s.extend(_port_banks(len(t.ports), t.color, x + lw, y, w - lw, h, p))
-    s.extend(_u_pill(t, x, yc, w, p))
+    if w > 60:
+        s.extend(_u_pill(t, x, yc, w, p))
     return s
 
 
@@ -443,6 +452,12 @@ def render_rack(rack: Rack, types: dict[str, EquipmentType],
                      f'height="{ih - 2}" fill="{t.color}"/>')
             if not shared:
                 s.extend(_u_pill(t, inner_x, y + ih / 2, RACK_W, p))
+        elif t.width_mm:
+            # Dessin d'un boîtier compact : à SA largeur réelle, comme la
+            # photo — l'échelle ne dépend pas du rendu choisi.
+            s.append(f'<rect x="{bx:.1f}" y="{y + 1}" width="{bw:.1f}" '
+                     f'height="{ih - 2}" fill="{p["face"]}" fill-opacity="0.35"/>')
+            s.extend(_faceplate_placeholder(t, ix, y, iw, label, p))
         else:
             s.extend(_faceplate_placeholder(t, inner_x, y, RACK_W, label, p))
         s.append('</g>')

@@ -478,42 +478,55 @@ function drawFaceplate(g, t, x, y, label, selected, item) {
     return;
   }
   const yc = y + h / 2;
+  /* Dessin d'un boîtier compact : à SA largeur réelle (miroir Python) —
+     l'échelle ne dépend pas du rendu choisi. */
+  const box = t.width_mm ? itemBox(t, item, x) : { ix: x, iw: RACK_W, shared: false };
+  const px = box.ix, pw = box.iw;
+  if (t.width_mm)
+    g.appendChild(svgEl("rect", { x: box.shared ? box.ix : x, y: y + 1,
+      width: box.shared ? box.iw : RACK_W, height: h - 2, fill: C.face, "fill-opacity": 0.35 }));
+  const lwc = (label && pw > LABEL_W + 70) ? LABEL_W : 0;
   /* Corps plat teinté par rôle — style PATCHBOX/Lucid (miroir Python). */
   g.appendChild(svgEl("rect", {
-    x, y: y + 1, width: RACK_W, height: h - 2, rx: 3, fill: C.face,
+    x: px, y: y + 1, width: pw, height: h - 2, rx: 3, fill: C.face,
     stroke: selected ? C.accent : C.faceStroke, "stroke-width": selected ? 1.6 : 1,
   }));
   g.appendChild(svgEl("rect", {
-    x, y: y + 1, width: RACK_W, height: h - 2, rx: 3,
+    x: px, y: y + 1, width: pw, height: h - 2, rx: 3,
     fill: t.color, "fill-opacity": 0.07,
   }));
-  g.appendChild(svgEl("rect", { x, y: y + 1, width: 4, height: h - 2, fill: t.color }));
+  g.appendChild(svgEl("rect", { x: px, y: y + 1, width: 4, height: h - 2, fill: t.color }));
   /* Cartouche de nom à côté, décor dans la zone restante (miroir Python). */
-  if (label) drawNamePlate(g, label, x, y, h);
-  if (["server", "ups", "cable-mgmt"].includes(t.category))
-    drawCategoryDecor(g, t, x + lw, y, RACK_W - lw, h);
+  if (lwc) drawNamePlate(g, label, px, y, h);
+  if (["server", "ups", "cable-mgmt"].includes(t.category) && pw - lwc > 200)
+    drawCategoryDecor(g, t, px + lwc, y, pw - lwc, h);
   else if ((t.ports || []).length)
-    drawPortBanks(g, t, item, x + lw, y, RACK_W - lw, h);
+    drawPortBanks(g, t, item, px + lwc, y, pw - lwc, h);
   /* Pastille de hauteur U. */
-  g.appendChild(svgEl("rect", {
-    x: x + RACK_W - 44, y: yc - 9.5, width: 36, height: 19, rx: 9,
-    fill: C.face, "fill-opacity": 0.85, stroke: C.pill, "stroke-width": 1,
-  }));
-  g.appendChild(svgEl("text", {
-    x: x + RACK_W - 26, y: yc + 4.5, "text-anchor": "middle",
-    "font-size": 13, fill: C.dim, "font-family": "monospace",
-  }, t.u_height + "U"));
+  if (pw > 60) {
+    g.appendChild(svgEl("rect", {
+      x: px + pw - 44, y: yc - 9.5, width: 36, height: 19, rx: 9,
+      fill: C.face, "fill-opacity": 0.85, stroke: C.pill, "stroke-width": 1,
+    }));
+    g.appendChild(svgEl("text", {
+      x: px + pw - 26, y: yc + 4.5, "text-anchor": "middle",
+      "font-size": 13, fill: C.dim, "font-family": "monospace",
+    }, t.u_height + "U"));
+  }
 }
 
 /* Ports groupés en banques de 6, 2 rangées au-delà de 12 (miroir Python).
  * Chaque port a une zone de survol élargie → info-bulle de config. */
 function drawPortBanks(g, t, item, x, y, w, h) {
   const color = t.color;
-  const n = Math.min((t.ports || []).length, 48);
+  let n = Math.min((t.ports || []).length, 48);
   const rows = n > 12 ? 2 : 1;
-  const cols = Math.ceil(n / rows);
   /* Dimensions à l'échelle U_PX=40.5 — miroir Python. */
   const pw = 8, gapx = 2, group = 6, ggap = 6;
+  /* Boîtier compact : seulement les ports qui tiennent dans sa largeur. */
+  const colsMax = Math.max(1, Math.floor((w - 54 + gapx) / (pw + gapx)) - 1);
+  n = Math.min(n, colsMax * rows);
+  const cols = Math.ceil(n / rows);
   const ph = rows === 2 ? 10 : 14;
   const groups = Math.ceil(cols / group);
   const totalW = cols * (pw + gapx) - gapx + (groups - 1) * ggap;
