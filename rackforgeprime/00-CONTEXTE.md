@@ -728,3 +728,16 @@ LC 12/48, Corning EDGE, FS FHD, + 23 photos en angle. Règle : vue de face mesur
 
 [à vérifier] 23 compacts sans fiche (SMC, MitraStar, PBXact 75, Vertiv SA1, RackifyUS 10"…),
 EC-XS 240 mm, Hikvision K2 52 mm, IE-4000 rail DIN.
+
+## 🌉 Pont d'Hemingway — 05/09/2026 — photos de face, testeur final
+
+- **Agent « photos de face »** (24 types) : **11 remplacées** par une vraie vue de face
+  mesurée (passe-câbles Panduit NM1, tiroir LC 12, FS FHD, FPR4115, Arista 7050SX ×4,
+  F5 i7800, C8300 ×2), **7 retirées → dessinées à l'échelle** (obturateurs 1U/2U, LC 48,
+  Corning EDGE, PA-3060, Vertiv SA1, ERS 3526T — aucune façade 19" propre trouvée),
+  6 conservées avec réserve (écart dû au `u_height` du pack : N9K-C93240, Hikvision K2,
+  MDX, ENVR, IP Office 500, UDM-Pro-Max → [à corriger dans un pack]). 2 workspaces md5
+  identiques ; anciens fichiers dans `bibliotheque\<C>\_remplacees-2026-09-04\`.
+  Catalogue servi après relance : **1 229 types, 1 207 avec image, 123 avec width_mm**.
+- Agent testeur final lancé (pytest, API, cohérence des packs, échelle réelle mesurée
+  dans le SVG, 7 captures UI, appli de bureau).
