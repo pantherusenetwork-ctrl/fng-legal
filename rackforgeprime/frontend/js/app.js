@@ -592,9 +592,10 @@ function drawCategoryDecor(g, t, x, y, w, h) {
         rx: 1.5, fill: C.decorFill,
       }));
   } else if (t.category === "cable-mgmt") {
+    /* Anneaux calés à droite de la zone restante (miroir Python). */
     for (let i = 0; i < 4; i++)
       g.appendChild(svgEl("rect", {
-        x: x + 200 + i * 50, y: y + 4, width: 30, height: h - 8, rx: 6,
+        x: x + w - 60 - 180 + i * 50, y: y + 4, width: 30, height: h - 8, rx: 6,
         fill: "none", stroke: C.ring, "stroke-width": 3,
       }));
   }

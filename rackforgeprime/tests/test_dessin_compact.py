@@ -27,3 +27,14 @@ def test_placeholder_compact_a_sa_largeur():
     # Pas d'oreilles de rail sur un compact, ports présents (5 tiennent).
     assert g.count("<circle") == 0
     assert g.count('fill-opacity="0.85"') >= 5
+
+
+def test_passe_cables_avec_hostname_reste_dans_la_baie():
+    p = Project(id="p", name="p", racks=[Rack(id="r", name="R", items=[
+        RackItem(id="cm", type_id="generic-cable-mgmt-1u", position_u=5,
+                 meta={"hostname": "PASSE-CABLES-01"})])])
+    svg = render_project_svg(p, rendu="dessin")
+    g = svg[svg.index('id="item-cm"'):]
+    g = g[:g.index("</g>")]
+    xs = [float(x) for x in re.findall(r'<rect x="([\d.]+)" y="[\d.]+" width="30"', g)]
+    assert len(xs) == 4 and max(xs) + 30 <= 40 + RACK_W, xs

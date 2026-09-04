@@ -167,9 +167,10 @@ def _category_decor(t: EquipmentType, x: int, y: int, w: int, h: int,
             s.append(f'<rect x="{vx}" y="{y + h / 2 - 10:.1f}" width="3" '
                      f'height="20" rx="1.5" fill="{p["decor_fill"]}"/>')
     elif t.category == "cable-mgmt":
-        # Anneaux passe-câbles (à droite du libellé, avant la pastille U).
+        # Anneaux passe-câbles, calés à DROITE de la zone restante (avant
+        # la pastille U) — quelle que soit la place prise par le cartouche.
         for i in range(4):
-            rx0 = x + 200 + i * 50
+            rx0 = x + w - 60 - 180 + i * 50
             s.append(f'<rect x="{rx0}" y="{y + 4}" width="30" '
                      f'height="{h - 8}" rx="6" fill="none" '
                      f'stroke="{p["ring"]}" stroke-width="3"/>')

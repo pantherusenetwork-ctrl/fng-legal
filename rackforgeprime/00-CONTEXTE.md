@@ -741,3 +741,14 @@ EC-XS 240 mm, Hikvision K2 52 mm, IE-4000 rail DIN.
   Catalogue servi après relance : **1 229 types, 1 207 avec image, 123 avec width_mm**.
 - Agent testeur final lancé (pytest, API, cohérence des packs, échelle réelle mesurée
   dans le SVG, 7 captures UI, appli de bureau).
+
+**Testeur final (05/09)** : **121 tests — 116 OK, 5 KO, aucun bloquant**. pytest 88 ;
+API 67/69 ; catalogue/workspaces 27/29 ; **échelle réelle 9/10** (80 mesures à ± 0,05 px de
+440 × width_mm / 482,6, 19" = 440 px, centrage exact) ; UI 7/7 ; appli de bureau 5/5
+(bye d'un id bidon n'éteint pas le serveur). Perf logique médiane 16 ms, 11 cas hostiles
+→ 422 propres, 0 erreur 500. KO corrigés en **v1.5.4** : anneaux du passe-câbles dessiné
+avec hostname qui sortaient de la baie (`_category_decor` : calés à droite de la zone
+restante, Python + JS, test ajouté) ; `room=<inconnue>` → 422 « Salle inconnue » comme
+`rack=`. KO restants = libellés / inventaire (7 packs dont `brassage-etendu`, `Nouveau
+projet.json` recréé à l'usage). [à vérifier] pypdf 6.16 plante sur la page TITAN des PDF
+(image ASCII85) — pymupdf lit tout ; ouvrir la page dans Edge/Acrobat une fois. Tests : 89.

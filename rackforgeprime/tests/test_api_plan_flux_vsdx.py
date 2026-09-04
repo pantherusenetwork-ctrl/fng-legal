@@ -39,9 +39,11 @@ def test_api_plan_svg_et_pdf():
     assert "-plan.svg" in svg.headers["content-disposition"]
     pdf = client.post("/api/export/pdf?view=plan&room=r1", json=_payload())
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
-    # Salle inconnue : état vide propre, pas de 500.
+    # Salle inconnue : 422 lisible (comme rack=) ; sans room = première salle.
     svg2 = client.post("/api/export/svg?view=plan&room=zz", json=_payload())
-    assert svg2.status_code == 200 and b"Aucune salle" in svg2.content
+    assert svg2.status_code == 422 and "Salle inconnue" in svg2.text
+    svg3 = client.post("/api/export/svg?view=plan", json=_payload())
+    assert svg3.status_code == 200 and b"planrack-rack-a" in svg3.content
 
 
 def test_api_vsdx():

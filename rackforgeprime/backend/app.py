@@ -47,7 +47,7 @@ else:
 
 # Version de l'application — à mettre à jour en même temps que le badge
 # affiché dans l'UI (frontend/index.html, #brand-version).
-VERSION = "1.5.3"
+VERSION = "1.5.4"
 
 app = FastAPI(title="RackForgePrime", version=VERSION, docs_url="/api/docs")
 
@@ -71,6 +71,17 @@ def _parse_layers(layers: str | None):
             detail=[f"Calque inconnu : {', '.join(sorted(unknown))} "
                     f"(attendus : {', '.join(LOGICAL_LAYERS)})"])
     return asked
+
+
+def _check_room(project: Project, room: str | None) -> str | None:
+    """``room=<id>`` : la salle doit exister — 422 lisible sinon (vide = 1re)."""
+    if not room:
+        return None
+    for site in project.sites:
+        for b in site.buildings:
+            if any(r.id == room for r in b.rooms):
+                return room
+    raise HTTPException(status_code=422, detail=[f"Salle inconnue : {room}"])
 
 
 def _check_rack(project: Project, rack: str | None) -> str | None:
@@ -252,7 +263,7 @@ def export_svg(payload: dict,
     elif view == "diagram":
         svg = render_diagram_svg(project, theme=theme)
     elif view == "plan":
-        svg = render_plan_svg(project, room or None, theme=theme)
+        svg = render_plan_svg(project, _check_room(project, room), theme=theme)
     else:
         svg = render_project_svg(project, theme=theme, rendu=rendu,
                                  face=face)
@@ -287,7 +298,7 @@ def export_pdf(payload: dict,
     else:
         pdf = render_project_pdf(project, view=view, theme=theme, rendu=rendu,
                                  layers=_parse_layers(layers), face=face,
-                                 room=room or None,
+                                 room=_check_room(project, room),
                                  rack=_check_rack(project, rack))
         suffix = {"logical": "-logique", "diagram": "-diagramme",
                   "plan": "-plan"}.get(view, "")
