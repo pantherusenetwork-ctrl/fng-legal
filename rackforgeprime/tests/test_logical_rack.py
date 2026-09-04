@@ -45,7 +45,7 @@ def test_vue_baie_garde_ses_equipements_et_ses_voisins():
     by_id = {n["id"]: n for n in nodes}
     assert set(by_id) == {"fw", "sw", "srv"}      # ups (TITAN, non relié) absent
     assert not by_id["fw"]["ghost"] and not by_id["sw"]["ghost"]
-    assert by_id["srv"]["ghost"] and "autre baie" in by_id["srv"]["sub"]
+    assert by_id["srv"]["ghost"] and by_id["srv"]["sub"].startswith("↗ ")
 
 
 def test_svg_baie_fantome_pointille_et_titre():

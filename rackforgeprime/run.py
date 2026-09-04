@@ -155,8 +155,11 @@ def watch_window(server, app_obj, grace: float = 90.0,
         time.sleep(1.0)
         now = time.time()
         st = app_obj.state
-        if st.bye_at and now - st.bye_at > bye_delay and st.last_ping < st.bye_at:
-            print("Fenêtre fermée : arrêt du serveur.")
+        clients = getattr(st, "clients", {})
+        alive = [t for t in clients.values() if now - t < silence]
+        if st.bye_at and now - st.bye_at > bye_delay and not alive \
+                and st.last_ping < st.bye_at:
+            print("Dernière fenêtre fermée : arrêt du serveur.")
             server.should_exit = True
         elif st.last_ping and now - st.last_ping > silence:
             print("Plus de fenêtre depuis 3 min : arrêt du serveur.")

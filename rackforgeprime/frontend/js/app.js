@@ -3318,11 +3318,21 @@ $("#btn-toggle-u").addEventListener("click", () => {
 /* Ajouter une baie — TOUJOURS dit où elle va : « à droite de X » (après
    la baie donnée) ou tout à droite (bouton du bandeau / tuile « + Baie »).
    La lettre suivante est la première libre (A, B, C… sans doublon). */
+/* Lettre de baie libre : A…Z puis AA, AB… (style colonnes Excel) — jamais
+   de « Baie [ » ni de doublon « Baie Z ». */
+function nextRackLetter() {
+  const used = new Set(project.racks.map((r) => r.id));
+  const names = new Set(project.racks.map((r) => r.name));
+  for (let n = 0; n < 702; n++) {
+    let k = n, s = "";
+    do { s = String.fromCharCode(65 + (k % 26)) + s; k = Math.floor(k / 26) - 1; } while (k >= 0);
+    if (!used.has("rack-" + s.toLowerCase()) && !names.has("Baie " + s)) return s;
+  }
+  return "X" + Date.now().toString(36);
+}
 function addRack(afterRack) {
   const used = new Set(project.racks.map((r) => r.id));
-  let letter = "A";
-  while (used.has("rack-" + letter.toLowerCase()) && letter < "Z")
-    letter = String.fromCharCode(letter.charCodeAt(0) + 1);
+  const letter = nextRackLetter();
   const rack = newRack(letter);
   if (used.has(rack.id)) rack.id = "rack-" + Date.now().toString(36);
   const idx = afterRack ? project.racks.indexOf(afterRack) + 1 : project.racks.length;
@@ -4018,10 +4028,7 @@ function wirePlan(svg, room) {
 }
 function addRackSilently() {
   const used = new Set(project.racks.map((r) => r.id));
-  let letter = "A";
-  while (used.has("rack-" + letter.toLowerCase()) && letter < "Z")
-    letter = String.fromCharCode(letter.charCodeAt(0) + 1);
-  const rack = newRack(letter);
+  const rack = newRack(nextRackLetter());
   if (used.has(rack.id)) rack.id = "rack-" + Date.now().toString(36);
   project.racks.push(rack);
   return rack;
@@ -4303,13 +4310,16 @@ $("#btn-flows-csv").addEventListener("click", () =>
  * suivant). Un rechargement (F5) renvoie un ping tout de suite.
  * =================================================================== */
 (function heartbeat() {
-  const ping = () => fetch("/api/ping", { cache: "no-store" }).catch(() => {});
+  /* Chaque fenêtre/onglet a son identifiant : fermer l'un n'éteint pas
+     l'app tant qu'un autre vit encore. */
+  const cid = "w-" + Math.random().toString(36).slice(2, 10);
+  const ping = () => fetch("/api/ping?c=" + cid, { cache: "no-store" }).catch(() => {});
   ping();
   setInterval(ping, 5000);
   window.addEventListener("pagehide", () => {
     try {
-      if (navigator.sendBeacon) navigator.sendBeacon("/api/bye", "");
-      else fetch("/api/bye", { method: "POST", keepalive: true }).catch(() => {});
+      if (navigator.sendBeacon) navigator.sendBeacon("/api/bye", cid);
+      else fetch("/api/bye", { method: "POST", body: cid, keepalive: true }).catch(() => {});
     } catch { /* rien : le silence de 3 min fera le reste */ }
   });
 })();

@@ -546,8 +546,8 @@ def render_project_dossier_pdf(project: Project, theme: str = "sombre",
                     page_no, total, pal)
         _draw_table_page(
             c, page_w, page_h,
-            "Budget PoE par switch — alerte à 80 %, jamais une valeur devinée",
-            ["Baie", "U", "Switch", "Budget", "Tiré", "Ports PoE", "Taux",
+            "Budget PoE par équipement PoE (switchs, routeurs PoE) — alerte à 80 %, jamais une valeur devinée",
+            ["Baie", "U", "Équipement", "Budget", "Tiré", "Ports PoE", "Taux",
              "État"],
             [10, 5, 22, 12, 10, 9, 8, 16], chunk, pal)
         c.showPage()

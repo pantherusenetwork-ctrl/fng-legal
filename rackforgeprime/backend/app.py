@@ -47,7 +47,7 @@ else:
 
 # Version de l'application — à mettre à jour en même temps que le badge
 # affiché dans l'UI (frontend/index.html, #brand-version).
-VERSION = "1.3.1"
+VERSION = "1.3.2"
 
 app = FastAPI(title="RackForgePrime", version=VERSION, docs_url="/api/docs")
 
@@ -107,21 +107,34 @@ def _parse_project(payload: dict) -> Project:
 # Sans ça, fermer la fenêtre laissait un processus fantôme sur le port.
 app.state.last_ping = 0.0
 app.state.bye_at = 0.0
+# Fenêtres vivantes : id de client -> dernier battement. Fermer UNE
+# fenêtre n'éteint l'app que si c'était la dernière.
+app.state.clients = {}
 
 
 @app.get("/api/ping")
-def ping() -> dict:
-    app.state.last_ping = time.time()
-    app.state.bye_at = 0.0
+def ping(c: str = "") -> dict:
+    now = time.time()
+    app.state.last_ping = now
+    if c:
+        app.state.clients[c] = now
+    # Un battement quelconque annule un « bye » SEULEMENT s'il reste
+    # une fenêtre connue vivante (ou si les clients ne s'identifient pas).
+    if not c or app.state.clients:
+        app.state.bye_at = 0.0
     return {"ok": True, "version": VERSION, "app": "RackForgePrime"}
 
 
 @app.post("/api/bye")
-def bye() -> dict:
-    """La fenêtre se ferme (pagehide). Un rechargement renvoie un ping
-    dans la foulée et annule l'arrêt."""
-    app.state.bye_at = time.time()
-    return {"ok": True}
+async def bye(request: Request) -> dict:
+    """Une fenêtre se ferme (pagehide) : on la retire. S'il n'en reste
+    aucune, run.py arrête le serveur après un court délai (un
+    rechargement F5 renvoie un ping et annule)."""
+    cid = (await request.body()).decode("utf-8", errors="replace").strip()
+    app.state.clients.pop(cid, None)
+    if not app.state.clients:
+        app.state.bye_at = time.time()
+    return {"ok": True, "restantes": len(app.state.clients)}
 
 
 # --- Catalogue --------------------------------------------------------------

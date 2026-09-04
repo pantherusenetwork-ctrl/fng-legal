@@ -160,8 +160,8 @@ def _collect_nodes(project: Project, types: dict[str, EquipmentType],
             nodes.append({
                 "id": item.id,
                 "label": item.meta.hostname or f"{t.vendor} {t.model}",
-                "sub": f"{rack.name} · U{item.position_u}"
-                       + (" — autre baie" if ghost else ""),
+                # Fantôme : « ↗ » = dans une autre baie (tient sur la carte).
+                "sub": (("↗ " if ghost else "") + f"{rack.name} · U{item.position_u}"),
                 "sub2": sub2,
                 "category": t.category,
                 "color": t.color,
