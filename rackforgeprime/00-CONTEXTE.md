@@ -533,3 +533,42 @@ processus disparaît (vérifier `Get-Process RackForgePrime` vide). Backlog
 inchangé : câbles v2 (export + ancrage port), appariement panneau↔switch,
 multi-sélection/Ctrl+C-V, VSDX à ouvrir dans un vrai Visio, re-photos.
 Optimisation suivante : ne pas ré-enregistrer un projet inchangé à la bascule.
+
+## 🌉 Pont d'Hemingway — 04/09/2026 (17h) — campagne 4 agents, v1.3.1 → v1.3.2
+
+**4 agents indépendants (lecture seule) sur la v1.3.0 déployée** :
+- Testeur API : **85 tests, 85 OK, 0 KO** (routes, exports, 422 en français, perf
+  logique médiane 41 ms grâce au cache catalogue).
+- Vérificateur UI : 7 captures headless OK, 0 bloquant, 0 texte undefined/NaN ;
+  gênant : sélecteur de baie visible en Diagramme, logique OLYMPE coupée à droite.
+- Auditeur d'état : **bug de perte de données** — « Importer JSON » ne détachait pas
+  le projet de l'espace de travail → l'enregistrement auto a écrasé
+  `RackForgePrime-Workspace\projets\reseau-maison.json` du DÉPÔT avec salle-olympe
+  (03/09 21:48). Restauré depuis la copie PC (md5 0a9ddca2…), fichier écrasé mis en
+  `RAZOR LOCK\POUBELLE-A-VALIDER-2026-09-04\`. Aussi : projets réécrits à l'ouverture
+  sans geste ; LANCER-PHONE muet si l'édition PC tourne ; docs périmées.
+- Juge vs Visio/draw.io : **7,5/10** (prise en main 7,5 · métier 8,0 · esthétique
+  7,0). Meilleur pour ce métier (échelle réelle, vue arrière dérivée, brassage /
+  étiquettes / PoE / BOM / dossier générés), moins bien en éditeur généraliste
+  (multi-sélection, Ctrl+C/V, connecteurs éditables, impression à l'échelle).
+  5 reproches : auto-layout logique inutilisable sur 61 équipements (4 521 px),
+  aucune impression à l'échelle, textes tronqués « … » dans le PDF, pas de
+  multi-sélection, VSDX sans connecteurs et jamais ouvert dans Visio.
+
+**Corrigé dans la foulée** — v1.3.1 (commit v1.3.1) : import JSON détaché,
+pas de PUT si le projet est inchangé (`_wsLastSaved`), LANCER-PHONE → boîte de
+message si l'édition PC tourne, logique ajustée à la 1re ouverture, sélecteur de
+baie masqué en Diagramme, CLAUDE.md/en-tête à jour. v1.3.2 : **fenêtres
+multiples** (chaque fenêtre a un id ; fermer un onglet n'éteint l'app que si
+c'était le dernier — le juge avait vu le risque), lettres de baie AA/AB après Z
+(fini « Baie [ »), fantômes logiques « ↗ BAIE · Uxx », tableau PoE « par
+équipement PoE ». Tests : **87 verts**.
+
+**Prochaine étape exacte (par impact, d'après le juge)** : (1) auto-layout
+logique compact (grouper par baie, plusieurs rangées de brassage) ; (2) impression
+à l'échelle (1:10 / 1:20 écrit sur la page) ; (3) plus jamais de « … » sur un
+identifiant dans le PDF (retour à la ligne) ; (4) multi-sélection + Ctrl+C/V ;
+(5) VSDX avec <Connect> + ouverture réelle dans Visio [Panther].
+Toujours en attente de Panther : 24/48 ports du stack 2930 + budgets PoE des 2930F,
+VLANs d'OLYMPE (sans eux : 0 flux proposable), photo STORI, Belden v2, test PHONE,
+vraies positions des baies + image du plan de la salle.
