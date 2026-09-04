@@ -65,7 +65,7 @@
     <div id="brand">
       <img class="brand-logo" src="/static/assets/icon.svg" alt="">
       RackForge<span class="brand-accent">Prime</span>
-      <span id="brand-version" title="Version de l'application">v1.4.0</span>
+      <span id="brand-version" title="Version de l'application">v1.5.0</span>
     </div>
     <input id="project-name" type="text" value="Nouveau projet" title="Nom du projet"
            aria-label="Nom du projet">
@@ -80,6 +80,14 @@
       <button id="btn-view-plan" title="Plan d'étage : ville → bâtiment → salle → baies posées sur le plan">Plan</button>
     </nav>
     <div id="topbar-actions">
+      <span class="tb-group" aria-label="Projet">
+        <button id="btn-vider" title="Vider le projet : tout disparaît de l'écran, rien n'est perdu — recliquez pour tout remettre">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 1.5 14.5 5.5 7 13H3v-4z"></path><path d="M8.5 3.5 12.5 7.5"></path><path d="M2 14.5h12"></path></svg>
+        </button>
+        <button id="btn-minimap" title="Minimap : le plan de navigation en bas à droite — afficher / masquer">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M8 1.5v13 M1.5 8h13 M3.4 3.4l9.2 9.2 M12.6 3.4l-9.2 9.2"></path><circle cx="8" cy="8" r="1.6" fill="currentColor" stroke="none"></circle></svg>
+        </button>
+      </span>
       <span class="tb-group" aria-label="Édition">
         <button id="btn-undo" title="Annuler (Ctrl+Z)" disabled>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5 3 7l3.5 3.5 M3 7h6a4 4 0 0 1 0 8H8"></path></svg>
@@ -272,7 +280,7 @@
     <!-- Canvas : les baies, rendues en SVG à l'échelle U exacte -->
     <section id="canvas-wrap">
       <div id="canvas"><!-- SVG des baies, généré par app.js --></div>
-      <div id="minimap" class="hidden" title="Minimap — cliquez ou glissez pour naviguer"><canvas width="150" height="100"></canvas><button id="minimap-close" title="Masquer la minimap (réactivable dans le menu Calques)">×</button></div>
+      <div id="minimap" class="hidden" title="Minimap — cliquez ou glissez pour naviguer"><canvas width="220" height="140"></canvas><button id="minimap-close" title="Masquer la minimap (réactivable dans le menu Calques)">×</button></div>
     </section>
 
     <!-- Panneau métadonnées : s'ouvre au clic sur un équipement -->

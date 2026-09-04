@@ -2513,6 +2513,8 @@ $("#canvas-wrap").addEventListener("pointerdown", (e) => {
    Dessin schématique : une boîte par élément posé + le rectangle du
    viewport. Cachée quand tout tient à l'écran. */
 let minimapOff = localStorage.getItem("rfp-minimap-off") === "1";
+/* Demandée explicitement (bouton étoile) : visible même si tout tient. */
+let minimapForce = localStorage.getItem("rfp-minimap-force") === "1";
 function updateMinimap() {
   const wrap = $("#canvas-wrap");
   const mini = $("#minimap");
@@ -2521,11 +2523,15 @@ function updateMinimap() {
      et jamais si l'utilisateur l'a fermée (son choix, mémorisé). */
   const fits = wrap.scrollWidth <= wrap.clientWidth + 40 &&
                wrap.scrollHeight <= wrap.clientHeight + 40;
-  mini.classList.toggle("hidden", fits || minimapOff);
-  if (fits || minimapOff) return;
+  /* Masquée si l'utilisateur l'a fermée ; sinon visible dès que le plan
+     déborde — ou toujours, s'il l'a demandée par le bouton étoile. */
+  const hide = minimapOff || (fits && !minimapForce);
+  mini.classList.toggle("hidden", hide);
+  $("#btn-minimap")?.classList.toggle("actif", !hide);
+  if (hide) return;
   /* Épingle au coin bas-droit du VIEWPORT (le conteneur défile). */
-  mini.style.left = (wrap.scrollLeft + wrap.clientWidth - 150 - 12) + "px";
-  mini.style.top = (wrap.scrollTop + wrap.clientHeight - 100 - 12) + "px";
+  mini.style.left = (wrap.scrollLeft + wrap.clientWidth - 220 - 12) + "px";
+  mini.style.top = (wrap.scrollTop + wrap.clientHeight - 140 - 12) + "px";
   const cv = mini.querySelector("canvas");
   const ctx = cv.getContext("2d");
   const W = cv.width, H = cv.height;
@@ -2542,15 +2548,27 @@ function updateMinimap() {
   ctx.fillStyle = css.getPropertyValue("--text-dim").trim() || "#64748b";
   ctx.globalAlpha = 0.35;
   const wr = wrap.getBoundingClientRect();
+  const labels = [];
   for (const el of $("#canvas").children) {
     const r = el.getBoundingClientRect();
     const x = r.left - wr.left + wrap.scrollLeft;
     const y = r.top - wr.top + wrap.scrollTop;
+    const bw = Math.max(3, r.width * k - 1), bh = Math.max(3, r.height * k - 1);
     ctx.beginPath();
-    ctx.roundRect(ox + x * k + 0.5, oy + y * k + 0.5,
-                  Math.max(3, r.width * k - 1), Math.max(3, r.height * k - 1), 2);
+    ctx.roundRect(ox + x * k + 0.5, oy + y * k + 0.5, bw, bh, 2);
     ctx.fill();
+    /* Nom de la baie quand la boîte est assez large pour le lire. */
+    const rid = el.dataset && el.dataset.rackId;
+    const rack = rid && project.racks.find((rk) => rk.id === rid);
+    if (rack && bw >= 22 && bh >= 12)
+      labels.push([rack.name, ox + x * k + bw / 2 + 0.5, oy + y * k + 9, bw - 4]);
   }
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = css.getPropertyValue("--text").trim() || "#cbd5e1";
+  ctx.font = "bold 8px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  for (const [name, lx, ly, maxw] of labels) ctx.fillText(name, lx, ly, maxw);
+  ctx.textAlign = "start";
   /* Viewport : liseré accent fin + voile léger — on voit OÙ on est sans
      que le rectangle écrase le plan. */
   const vx = ox + wrap.scrollLeft * k, vy = oy + wrap.scrollTop * k;
@@ -2599,6 +2617,16 @@ function updateMinimap() {
     renderStatus("Minimap masquée — réactivable dans le menu Calques");
   });
   if (chk) chk.addEventListener("change", () => setMinimap(!chk.checked));
+  /* Bouton étoile du bandeau : un clic montre (même si tout tient à
+     l'écran), un second masque. */
+  $("#btn-minimap").addEventListener("click", () => {
+    const visible = !mini.classList.contains("hidden");
+    if (visible) { minimapForce = false; setMinimap(true); }
+    else { minimapForce = true; setMinimap(false); }
+    localStorage.setItem("rfp-minimap-force", minimapForce ? "1" : "0");
+    renderStatus(visible ? "Minimap masquée" :
+      "Minimap affichée — cliquez ou glissez dedans pour vous déplacer");
+  });
   mini.addEventListener("pointerdown", (e) => {
     if (e.target === closeBtn) return;
     e.preventDefault();
@@ -3512,6 +3540,7 @@ function saveLocal() {
 let _wsTimer = null;
 let _wsLastSaved = "";   // dernier JSON enregistré : inchangé = pas de PUT
 function scheduleWorkspaceSave() {
+  if (projectStash) return;          // projet vidé à l'écran : on n'écrit pas ça
   clearTimeout(_wsTimer);
   _wsTimer = setTimeout(() => saveToWorkspace(), 1500);
 }
@@ -3523,6 +3552,10 @@ function slugName(name) {
 async function saveToWorkspace(name) {
   const target = name || workspaceName;
   if (!target) return false;
+  if (projectStash) {
+    renderStatus("Projet vidé à l'écran : remettez-le (bouton gomme) avant d'enregistrer");
+    return false;
+  }
   clearTimeout(_wsTimer);
   const body = JSON.stringify(currentProject());
   if (target === workspaceName && body === _wsLastSaved) return true;  // rien n'a bougé
@@ -3630,6 +3663,59 @@ async function openProjectsMenu(e) {
   _logicalMenu(e, "Projets de l'espace de travail", actions);
 }
 $("#btn-projects").addEventListener("click", openProjectsMenu);
+
+/* =====================================================================
+ * Vider / Remettre : un clic vide TOUT le projet à l'écran (baies vides,
+ * plus de liens, VLANs, dessins, plans, flux) — rien n'est perdu : le
+ * projet complet est mis de côté (mémoire + localStorage). Un second
+ * clic remet tout. Pendant ce temps l'enregistrement automatique est
+ * suspendu : le fichier de l'espace de travail n'est jamais vidé.
+ * =================================================================== */
+let projectStash = null;
+try { projectStash = JSON.parse(localStorage.getItem("rfp-stash") || "null"); }
+catch { projectStash = null; }
+function syncViderBtn() {
+  const b = $("#btn-vider");
+  b.classList.toggle("actif", !!projectStash);
+  b.title = projectStash
+    ? "Remettre le projet : tout revient exactement comme avant"
+    : "Vider le projet : tout disparaît de l'écran, rien n'est perdu — recliquez pour tout remettre";
+}
+$("#btn-vider").addEventListener("click", async () => {
+  if (!projectStash) {
+    projectStash = JSON.parse(JSON.stringify(currentProject()));
+    try { localStorage.setItem("rfp-stash", JSON.stringify(projectStash)); }
+    catch { /* trop gros pour localStorage : la mémoire suffit */ }
+    for (const r of project.racks) r.items = [];
+    project.logical = { vlans: [], links: [], positions: {}, annotations: [] };
+    project.diagram = { annotations: [] };
+    project.flows = [];
+    for (const s of project.sites || [])
+      for (const b of s.buildings || [])
+        for (const room of b.rooms || []) { room.racks = []; room.points = []; }
+    selectedItemId = null; closeInspector();
+    renderAll();
+    renderStatus("Projet vidé à l'écran — rien n'est perdu : recliquez le même bouton pour tout remettre");
+  } else {
+    const edited = JSON.stringify(project.racks.map((r) => r.items.length)) !==
+                   JSON.stringify(project.racks.map(() => 0)) ||
+                   (project.logical.links || []).length;
+    if (edited && !await askConfirm("Remettre le projet d'origine ?",
+        "Ce que vous avez posé depuis le vidage sera remplacé (Ctrl+Z reste possible)."))
+      return;
+    project = projectStash;
+    projectStash = null;
+    localStorage.removeItem("rfp-stash");
+    refreshTypes();
+    renderPalette($("#palette-filter").value);
+    $("#project-name").value = project.name;
+    selectedItemId = null; closeInspector();
+    renderAll();
+    renderStatus("Projet remis tel qu'il était");
+  }
+  syncViderBtn();
+});
+syncViderBtn();
 document.addEventListener("keydown", async (e) => {
   if (!(e.ctrlKey || e.metaKey)) return;
   const k = e.key.toLowerCase();

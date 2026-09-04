@@ -85,7 +85,7 @@ body[data-view="logical"] g[id^="link-"] { cursor: pointer; }
   /* Épinglée au coin du viewport par JS (left/top recalculés au scroll —
      un absolute défilerait avec le contenu). */
   position: absolute; z-index: 6;
-  width: 150px; height: 100px;
+  width: 220px; height: 140px;
   background: color-mix(in srgb, var(--panel) 88%, transparent);
   border: 1px solid var(--line);
   border-radius: 9px; overflow: hidden; cursor: crosshair;
@@ -901,3 +901,8 @@ body[data-view="plan"] #canvas { justify-content: center; }
 #projects-count { font-family: var(--mono); font-size: 10.5px; color: var(--text-dim); }
 #item-menu .menu-item.menu-current { color: var(--accent); font-weight: 600; }
 #item-menu .menu-item.menu-sep { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 8px; }
+
+/* ---- Vider / Remettre + minimap (bandeau, à gauche d'Annuler) ---- */
+#btn-vider.actif { color: var(--accent); }
+#btn-vider.actif svg { filter: drop-shadow(0 0 3px var(--accent)); }
+#btn-minimap.actif { color: var(--accent); }
