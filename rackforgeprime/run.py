@@ -123,6 +123,18 @@ def running_instance(host: str, port: int) -> str | None:
         return None
 
 
+def _message_box(title: str, text: str) -> None:
+    """Boîte de message Windows (l'exe est fenêtré : pas de console où
+    lire un print). Silencieux ailleurs."""
+    if os.name != "nt":
+        return
+    try:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(None, text, title, 0x40)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def port_is_free(host: str, port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex((host if host != "0.0.0.0" else "127.0.0.1",
@@ -173,6 +185,16 @@ def main() -> None:
     already = running_instance("127.0.0.1", args.port)
     if already:
         url = f"http://127.0.0.1:{args.port}"
+        if args.host not in ("127.0.0.1", "localhost"):
+            # Édition Phone (--host 0.0.0.0) : impossible d'ouvrir le
+            # réseau tant que l'édition PC tient le port. On le DIT.
+            msg = (f"RackForgePrime v{already} tourne déjà en édition PC "
+                   f"sur le port {args.port}.\n\nFerme sa fenêtre, puis "
+                   f"relance LANCER-PHONE.bat : le serveur s'ouvrira alors "
+                   f"au réseau (téléphone).")
+            print(msg)
+            _message_box("RackForgePrime — édition Phone", msg)
+            return
         print(f"RackForgePrime v{already} tourne déjà → {url} (fenêtre rouverte)")
         if not args.no_browser and not open_app_window(url):
             webbrowser.open(url)

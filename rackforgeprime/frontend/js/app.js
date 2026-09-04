@@ -2109,16 +2109,13 @@ $("#btn-import-json input").addEventListener("change", async (e) => {
   if (!file) return;
   try {
     const data = JSON.parse(await file.text());
-    project = data;
-    if (!project.equipment_types) project.equipment_types = [];
-    if (!project.logical) project.logical = { vlans: [], links: [], positions: {} };
-    if (!project.sites) project.sites = [];
-    if (!project.flows) project.flows = [];
-    refreshTypes();
-    renderPalette($("#palette-filter").value);
-    $("#project-name").value = project.name || "Sans nom";
-    closeInspector();
-    renderAll();
+    /* Un fichier importé n'est PAS le projet de l'espace de travail
+       ouvert avant : on le détache (sinon l'enregistrement automatique
+       l'écrirait par-dessus l'autre — bug constaté le 03/09). */
+    if (workspaceName) await saveToWorkspace();
+    _installProject(data, null);
+    renderStatus(`Fichier importé (${esc(file.name)}) — non rattaché à l'espace de ` +
+      "travail : Projets › Enregistrer pour lui donner un nom");
   } catch {
     renderStatus('<span class="stat-err">JSON illisible</span>');
   }
@@ -2147,6 +2144,7 @@ $("#logical-rack").addEventListener("change", (e) => {
   logicalRack = e.target.value || null;
   renderAll();
 });
+let _logicalFitted = false;
 async function renderLogical() {
   syncLogicalRackSelect();
   const res = await fetch("/api/export/svg?view=logical&theme=" + theme
@@ -2162,6 +2160,14 @@ async function renderLogical() {
   }
   canvas.innerHTML = await res.text();
   wireLogical(canvas.querySelector("svg"));
+  /* Première ouverture d'un schéma logique plus large que l'écran :
+     on l'ajuste d'office (sinon la droite est coupée et il faut
+     deviner le bouton Ajuster). Ensuite le zoom de l'utilisateur prime. */
+  if (!_logicalFitted) {
+    _logicalFitted = true;
+    const wrap = $("#canvas-wrap");
+    if (wrap.scrollWidth > wrap.clientWidth + 8) $("#btn-zoom-fit").click();
+  }
   if (logicalRack) {
     const rk = project.racks.find((r) => r.id === logicalRack);
     const n = canvas.querySelectorAll('g[id^="lnode-"]').length;
@@ -3469,6 +3475,7 @@ function saveLocal() {
  * le courant est enregistré, l'autre est chargé, aucun rechargement.
  * =================================================================== */
 let _wsTimer = null;
+let _wsLastSaved = "";   // dernier JSON enregistré : inchangé = pas de PUT
 function scheduleWorkspaceSave() {
   clearTimeout(_wsTimer);
   _wsTimer = setTimeout(() => saveToWorkspace(), 1500);
@@ -3482,9 +3489,11 @@ async function saveToWorkspace(name) {
   const target = name || workspaceName;
   if (!target) return false;
   clearTimeout(_wsTimer);
+  const body = JSON.stringify(currentProject());
+  if (target === workspaceName && body === _wsLastSaved) return true;  // rien n'a bougé
   const res = await fetch("/api/projects/" + encodeURIComponent(target), {
     method: "PUT", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(currentProject()),
+    body,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -3492,6 +3501,7 @@ async function saveToWorkspace(name) {
     return false;
   }
   workspaceName = target;
+  _wsLastSaved = body;
   localStorage.setItem("rfp-ws-name", target);
   return true;
 }
@@ -3511,7 +3521,8 @@ function _installProject(data, name) {
   workspaceName = name;
   if (name) localStorage.setItem("rfp-ws-name", name);
   else localStorage.removeItem("rfp-ws-name");
-  selectedItemId = null; focusRackId = null; logicalRack = null;
+  selectedItemId = null; focusRackId = null; logicalRack = null; _logicalFitted = false;
+  _wsLastSaved = name ? JSON.stringify(project) : "";
   planNav = { siteId: null, buildingId: null, roomId: null };
   history.stack = []; history.index = -1;
   refreshTypes();

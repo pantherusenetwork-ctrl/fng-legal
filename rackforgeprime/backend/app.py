@@ -47,7 +47,7 @@ else:
 
 # Version de l'application — à mettre à jour en même temps que le badge
 # affiché dans l'UI (frontend/index.html, #brand-version).
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 
 app = FastAPI(title="RackForgePrime", version=VERSION, docs_url="/api/docs")
 

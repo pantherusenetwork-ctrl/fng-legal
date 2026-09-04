@@ -2,9 +2,10 @@
 
 Application 100 % locale de schémas de baies réseau (élévation 42U, vue logique
 VLAN/liens, tableau de brassage généré). Code dans ce dossier, branche
-`claude/rackforgeprimes-foundations-y41pt4`. Exe déployé sur
-`C:\Users\koyon\Desktop\CITADEL\RACKFORGEPRIME\` (serveur de dev : port 8138,
-l'exe garde 8137).
+`claude/rackforgeprimes-foundations-y41pt4`. Exe déployé dans
+`C:\Users\koyon\Desktop\CITADEL\RACKFORGEPRIME\RackForgePrime-PC\` (serveur de dev :
+`run.py --port 8138`, l'exe garde 8137). Les compteurs ci-dessous sont ceux de
+leur date : la DERNIÈRE section « Pont d'Hemingway » fait foi.
 
 ## État au 31/08/2026
 

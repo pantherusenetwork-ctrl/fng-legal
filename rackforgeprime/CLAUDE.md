@@ -9,7 +9,7 @@ réseau (élévation 42U à l'échelle réelle EIA-310, vue logique, brassage, e
    « Prochaine étape exacte ». Ne jamais repartir de zéro.
 2. Vérifier `git status` et `git log -3` : la branche de travail est
    `claude/rackforgeprimes-foundations-y41pt4` (dépôt = dossier parent `fng-legal`).
-3. Lancer les tests : `python -m pytest tests -q` (76 tests attendus verts au 03/09/2026). ⛔ RÈGLE PANTHER : la version (app.py VERSION + badge index.html) CHANGE À CHAQUE exe déployé.
+3. Lancer les tests : `python -m pytest tests -q` (84 tests attendus verts au 04/09/2026). ⛔ RÈGLE PANTHER : la version (app.py VERSION + badge index.html) CHANGE À CHAQUE exe déployé.
 
 ## Repères
 - Code : ce dossier (`backend/`, `frontend/`, `tests/`, `docs/`).

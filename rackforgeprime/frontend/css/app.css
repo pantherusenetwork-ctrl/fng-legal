@@ -61,7 +61,8 @@ body[data-view="diagram"] #palette { display: none; }
 body[data-view="diagram"] #btn-add-link,
 body[data-view="diagram"] #btn-add-vlan { display: none; }
 /* Les calques sont ceux du schéma logique : sans objet en Diagramme. */
-body[data-view="diagram"] #btn-calques { display: none; }
+body[data-view="diagram"] #btn-calques,
+body[data-view="diagram"] #logical-rack { display: none; }
 /* Schéma logique / diagramme : centrés dans le plan (jamais collés à
    gauche dans le vide). */
 body[data-view="logical"] #canvas,
