@@ -2630,7 +2630,7 @@ function updateMinimap() {
     renderStatus("Minimap masquée — réactivable dans le menu Calques");
   });
   if (chk) chk.addEventListener("change", () => setMinimap(!chk.checked));
-  /* Bouton étoile du bandeau : un clic montre (même si tout tient à
+  /* Bouton araignée du bandeau : un clic montre (même si tout tient à
      l'écran), un second masque. */
   $("#btn-minimap").addEventListener("click", () => {
     const visible = !mini.classList.contains("hidden");
