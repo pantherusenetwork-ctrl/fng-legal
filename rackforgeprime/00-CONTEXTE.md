@@ -705,3 +705,26 @@ multi-sélection).
 - [à vérifier] pour Panther : génération UCOPIA, Livebox « Business 320 » (130 mm sans
   source), cotes ONT/mini-PC/OptiPlex, OXO S/M/L + photo de face, photos de gamme STORI /
   Huawei / SEWAN / CCR / FGT 200F, stack 2930 24/48.
+
+## 🌉 Pont d'Hemingway — 05/09/2026 — dimensions réelles de tout le catalogue
+
+**Demande Panther** : « pareil pour les passe-câbles et autres : cherche les vraies
+dimensions — un équipement posé dans la baie avec sa dimension à l'échelle réelle ».
+
+**Agent « dimensions »** (+ 5 chercheurs par constructeur) : mesure du ratio de chaque
+image contre la hauteur U attendue (`mesures.csv`, 1 229 types) → 1 058 types 19"
+cohérents, **80 compacts avec width_mm sourcée** (HPE 25, Cisco 21, Fortinet 6, Juniper 6,
+Extreme 5…) + 4 u_height corrigés (Arista 7280CR2/7050CX4M 1U → 2U, datasheet « 2RU »),
+23 compacts sans fiche (rien posé), 23 photos en angle listées, 15 sans image.
+Pack `pack-dimensions-v1.json` (2 workspaces, md5 identiques) ; + 9 cotes du chercheur
+Juniper/Ubiquiti/divers intégrées à la main (Ciena 3984 293, Huawei S5735-L8 320/250,
+Minisforum 196 [à vérifier — axes], Zyxel 265/165) — 2 faux positifs (PBXact 400 = 19")
+retirés. Catalogue servi : **width_mm 36 → 123 types**.
+
+**À refaire (agent « photos de face » en cours)** : `generic-cable-mgmt-1u` (photo en
+perspective → 226 mm au lieu de 483), `generic-blank-1u/2u` (texture sans bords), tiroirs
+LC 12/48, Corning EDGE, FS FHD, + 23 photos en angle. Règle : vue de face mesurée
+(ratio ± 15 %) ou pas d'image.
+
+[à vérifier] 23 compacts sans fiche (SMC, MitraStar, PBXact 75, Vertiv SA1, RackifyUS 10"…),
+EC-XS 240 mm, Hikvision K2 52 mm, IE-4000 rail DIN.
