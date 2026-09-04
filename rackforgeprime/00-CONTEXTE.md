@@ -596,3 +596,24 @@ inventer : les 5 photos n'existent plus sur ce PC).
 **Prochaine étape exacte** : intégrer la proposition OLYMPE si justifiée (2 copies),
 puis chantiers du juge : layout logique compact, impression à l'échelle, fin des
 « … » dans le PDF, multi-sélection.
+
+## 🌉 Pont d'Hemingway — 04/09/2026 (18h30) — v1.5.0 Vider/Remettre + étoile minimap
+
+**Demande Panther (capture du bandeau)** : à gauche des flèches Annuler/Rétablir,
+deux icônes — une qui vide le projet (un clic vide tout, un second remet tout) et
+une étoile « style Claude » qui affiche la minimap, à améliorer.
+
+**v1.5.0 (déployée, ping 1.5.0)** : bouton **Vider / Remettre** (`#btn-vider`,
+gomme) : le projet complet est mis de côté (`projectStash` + localStorage
+`rfp-stash`), l'écran montre les baies vides sans liens/VLAN/dessins/plans/flux ;
+l'enregistrement automatique ET Ctrl+S sont suspendus tant qu'il est vidé (le
+fichier n'est jamais vidé) ; second clic = remise exacte (confirmation si on a
+posé des choses entre-temps). Bouton **étoile** (`#btn-minimap`) : affiche /
+masque la minimap, qui devient visible même si tout tient à l'écran
+(`minimapForce`) ; minimap agrandie 220×140 avec les **noms des baies** dans les
+blocs. Vérifié au navigateur : 5 baies 4/17/15/13/12 → 0/0/0/0/0 → remise
+4/17/15/13/12, 11 liens, 4 baies posées sur le plan retrouvés.
+
+**Prochaine étape exacte** : proposition de l'agent « salle OLYMPE » (en cours),
+puis chantiers du juge (layout logique compact, échelle d'impression, « … » du PDF,
+multi-sélection).
