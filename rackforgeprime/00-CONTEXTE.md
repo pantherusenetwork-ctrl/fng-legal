@@ -617,3 +617,24 @@ blocs. Vérifié au navigateur : 5 baies 4/17/15/13/12 → 0/0/0/0/0 → remise
 **Prochaine étape exacte** : proposition de l'agent « salle OLYMPE » (en cours),
 puis chantiers du juge (layout logique compact, échelle d'impression, « … » du PDF,
 multi-sélection).
+
+## 🌉 Pont d'Hemingway — 04/09/2026 (19h30) — constructeur MikroTik
+
+**Demande Panther** : « tu dois avoir les images de MikroTik aussi, constructeur
+important : routeurs, switchs, etc. » Avant : 18 modèles (+4 doublons `nb-`).
+
+**Agent constructeur (1 agent)** : pack `catalogue\types-officiels\pack-mikrotik-v2.json`
+= **65 modèles** (32 routeurs, 32 switchs, 1 RDS), 938 ports, power_w 64/65,
+**width_mm 28 compacts** (RB5009 220, hEX 113, CRS310, CRS305… lus dans les specs
+mikrotik.com), **42 images de façade officielles** neuves (≤ 300 Ko, originaux
+pleine taille dans `bibliotheque\MikroTik\`), 14 images NetBox conservées, 9 sans
+image honnêtes (vue en angle seulement : RB5009, RB4011 Wi-Fi, CRS106, RB260GS ;
+boîtiers extérieurs netPower/PowerBox ; CCR1036 page 404). Déployé à l'identique
+dans les 2 workspaces. ⚠️ **Règle apprise : les packs se chargent par ordre
+alphabétique, le dernier gagne** → pack renommé `pack-mikrotik-v2.json` (après
+`netbox-massif` et `pack-constructeurs`) pour que ses améliorations s'appliquent ;
+4 doublons `nb-mikrotik-crs…` retirés de `netbox-massif.json` (entrées + images en
+`POUBELLE-A-VALIDER-2026-09-04`). Exe : 1 209 types, **MikroTik 65, 56 avec image**.
+Agent « analyse du rendu » lancé (chaque modèle posé en baie, captures, verdicts).
+
+[à vérifier] largeur hEX S 2025 et hEX PoE ; u_height 2 des netPower 15FR / Lite 7R.
