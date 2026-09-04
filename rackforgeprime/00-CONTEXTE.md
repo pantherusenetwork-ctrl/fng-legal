@@ -572,3 +572,27 @@ identifiant dans le PDF (retour à la ligne) ; (4) multi-sélection + Ctrl+C/V ;
 Toujours en attente de Panther : 24/48 ports du stack 2930 + budgets PoE des 2930F,
 VLANs d'OLYMPE (sans eux : 0 flux proposable), photo STORI, Belden v2, test PHONE,
 vraies positions des baies + image du plan de la salle.
+
+## 🌉 Pont d'Hemingway — 04/09/2026 (17h45) — v1.4.0 Enregistrer sous, nettoyage
+
+**Demande Panther** : « je ne peux pas choisir le chemin où enregistrer mon
+projet, ni sous quel format » + « nettoie tout le projet » + « reconstruis la
+salle OLYMPE avec la réalité, vue baie, la logique en découle ».
+
+**v1.4.0 (déployée, ping 1.4.0)** : menu Projets → **Ouvrir un fichier .json…
+(Ctrl+O)**, **Enregistrer sous… dossier + nom + format (Ctrl+Maj+S)** — même
+dialogue que Sauvegarder, préréglé projet/JSON/boîte Windows, 7 formats dont
+**Visio .vsdx** —, **Enregistrer dans l'espace de travail (Ctrl+S)**.
+Vérifié : aucune option retirée entre v1.1.0 et v1.4.0
+(`git diff 0bab269 HEAD -- index.html` : 0 bouton supprimé).
+
+**Nettoyage** : `Nouveau projet.json` (26 baies, 8 équipements, test du 03/09)
+→ `RAZOR LOCK\POUBELLE-A-VALIDER-2026-09-04\` (manifeste). Les « 83 doublons
+png+jpg » de l'audit sont en fait les originaux de `_originaux-2026-08-31\` :
+aucun jumeau mort dans images-officielles (0 déplacé, 1 166 fichiers + 92
+originaux). Agent « salle OLYMPE » lancé (proposition JSON + rapport, sans
+inventer : les 5 photos n'existent plus sur ce PC).
+
+**Prochaine étape exacte** : intégrer la proposition OLYMPE si justifiée (2 copies),
+puis chantiers du juge : layout logique compact, impression à l'échelle, fin des
+« … » dans le PDF, multi-sélection.
