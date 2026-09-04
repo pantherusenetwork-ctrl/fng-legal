@@ -16,8 +16,8 @@
        imposé (quoi / format / destination). -->
   <dialog id="backup-dialog">
     <form id="backup-form">
-      <h2>Sauvegarder</h2>
-      <p class="dialog-hint">Une copie datée, rangée — rien n'est écrasé.</p>
+      <h2 id="backup-title">Sauvegarder</h2>
+      <p class="dialog-hint" id="backup-hint">Une copie datée, rangée — rien n'est écrasé.</p>
       <fieldset>
         <legend>Quoi ?</legend>
         <label><input type="radio" name="bk-scope" value="projet" checked> Le projet ouvert</label>
@@ -32,10 +32,11 @@
         <label class="bk-visual"><input type="radio" name="bk-format" value="svg"> SVG <small>rééditable draw.io / Inkscape</small></label>
         <label class="bk-visual"><input type="radio" name="bk-format" value="png"> PNG <small>image de la vue affichée</small></label>
         <label class="bk-visual"><input type="radio" name="bk-format" value="drawio"> draw.io <small>élévation + logique</small></label>
+        <label class="bk-visual"><input type="radio" name="bk-format" value="vsdx"> Visio .vsdx <small>format d'échange entreprise</small></label>
       </fieldset>
       <fieldset>
         <legend>Où ?</legend>
-        <label><input type="radio" name="bk-dest" value="telecharger" checked> Je choisis à l'enregistrement <small>boîte « Enregistrer sous »</small></label>
+        <label><input type="radio" name="bk-dest" value="telecharger" checked> Je choisis le dossier et le nom <small>boîte Windows « Enregistrer sous »</small></label>
         <label><input type="radio" name="bk-dest" value="pc"> Dossier de sauvegarde de l'app <small id="bk-dossier-app"></small></label>
         <label><input type="radio" name="bk-dest" value="dossier"> Un dossier précis <small>autre disque, NAS, clé USB…</small></label>
         <input type="text" id="bk-dir" placeholder="\\serveur\partage\dossier  ou  D:\Sauvegardes" hidden>
@@ -64,7 +65,7 @@
     <div id="brand">
       <img class="brand-logo" src="/static/assets/icon.svg" alt="">
       RackForge<span class="brand-accent">Prime</span>
-      <span id="brand-version" title="Version de l'application">v1.3.2</span>
+      <span id="brand-version" title="Version de l'application">v1.4.0</span>
     </div>
     <input id="project-name" type="text" value="Nouveau projet" title="Nom du projet"
            aria-label="Nom du projet">

@@ -1968,6 +1968,7 @@ const SAVE_TYPES = {
   ".svg":    { description: "Image SVG",             accept: { "image/svg+xml": [".svg"] } },
   ".png":    { description: "Image PNG",             accept: { "image/png": [".png"] } },
   ".drawio": { description: "Schéma draw.io",        accept: { "application/xml": [".drawio"] } },
+  ".vsdx":   { description: "Dessin Visio",           accept: { "application/vnd.ms-visio.drawing": [".vsdx"] } },
 };
 async function saveBlob(blob, filename) {
   const ext = "." + filename.split(".").pop().toLowerCase();
@@ -2249,7 +2250,11 @@ function restoreBackupChoices() {
       radio.checked = true;
   }
 }
-$("#btn-backup").addEventListener("click", async () => {
+/* Un seul dialogue pour « Sauvegarder » (copie datée) et « Enregistrer
+   sous » (JE choisis le dossier, le nom et le format) : mêmes 3 questions
+   quoi / format / où — les préréglages changent, jamais les choix offerts. */
+async function openBackupDialog(opts) {
+  opts = opts || {};
   try {
     backupCfg = await (await fetch("/api/backup/config")).json();
   } catch { /* la config est un confort, pas une condition */ }
@@ -2257,9 +2262,26 @@ $("#btn-backup").addEventListener("click", async () => {
   const dir = $("#bk-dir");
   if (!dir.value) dir.value = backupCfg.dernier_dossier || "";
   restoreBackupChoices();
+  $("#backup-title").textContent = opts.title || "Sauvegarder";
+  $("#backup-hint").textContent = opts.hint ||
+    "Une copie datée, rangée — rien n'est écrasé.";
+  for (const [name, val] of [["bk-scope", opts.scope], ["bk-format", opts.format],
+                             ["bk-dest", opts.dest]]) {
+    const inp = val && $(`#backup-form input[name="${name}"][value="${val}"]`);
+    if (inp) inp.checked = true;
+  }
   syncBackupForm();
   $("#backup-dialog").showModal();
-});
+}
+$("#btn-backup").addEventListener("click", () => openBackupDialog());
+function openSaveAs() {
+  return openBackupDialog({
+    title: "Enregistrer sous…",
+    hint: "Choisis le format (JSON = le projet rechargeable), puis le dossier " +
+          "et le nom dans la boîte Windows.",
+    scope: "projet", format: "json", dest: "telecharger",
+  });
+}
 $("#backup-cancel").addEventListener("click", (e) => {
   e.preventDefault();
   $("#backup-dialog").close();
@@ -2331,6 +2353,9 @@ $("#backup-form").addEventListener("submit", async (e) => {
     } else if (fmt === "drawio") {
       blob = await fetchExportBlob("/api/export/drawio");
       name = id + ".drawio";
+    } else if (fmt === "vsdx") {
+      blob = await fetchExportBlob("/api/export/vsdx");
+      name = id + ".vsdx";
     }
     if (!blob) return;                       // l'erreur est déjà affichée
     if (dest === "telecharger") {
@@ -3577,8 +3602,10 @@ async function openProjectsMenu(e) {
     _installProject(newProject(), null);
     renderStatus("Nouveau projet — « Projets › Enregistrer » lui donne un nom dans l'espace de travail");
   }, "sep"]);
-  actions.push([workspaceName ? `Enregistrer maintenant (${workspaceName})`
-                              : "Enregistrer dans l'espace de travail…", async () => {
+  actions.push(["Ouvrir un fichier .json… (Ctrl+O)", () => $("#btn-import-json input").click(), "sep"]);
+  actions.push(["Enregistrer sous… — dossier, nom et format (Ctrl+Maj+S)", () => openSaveAs()]);
+  actions.push([workspaceName ? `Enregistrer dans l'espace de travail — ${workspaceName} (Ctrl+S)`
+                              : "Enregistrer dans l'espace de travail… (Ctrl+S)", async () => {
     let name = workspaceName;
     if (!name) {
       name = await askText("Nom du projet dans l'espace de travail",
@@ -3603,6 +3630,17 @@ async function openProjectsMenu(e) {
   _logicalMenu(e, "Projets de l'espace de travail", actions);
 }
 $("#btn-projects").addEventListener("click", openProjectsMenu);
+document.addEventListener("keydown", async (e) => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const k = e.key.toLowerCase();
+  if (k === "s" && e.shiftKey) { e.preventDefault(); openSaveAs(); }
+  else if (k === "s") {
+    e.preventDefault();
+    if (workspaceName) {
+      if (await saveToWorkspace()) renderStatus(`Enregistré : ${esc(workspaceName)}.json ✓`);
+    } else openSaveAs();
+  } else if (k === "o") { e.preventDefault(); $("#btn-import-json input").click(); }
+});
 listWorkspaceProjects().then((names) => {
   $("#projects-count").textContent = names.length ? String(names.length) : "";
 });
