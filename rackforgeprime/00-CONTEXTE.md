@@ -683,3 +683,25 @@ multi-sélection).
   `pack-olympe-v1.json` + images-officielles (projet 1,7 Mo → léger).
 - Panther : « l'application commence à avoir de la gueule » ; demande un **agent
   testeur à la fin**.
+
+## 🌉 Pont d'Hemingway — 04/09/2026 (23h) — OLYMPE allégé, glisser-déposer adaptatif, DAT
+
+- **DAT de l'application** : `docs/DAT-RACKFORGEPRIME.md` (13 sections, code étape par
+  étape) + page lisible publiée ; README réécrit (v1.5.2).
+- **Agent images OLYMPE** : les 21 types custom sortent du projet vers
+  `pack-olympe-v1.json` + `images-officielles` + `bibliotheque\<Constructeur>\` (2
+  workspaces, md5 identiques) → `salle-olympe.json` **1 772 452 → 47 330 octets**.
+  AudioCodes Mediant 800 : façade officielle + **width_mm 345** (datasheet) ; UCOPIA :
+  façade rack 1U 19" (gamme, génération [à vérifier]) ; RAD ETX-205A : datasheet 440 mm
+  → 19" (width_mm 215 retiré) ; 6 photos d'angle retirées (KVM Dell, ONT, mini-PC,
+  étagère…) → dessinées ; OXO Connect reste dessiné (aucune façade ≥ 800 px).
+  Posé dans les 2 copies (md5 90a6f8e2…), app relancée : 61 items, 54 avec image.
+- **Glisser-déposer adaptatif** (demande Panther) : le fantôme de dépose prend la vraie
+  hauteur ET la vraie largeur du boîtier (width_mm), se place côte à côte quand la
+  cohabitation est possible (tryShare), affiche « U5 · 1U · 113 mm ». Vérifié : hEX
+  = 103 px sur 440 (113 mm).
+- Agent « dimensions réelles » lancé sur tout le catalogue (ratio image / U attendu,
+  compacts → width_mm sourcée, photos en angle listées) → `pack-dimensions-v1.json`.
+- [à vérifier] pour Panther : génération UCOPIA, Livebox « Business 320 » (130 mm sans
+  source), cotes ONT/mini-PC/OptiPlex, OXO S/M/L + photo de face, photos de gamme STORI /
+  Huawei / SEWAN / CCR / FGT 200F, stack 2930 24/48.

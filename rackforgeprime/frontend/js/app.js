@@ -1796,23 +1796,44 @@ document.addEventListener("pointermove", (e) => {
   const hit = hitTest(e);
   if (!hit) return;
   const { rack, svg, u } = hit;
-  const ok = canPlace(rack, u, drag.type.u_height, drag.itemId);
-  /* Fantôme : cadre cyan si posable, rouge barré si collision (= refus). */
-  const topU = rack.desc_units ? u : u + drag.type.u_height - 1;
+  const t = drag.type;
+  let ok = canPlace(rack, u, t.u_height, drag.itemId);
+  /* Le fantôme S'ADAPTE à l'équipement : sa vraie hauteur (U) et sa
+     VRAIE LARGEUR (width_mm) — un boîtier compact se voit à sa taille, et
+     s'il peut se coller à côté d'un autre compact dans le même U, le
+     fantôme se place là où il sera posé (cohabitation, position au mm). */
+  const innerX = FRAME_PAD + RAIL_W;
+  const iw = t.width_mm ? Math.min(RACK_W, RACK_W * t.width_mm / MM_19_POUCES) : RACK_W;
+  let ix = innerX + (RACK_W - iw) / 2;
+  let shared = false;
+  if (!ok && t.width_mm) {
+    const shareX = tryShare(rack, u, t, drag.itemId);
+    if (shareX != null) { ok = true; shared = true; ix = innerX + RACK_W * shareX / MM_19_POUCES; }
+  }
+  const topU = rack.desc_units ? u : u + t.u_height - 1;
   const y = uToY(rack, topU);
+  const h = t.u_height * U_PX;
   const g = svgEl("g", { class: "drag-ghost" });
+  /* Trace du slot complet en filigrane (on voit le U visé), puis le
+     boîtier à sa taille réelle. */
+  if (iw < RACK_W)
+    g.appendChild(svgEl("rect", { x: innerX, y: y + 1, width: RACK_W, height: h - 2,
+      fill: "none", stroke: ok ? C.accent : C.danger, "stroke-opacity": 0.35,
+      "stroke-width": 1, "stroke-dasharray": "3,3" }));
   g.appendChild(svgEl("rect", {
-    x: FRAME_PAD + RAIL_W, y: y + 1, width: RACK_W,
-    height: drag.type.u_height * U_PX - 2, rx: 2,
-    fill: ok ? "rgba(249,115,22,.12)" : "rgba(248,113,113,.15)",
+    x: ix, y: y + 1, width: iw, height: h - 2, rx: 2,
+    fill: ok ? "rgba(249,115,22,.14)" : "rgba(248,113,113,.15)",
     stroke: ok ? C.accent : C.danger, "stroke-width": 1.5,
     "stroke-dasharray": ok ? "" : "5,4",
   }));
+  const dims = t.width_mm ? `${Math.round(t.width_mm)} mm` : "19\"";
+  const lbl = !ok ? "collision" :
+    (shared ? `U${u} · côte à côte` : `U${u}`) + (iw >= 120 ? ` · ${t.u_height}U · ${dims}` : "");
   g.appendChild(svgEl("text", {
-    x: FRAME_PAD + RAIL_W + RACK_W / 2, y: y + (drag.type.u_height * U_PX) / 2 + 4,
+    x: ix + iw / 2, y: y + h / 2 + 4,
     "text-anchor": "middle", "font-size": 11, "font-family": "monospace",
     fill: ok ? C.accent : C.danger,
-  }, ok ? `U${u}` : "collision"));
+  }, lbl));
   svg.appendChild(g);
 });
 
