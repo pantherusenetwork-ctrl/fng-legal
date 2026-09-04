@@ -668,3 +668,18 @@ sombre), CRS418 légèrement de dessus ; 9 modèles sans image (RB5009UG, RB4011
 Wi-Fi, CRS106, RB260GS, PowerBox Pro, netPower ×3, CCR1036-12G-4S).
 Reste du backlog inchangé (layout logique, échelle d'impression, « … » PDF,
 multi-sélection).
+
+## 🌉 Pont d'Hemingway — 04/09/2026 (21h45) — HERCULE, araignée, images OLYMPE
+
+- **Le coffret mural A6KVC s'appelle HERCULE** (Panther : « c'est la baie Hercule,
+  j'ai juste pas encore étiqueté »). Renommé dans les 2 copies (id `rack-a6kvc`
+  conservé, révision V3, note dans la baie). Les hostnames de reproduction
+  `SW-A6KVC-01` / `PP-A6KVC` restent [à vérifier] (noms non lus sur photo).
+- **v1.5.2 déployée** : icône **araignée** (corps, tête, 8 pattes) pour la minimap,
+  à la place de l'étoile (« regarde la PJ » : Panther voulait une araignée).
+- Agent « images salle OLYMPE » en cours : juge les 21 types custom, cherche des
+  façades de face (AudioCodes Mediant 800, UCOPIA, Alcatel OXO Connect — seul type
+  sans image —, Livebox, RAD, Synology, Dell), les sort du projet vers
+  `pack-olympe-v1.json` + images-officielles (projet 1,7 Mo → léger).
+- Panther : « l'application commence à avoir de la gueule » ; demande un **agent
+  testeur à la fin**.
