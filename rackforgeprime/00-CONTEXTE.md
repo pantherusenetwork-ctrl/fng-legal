@@ -638,3 +638,33 @@ alphabétique, le dernier gagne** → pack renommé `pack-mikrotik-v2.json` (apr
 Agent « analyse du rendu » lancé (chaque modèle posé en baie, captures, verdicts).
 
 [à vérifier] largeur hEX S 2025 et hEX PoE ; u_height 2 des netPower 15FR / Lite 7R.
+
+## 🌉 Pont d'Hemingway — 04/09/2026 (21h) — MikroTik rendu corrigé, v1.5.1
+
+**Agent analyse du rendu (65 modèles posés dans 3 baies, captures)** : 12 ✅ · 20 ⚠️ ·
+33 ❌ — cause n°1 : mikrotik.com publie des photos **piquées de dessus (3/4)**, que le
+moteur (meet, jamais de déformation) cale sur la hauteur du U → châssis 19"
+rendus à 30-70 % de leur largeur. Aussi : halo blanc des JPEG en thème sombre,
+width_mm manquante hEX PoE / hEX S 2025, ports `lte` fantômes, CRS309 avec sa
+rallonge, RDS2216 en `other`, et **le mode Dessin ignorait width_mm**.
+
+**Agent correctif images** : 41 façades recadrées sur la bande frontale des
+originaux (photos piquées sans lacet → façade rectangulaire, parallélisme ± 5 %
+mesuré, ratio largeur/hauteur vérifié contre les cotes mikrotik.com : tous dans
+± 30 %), 1 vraie vue de face NetBox (RB4011iGS+RM), 43 **PNG alpha** (fin du halo),
+width_mm hEX PoE 114 / hEX S 113 / CRS309 272 (brochures), 4 `lte` retirés,
+`100base-tx` sur le port mgmt du CRS326-4C, RDS2216 → `server`. Anciennes images
+dans `bibliotheque\MikroTik\_remplacees-2026-09-04\` (2 workspaces, md5 identiques).
+Contre-vérifié : CRS510 ratio 10,81 (attendu 10,86), CRS520 10,81, RB4011 11,33.
+Exe : **MikroTik 65, 56 avec image** (9 sans face propre restent dessinés).
+
+**v1.5.1 (déployée, ping 1.5.1)** : mode Dessin à la largeur réelle des compacts
+(placeholder à `width_mm`, ports limités à la largeur, pas d'équerres, cartouche
+seulement si la place existe) — Python + JS miroir, test `test_dessin_compact`.
+Tests : **88 verts**.
+
+[à vérifier] 11 des 13 façades NetBox conservées sont des JPEG (halo léger en
+sombre), CRS418 légèrement de dessus ; 9 modèles sans image (RB5009UG, RB4011
+Wi-Fi, CRS106, RB260GS, PowerBox Pro, netPower ×3, CCR1036-12G-4S).
+Reste du backlog inchangé (layout logique, échelle d'impression, « … » PDF,
+multi-sélection).
