@@ -343,7 +343,7 @@ def _rear_faceplate(t: EquipmentType, x: float, y: float, w: float,
 def render_rack(rack: Rack, types: dict[str, EquipmentType],
                 offset_x: int = 0, offset_y: int = 0,
                 theme: str = "sombre", rendu: str = "photos",
-                face: str = "front") -> str:
+                face: str = "front", noms: bool = True) -> str:
     """Rend une baie complète dans un <g> nommé.
 
     ``rendu="dessin"`` ignore les images officielles : toute la baie en
@@ -411,7 +411,10 @@ def render_rack(rack: Rack, types: dict[str, EquipmentType],
         y = _u_to_y(rack, top_u if not rack.desc_units else item.position_u)
         # RÈGLE : rien n'est écrit sur le dessin SAUF un hostname saisi
         # PAR L'UTILISATEUR. Jamais de « constructeur modèle » auto-posé.
-        label = item.meta.hostname
+        # ``noms=False`` : vue physique SANS AUCUN texte (demande Panther :
+        # « images claires, à l'échelle, bien structurées ») — le nom vit
+        # alors uniquement au survol et dans les tableaux.
+        label = item.meta.hostname if noms else ""
         ih = t.u_height * U_PX
         # Empreinte au mm, déjà mise en miroir si on regarde par l'arrière.
         ix, iw, shared = _item_box(t, item, inner_x, face)
@@ -473,7 +476,8 @@ def render_rack(rack: Rack, types: dict[str, EquipmentType],
 
 
 def render_project_svg(project: Project, theme: str = "sombre",
-                       rendu: str = "photos", face: str = "front") -> str:
+                       rendu: str = "photos", face: str = "front",
+                       noms: bool = True) -> str:
     """SVG complet : toutes les baies du projet côte à côte.
 
     ``face="rear"`` rend la vue arrière — dérivée du même JSON, jamais
@@ -503,7 +507,8 @@ def render_project_svg(project: Project, theme: str = "sombre",
     x = 20
     for rack, (w, _h) in zip(racks, sizes):
         parts.append(render_rack(rack, types, offset_x=x, offset_y=52,
-                                 theme=theme, rendu=rendu, face=face))
+                                 theme=theme, rendu=rendu, face=face,
+                                 noms=noms))
         x += w + GAP_X
     parts.append('</svg>')
     return "\n".join(parts)

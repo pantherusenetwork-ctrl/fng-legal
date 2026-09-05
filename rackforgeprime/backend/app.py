@@ -47,7 +47,7 @@ else:
 
 # Version de l'application — à mettre à jour en même temps que le badge
 # affiché dans l'UI (frontend/index.html, #brand-version).
-VERSION = "1.5.4"
+VERSION = "1.6.0"
 
 app = FastAPI(title="RackForgePrime", version=VERSION, docs_url="/api/docs")
 
@@ -247,7 +247,8 @@ def export_svg(payload: dict,
                              "plan"] = "physical",
                theme: Theme = "sombre", rendu: Rendu = "photos",
                layers: str | None = None, face: Face = "front",
-               room: str | None = None, rack: str | None = None) -> Response:
+               room: str | None = None, rack: str | None = None,
+               noms: bool = True) -> Response:
     """``view=physical`` : élévation ; ``logical`` : VLANs/liens
     (``rack=<id>`` : vue logique de cette seule baie) ;
     ``diagram`` : page de dessin libre ; ``plan`` : plan d'étage d'une
@@ -266,7 +267,7 @@ def export_svg(payload: dict,
         svg = render_plan_svg(project, _check_room(project, room), theme=theme)
     else:
         svg = render_project_svg(project, theme=theme, rendu=rendu,
-                                 face=face)
+                                 face=face, noms=noms)
     suffix = {"logical": "-logique", "diagram": "-diagramme",
               "plan": "-plan"}.get(view, "")
     if view == "physical" and face == "rear":
@@ -286,20 +287,22 @@ def export_pdf(payload: dict,
                              "dossier"] = "physical",
                theme: Theme = "sombre", rendu: Rendu = "photos",
                layers: str | None = None, face: Face = "front",
-               room: str | None = None, rack: str | None = None) -> Response:
+               room: str | None = None, rack: str | None = None,
+               noms: bool = True) -> Response:
     """``view`` : physical, logical, diagram, plan, ou ``dossier``
     (livrable DAT complet : élévation + logique + plans + brassage +
     flux + PoE + nomenclature, cartouche).
     ``theme`` : sombre/clair/kaki/nuit. ``rendu`` : photos ou dessin."""
     project = _parse_project(payload)
     if view == "dossier":
-        pdf = render_project_dossier_pdf(project, theme=theme, rendu=rendu)
+        pdf = render_project_dossier_pdf(project, theme=theme, rendu=rendu,
+                                         noms=noms)
         suffix = "-dossier"
     else:
         pdf = render_project_pdf(project, view=view, theme=theme, rendu=rendu,
                                  layers=_parse_layers(layers), face=face,
                                  room=_check_room(project, room),
-                                 rack=_check_rack(project, rack))
+                                 rack=_check_rack(project, rack), noms=noms)
         suffix = {"logical": "-logique", "diagram": "-diagramme",
                   "plan": "-plan"}.get(view, "")
         if view == "physical" and face == "rear":

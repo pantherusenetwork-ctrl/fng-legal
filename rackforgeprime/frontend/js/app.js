@@ -99,6 +99,10 @@ let logicalRack = null;
 let workspaceName = localStorage.getItem("rfp-ws-name") || null;
 /* Numéros U visibles (toggle façon Visio « Hide U sizes »). */
 let showUNumbers = localStorage.getItem("rfp-show-u") !== "0";
+/* Noms (hostnames) sur les équipements DESSINÉS de la vue physique :
+   masqués par défaut — Panther veut une vue physique sans texte, à
+   l'échelle ; le nom reste au survol, dans la fiche et les tableaux. */
+let showNames = localStorage.getItem("rfp-noms") === "1";
 /* Rendu des faceplates : "photos" (images officielles) ou "dessin"
  * (tout en faceplates dessinées — un seul langage visuel). */
 let renderMode = localStorage.getItem("rfp-render") === "dessin" ? "dessin" : "photos";
@@ -714,7 +718,7 @@ function renderRackSVG(rack) {
     /* RÈGLE : rien n'est écrit sur le dessin SAUF un hostname saisi PAR
        L'UTILISATEUR — jamais de « constructeur modèle » auto-posé (le
        survol, lui, donne toujours la fiche complète). */
-    const label = item.meta.hostname || "";
+    const label = showNames ? (item.meta.hostname || "") : "";
     /* On voit la FAÇADE d'un équipement quand la face regardée est celle
        sur laquelle il est monté ; sinon on voit son dos. */
     if ((item.face || "front") === rackFace) {
@@ -2069,6 +2073,8 @@ function exportQuery(view) {
   /* Ce que tu vois est ce que tu livres : l'élévation exportée est celle
      de la face regardée. */
   if (v === "physical") q.set("face", rackFace);
+  /* Noms masqués à l'écran = masqués à l'export (dossier compris). */
+  if (v === "physical" || v === "dossier") q.set("noms", showNames ? "true" : "false");
   if (v === "logical" && logicalRack) q.set("rack", logicalRack);
   /* Les calques masqués à l'écran le sont aussi à l'export. */
   if (v === "logical" && hiddenLayers.size)
@@ -2454,6 +2460,16 @@ function syncFaceBtn() {
   if (lbl) lbl.textContent = rackFace === "rear" ? "Arrière" : "Avant";
   $("#btn-face").classList.toggle("actif", rackFace === "rear");
 }
+function syncNomsBtn() { $("#btn-noms").classList.toggle("actif", showNames); }
+$("#btn-noms").addEventListener("click", () => {
+  showNames = !showNames;
+  localStorage.setItem("rfp-noms", showNames ? "1" : "0");
+  syncNomsBtn();
+  renderAll();
+  renderStatus(showNames ? "Noms affichés sur les équipements dessinés"
+                         : "Vue physique sans texte — le nom vit au survol et dans la fiche");
+});
+syncNomsBtn();
 $("#btn-face").addEventListener("click", () => {
   rackFace = rackFace === "rear" ? "front" : "rear";
   localStorage.setItem("rfp-face", rackFace);

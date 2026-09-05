@@ -72,7 +72,8 @@ def render_project_pdf(project: Project, view: str = "physical",
                        rendu: str = "photos",
                        face: str = "front",
                        room: str | None = None,
-                       rack: str | None = None) -> bytes:
+                       rack: str | None = None,
+                       noms: bool = True) -> bytes:
     """Projet -> PDF (bytes). Le SVG est la source, le PDF une vue.
 
     ``view`` : « physical » (élévation de baies) ou « logical » (VLANs/liens).
@@ -92,7 +93,7 @@ def render_project_pdf(project: Project, view: str = "physical",
         for rack in project.racks:
             sub = project.model_copy(update={"racks": [rack]})
             svg = render_project_svg(sub, theme=theme, rendu=rendu,
-                                     face=face)
+                                     face=face, noms=noms)
             drawing = svg2rlg(io.StringIO(svg))
             if drawing is None:
                 raise RuntimeError(
@@ -426,7 +427,8 @@ def render_labels_pdf(project: Project) -> bytes:
 
 
 def render_project_dossier_pdf(project: Project, theme: str = "sombre",
-                               rendu: str = "photos") -> bytes:
+                               rendu: str = "photos",
+                               noms: bool = True) -> bytes:
     """Dossier complet : élévation, vue logique, brassage, nomenclature.
 
     Chaque page porte le cadre et le cartouche auto-rempli — le livrable
@@ -488,7 +490,8 @@ def render_project_dossier_pdf(project: Project, theme: str = "sombre",
         sub = project.model_copy(update={"racks": [rack]})
         _page_frame(c, page_h, page_w, project,
                     f"Élévation — {rack.name}", page_no, total, pal)
-        _draw_svg_page(c, render_project_svg(sub, theme=theme, rendu=rendu),
+        _draw_svg_page(c, render_project_svg(sub, theme=theme, rendu=rendu,
+                                             noms=noms),
                        page_h, page_w)
         c.showPage()
         page_no += 1

@@ -752,3 +752,22 @@ restante, Python + JS, test ajouté) ; `room=<inconnue>` → 422 « Salle inconn
 `rack=`. KO restants = libellés / inventaire (7 packs dont `brassage-etendu`, `Nouveau
 projet.json` recréé à l'usage). [à vérifier] pypdf 6.16 plante sur la page TITAN des PDF
 (image ASCII85) — pymupdf lit tout ; ouvrir la page dans Edge/Acrobat une fois. Tests : 89.
+
+## 🌉 Pont d'Hemingway — 05/09/2026 — v1.6.0 : vue physique sans texte
+
+**Demande Panther** : « dans la vue physique je ne veux pas de nommage (nom, KVM…) ; je
+veux les images claires, à l'échelle, bien structurées ». Aussi : RAD ETX de travers,
+passe-câbles pas à l'échelle.
+
+- **Bouton « Noms »** (bandeau physique, masqué par défaut, localStorage `rfp-noms`) :
+  aucun cartouche de nom sur les équipements dessinés ; le hostname vit au survol, dans
+  la fiche et les tableaux. Paramètre API `noms=true|false` sur /api/export/svg et /pdf
+  (physical et dossier) : ce que l'écran montre est ce que l'export livre (défaut API
+  true = compat tests). Nuance sur E3 : le nom saisi ne s'écrit plus sur le dessin que si
+  l'utilisateur active « Noms ».
+- **RAD ETX-205A** : image redressée jugée de travers → retirée
+  (`bibliotheque\RAD\_remplacees-2026-09-05\`), type dessiné à l'échelle 19" 1U en
+  attendant une vraie photo de face [à trouver].
+- Passe-câbles : image Panduit NM1 de face (ratio 10,93 pour 10,86 attendu) posée le
+  04/09 — l'app relancée la sert ; l'ancienne perspective n'est plus visible.
+- Poubelle `POUBELLE-A-VALIDER-2026-09-05` : 10 exe périmés (un seul archivé gardé).
