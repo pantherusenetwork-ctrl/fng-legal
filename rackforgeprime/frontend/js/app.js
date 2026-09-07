@@ -81,6 +81,8 @@ let catalog = { types: [], role_colors: {} };
 let typesById = {};
 let project = null;
 let selectedItemId = null;
+let selectedItemIds = new Set();   /* multi-sélection (Ctrl/Maj+clic) */
+let itemClipboard = [];            /* Ctrl+C / Ctrl+V — interne, pas le presse-papiers OS */
 /* Vue active : "physical" (baies) ou "logical" (VLANs / liens). */
 let viewMode = "physical";
 /* Face regardée dans la vue physique : "front" ou "rear".
@@ -125,7 +127,10 @@ function newProject() {
     created: new Date().toISOString(),
     racks: [newRack("A")],
     equipment_types: [],
-    logical: { vlans: [], links: [] },
+    logical: { vlans: [], links: [], positions: {}, annotations: [] },
+    diagram: { annotations: [], pages: [], active_page: "" },
+    sites: [],
+    flows: [],
   };
 }
 
@@ -714,7 +719,8 @@ function renderRackSVG(rack) {
     const topU = rack.desc_units ? item.position_u : item.position_u + t.u_height - 1;
     const y = uToY(rack, topU);
     const g = svgEl("g", { "data-item-id": item.id, class: "rack-item" });
-    if (item.id === selectedItemId) g.classList.add("item-selected");
+    if (selectedItemIds.has(item.id) || item.id === selectedItemId)
+      g.classList.add("item-selected");
     /* RÈGLE : rien n'est écrit sur le dessin SAUF un hostname saisi PAR
        L'UTILISATEUR — jamais de « constructeur modèle » auto-posé (le
        survol, lui, donne toujours la fiche complète). */
@@ -1286,7 +1292,7 @@ function _purgeRackRefs(rack) {
     !ids.has(l.from.equipment_id) && !ids.has(l.to.equipment_id));
   for (const id of ids) {
     if (project.logical.positions) delete project.logical.positions[id];
-    if (selectedItemId === id) { selectedItemId = null; closeInspector(); }
+    if (selectedItemId === id) { selectedItemId = null; selectedItemIds.delete(id); closeInspector(); }
   }
 }
 
@@ -1437,6 +1443,8 @@ function openItemMenu(e, rack, item) {
       selectItem(item.id);
       $("#btn-start-connection").click();
     }],
+    ...(t.category === "patch-panel" ? [["Apparier avec un switch…",
+      () => pairPanelDialog(item)]] : []),
     ["Ouvrir les métadonnées", () => selectItem(item.id)],
     [(item.face || "front") === "rear"
       ? "Monter en façade (avant)" : "Monter à l'arrière de la baie",
@@ -1448,9 +1456,9 @@ function openItemMenu(e, rack, item) {
          : "Monté en façade — visible en vue avant, de dos en vue arrière");
      }],
     ["Supprimer", () => {
-      rack.items = rack.items.filter((i) => i.id !== item.id);
-      if (selectedItemId === item.id) { selectedItemId = null; closeInspector(); }
-      renderAll();
+      selectedItemIds.add(item.id);
+      selectedItemId = item.id;
+      deleteSelectedItems();
     }, "danger"],
   ];
   for (const [label, fn, cls] of actions) {
@@ -1670,7 +1678,9 @@ function renderOnboarding() {
     '<div class="onboard-step"><span class="num">2</span><span class="txt">' +
     "Cliquez l'équipement posé pour remplir <b>hostname, VLAN, prise, brassage</b>.</span></div>" +
     '<div class="onboard-step"><span class="num">3</span><span class="txt">' +
-    "Survolez un port pour voir sa config, puis exportez le <b>Dossier</b> complet.</span></div>";
+    "Survolez un port pour voir sa config, puis exportez le <b>Dossier</b> complet.</span></div>" +
+    '<div class="onboard-step"><span class="num">+</span><span class="txt">' +
+    "<b>Nouveau</b> (ou double-clic / clic droit sur le fond) : projet, page de diagramme, baie, salle.</span></div>";
   $("#canvas-wrap").appendChild(card);
 }
 
@@ -1739,23 +1749,126 @@ let _lastClickAt = 0;
 
 /* Touche Suppr : retire l'équipement sélectionné (vue physique), avec
    purge de ses liens — hors champs de saisie. */
-document.addEventListener("keydown", (e) => {
-  if (e.key !== "Delete" || viewMode !== "physical" || !selectedItemId) return;
-  const tag = (document.activeElement?.tagName || "").toLowerCase();
-  if (["input", "textarea", "select"].includes(tag)) return;
+function selectedSet() {
+  const s = new Set(selectedItemIds);
+  if (selectedItemId) s.add(selectedItemId);
+  return s;
+}
+
+function deleteSelectedItems() {
+  const ids = selectedSet();
+  if (!ids.size) return;
+  let n = 0;
   for (const rack of project.racks) {
-    const item = rack.items.find((i) => i.id === selectedItemId);
-    if (!item) continue;
-    project.logical.links = (project.logical.links || []).filter((l) =>
-      l.from.equipment_id !== item.id && l.to.equipment_id !== item.id);
-    if (project.logical.positions) delete project.logical.positions[item.id];
-    rack.items = rack.items.filter((i) => i !== item);
-    selectedItemId = null;
-    closeInspector();
-    renderAll();
-    renderStatus("Équipement supprimé — Ctrl+Z pour annuler");
+    const gone = rack.items.filter((i) => ids.has(i.id));
+    if (!gone.length) continue;
+    n += gone.length;
+    for (const item of gone) {
+      project.logical.links = (project.logical.links || []).filter((l) =>
+        l.from.equipment_id !== item.id && l.to.equipment_id !== item.id);
+      if (project.logical.positions) delete project.logical.positions[item.id];
+    }
+    rack.items = rack.items.filter((i) => !ids.has(i.id));
+  }
+  selectedItemId = null;
+  selectedItemIds.clear();
+  closeInspector();
+  renderAll();
+  renderStatus((n > 1 ? n + " équipements supprimés" : "Équipement supprimé")
+    + " — Ctrl+Z pour annuler");
+}
+
+function copySelectedItems() {
+  itemClipboard = [];
+  for (const id of selectedSet()) {
+    const f = findItem(id);
+    if (f) itemClipboard.push({
+      rackId: f.rack.id,
+      item: JSON.parse(JSON.stringify(f.item)),
+    });
+  }
+  if (itemClipboard.length)
+    renderStatus(itemClipboard.length + " équipement(s) copié(s) — Ctrl+V pour coller");
+}
+
+function pasteClipboardItems() {
+  if (!itemClipboard.length) {
+    renderStatus('<span class="stat-err">Presse-papiers vide — Ctrl+C d\'abord</span>');
     return;
   }
+  const newIds = [];
+  for (const clip of itemClipboard) {
+    const rack = project.racks.find((r) => r.id === clip.rackId)
+      || project.racks.find((r) => r.id === focusRackId)
+      || project.racks[0];
+    const t = typesById[clip.item.type_id];
+    if (!t || !rack) continue;
+    const u = nearestFreeSlot(rack, t.u_height, clip.item.position_u);
+    if (u == null) {
+      renderStatus('<span class="stat-err">Plus de place pour coller dans '
+        + esc(rack.name) + "</span>");
+      continue;
+    }
+    const meta = JSON.parse(JSON.stringify(clip.item.meta || {}));
+    if (meta.hostname) meta.hostname += " (copie)";
+    const id = nextItemId();
+    rack.items.push({
+      id, type_id: clip.item.type_id, position_u: u,
+      face: clip.item.face || "front",
+      position_x_mm: clip.item.position_x_mm ?? null,
+      meta,
+    });
+    newIds.push(id);
+  }
+  if (!newIds.length) return;
+  selectedItemIds = new Set(newIds);
+  selectedItemId = newIds[newIds.length - 1];
+  renderAll();
+  renderStatus(newIds.length + " équipement(s) collé(s)");
+}
+
+function nudgeSelected(du, dmm) {
+  const ids = selectedSet();
+  if (!ids.size) return;
+  let moved = 0;
+  for (const id of ids) {
+    const f = findItem(id);
+    if (!f) continue;
+    const t = typesById[f.item.type_id];
+    if (!t) continue;
+    if (du) {
+      const dest = f.item.position_u + du;
+      if (canPlace(f.rack, dest, t.u_height, f.item.id)) {
+        f.item.position_u = dest;
+        moved++;
+      }
+    } else if (dmm && t.width_mm) {
+      const cur = f.item.position_x_mm;
+      if (cur == null) continue;
+      const next = Math.max(0, Math.min(482.6 - t.width_mm, cur + dmm));
+      if (next !== cur) { f.item.position_x_mm = next; moved++; }
+    }
+  }
+  if (moved) renderAll();
+}
+
+document.addEventListener("keydown", (e) => {
+  const tag = (document.activeElement?.tagName || "").toLowerCase();
+  if (["input", "textarea", "select"].includes(tag)) return;
+  if (viewMode !== "physical") return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
+    e.preventDefault(); copySelectedItems(); return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") {
+    e.preventDefault(); pasteClipboardItems(); return;
+  }
+  if (e.key === "Delete") {
+    e.preventDefault(); deleteSelectedItems(); return;
+  }
+  if (e.key === "ArrowUp") { e.preventDefault(); nudgeSelected(1, 0); }
+  if (e.key === "ArrowDown") { e.preventDefault(); nudgeSelected(-1, 0); }
+  if (e.key === "ArrowLeft") { e.preventDefault(); nudgeSelected(0, -10); }
+  if (e.key === "ArrowRight") { e.preventDefault(); nudgeSelected(0, 10); }
 });
 
 function startPaletteDrag(e, type) {
@@ -1868,7 +1981,7 @@ document.addEventListener("pointerup", (e) => {
     } else {
       _lastClickItem = d.itemId;
       _lastClickAt = Date.now();
-      selectItem(d.itemId);
+      selectItem(d.itemId, e.shiftKey || e.ctrlKey || e.metaKey);
     }
     return;
   }
@@ -1921,9 +2034,15 @@ function findItem(id) {
   return null;
 }
 
-function selectItem(id) {
-  selectedItemId = id;
-  const found = findItem(id);
+function selectItem(id, additive) {
+  if (!additive) selectedItemIds.clear();
+  if (id) {
+    if (additive && selectedItemIds.has(id)) selectedItemIds.delete(id);
+    else selectedItemIds.add(id);
+  }
+  selectedItemId = [...selectedItemIds].at(-1) || null;
+  if (!selectedItemId) { closeInspector(); renderAll(); return; }
+  const found = findItem(selectedItemId);
   if (!found) return;
   const { rack, item } = found;
   const t = typesById[item.type_id];
@@ -1974,16 +2093,9 @@ $("#btn-add-port").addEventListener("click", () => {
   renderPortRows(found.item);
 });
 
-$("#btn-delete-item").addEventListener("click", () => {
-  const found = findItem(selectedItemId);
-  if (!found) return;
-  found.rack.items = found.rack.items.filter((i) => i.id !== selectedItemId);
-  closeInspector();
-  renderAll();
-});
+$("#btn-delete-item").addEventListener("click", () => deleteSelectedItems());
 
 function closeInspector() {
-  selectedItemId = null;
   $("#inspector").classList.add("hidden");
 }
 $("#btn-close-inspector").addEventListener("click", () => { closeInspector(); renderAll(); });
@@ -2075,6 +2187,7 @@ function exportQuery(view) {
   if (v === "physical") q.set("face", rackFace);
   /* Noms masqués à l'écran = masqués à l'export (dossier compris). */
   if (v === "physical" || v === "dossier") q.set("noms", showNames ? "true" : "false");
+  if (v === "physical" && cablesVisible) q.set("cables", "true");
   if (v === "logical" && logicalRack) q.set("rack", logicalRack);
   /* Les calques masqués à l'écran le sont aussi à l'export. */
   if (v === "logical" && hiddenLayers.size)
@@ -2088,6 +2201,15 @@ $("#btn-export-svg").addEventListener("click", () =>
 $("#btn-export-pdf").addEventListener("click", () =>
   postForBlob("/api/export/pdf" + exportQuery(),
               currentProject().id + viewSuffix() + ".pdf"));
+$("#btn-export-pdf-10")?.addEventListener("click", () =>
+  postForBlob("/api/export/pdf" + exportQuery("physical") + "&echelle=10",
+              currentProject().id + "-1-10.pdf"));
+$("#btn-export-pdf-20")?.addEventListener("click", () =>
+  postForBlob("/api/export/pdf" + exportQuery("physical") + "&echelle=20",
+              currentProject().id + "-1-20.pdf"));
+$("#btn-export-svg-leger")?.addEventListener("click", () =>
+  postForBlob("/api/export/svg" + exportQuery("physical") + "&leger=true",
+              currentProject().id + "-leger.svg"));
 $("#btn-export-dossier").addEventListener("click", () =>
   postForBlob("/api/export/pdf" + exportQuery("dossier"),
               currentProject().id + "-dossier.pdf"));
@@ -2538,26 +2660,87 @@ $("#canvas-wrap").addEventListener("wheel", (e) => {
                 e.clientX, e.clientY);
 }, { passive: false });
 
-/* Pan : glisser le fond vide (ou bouton du milieu n'importe où). */
+/* Pan : glisser le fond vide (ou bouton du milieu n'importe où).
+   Clic sans bouger = désélection. Maj+glisser = rectangle de sélection. */
 $("#canvas-wrap").addEventListener("pointerdown", (e) => {
   const wrap = $("#canvas-wrap");
-  const onBg = e.target === wrap || e.target.id === "canvas";
+  const onBg = e.target === wrap || e.target.id === "canvas"
+    || (e.target.tagName === "svg" && !e.target.closest(".rack-item, [id^='lnode-']"));
   if (annotTool || drag) return;
+  if (e.button === 2) return;
   if (e.button !== 1 && !onBg) return;
   e.preventDefault();
-  const sx = e.clientX + wrap.scrollLeft, sy = e.clientY + wrap.scrollTop;
-  document.body.style.cursor = "grabbing";
+  const sx = e.clientX, sy = e.clientY;
+  const sl = wrap.scrollLeft, st = wrap.scrollTop;
+  let moved = false;
+  const marquee = e.shiftKey && e.button === 0;
+  let box = null;
+  if (marquee) {
+    box = document.createElement("div");
+    box.id = "sel-rect";
+    box.style.cssText = "position:fixed;border:1px dashed var(--accent);background:rgba(249,115,22,.12);z-index:40;pointer-events:none";
+    document.body.appendChild(box);
+  }
+  document.body.style.cursor = marquee ? "crosshair" : "grabbing";
   const move = (ev) => {
-    wrap.scrollLeft = sx - ev.clientX;
-    wrap.scrollTop = sy - ev.clientY;
+    if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) > 4) moved = true;
+    if (marquee && box) {
+      const x = Math.min(sx, ev.clientX), y = Math.min(sy, ev.clientY);
+      box.style.left = x + "px"; box.style.top = y + "px";
+      box.style.width = Math.abs(ev.clientX - sx) + "px";
+      box.style.height = Math.abs(ev.clientY - sy) + "px";
+    } else {
+      wrap.scrollLeft = sl + sx - ev.clientX;
+      wrap.scrollTop = st + sy - ev.clientY;
+    }
   };
-  const up = () => {
+  const up = (ev) => {
     document.body.style.cursor = "";
     document.removeEventListener("pointermove", move);
     document.removeEventListener("pointerup", up);
+    box?.remove();
+    if (marquee && moved) {
+      const r = { x1: Math.min(sx, ev.clientX), y1: Math.min(sy, ev.clientY),
+                  x2: Math.max(sx, ev.clientX), y2: Math.max(sy, ev.clientY) };
+      selectedItemIds.clear();
+      for (const g of $("#canvas").querySelectorAll("[data-item-id]")) {
+        const b = g.getBoundingClientRect();
+        const cx = (b.left + b.right) / 2, cy = (b.top + b.bottom) / 2;
+        if (cx >= r.x1 && cx <= r.x2 && cy >= r.y1 && cy <= r.y2)
+          selectedItemIds.add(g.dataset.itemId);
+      }
+      selectedItemId = [...selectedItemIds].at(-1) || null;
+      renderAll();
+      if (selectedItemId) selectItem(selectedItemId, true);
+      else renderStatus(selectedItemIds.size
+        ? selectedItemIds.size + " équipements sélectionnés"
+        : "Aucun équipement dans le rectangle");
+      return;
+    }
+    if (!moved && e.button === 0) {
+      selectedItemIds.clear();
+      selectedItemId = null;
+      closeInspector();
+      renderAll();
+    }
   };
   document.addEventListener("pointermove", move);
   document.addEventListener("pointerup", up);
+});
+
+$("#canvas-wrap").addEventListener("contextmenu", (e) => {
+  if (e.target.closest(".rack-item, #item-menu, #rack-menu, .plan-card, .palette-item"))
+    return;
+  if (e.target.closest("[id^='lnode-'], [id^='link-'], [id^='annot-']")) return;
+  openNouveauMenu(e);
+});
+$("#canvas-wrap").addEventListener("dblclick", (e) => {
+  if (e.target.closest(".rack-item, [id^='lnode-'], #onboard-card, #inspector"))
+    return;
+  const onBg = e.target === $("#canvas-wrap") || e.target.id === "canvas"
+    || e.target.tagName === "svg";
+  if (!onBg) return;
+  openNouveauMenu(e);
 });
 
 /* ---- Minimap de navigation (coin bas-droit, toutes vues) ------------
@@ -2809,9 +2992,9 @@ function svgPoint(svg, e) {
    même moteur, deux collections. */
 function annotList() {
   if (viewMode === "diagram") {
-    project.diagram = project.diagram || { annotations: [] };
-    project.diagram.annotations = project.diagram.annotations || [];
-    return project.diagram.annotations;
+    const bag = diagramBag();
+    bag.annotations = bag.annotations || [];
+    return bag.annotations;
   }
   project.logical.annotations = project.logical.annotations || [];
   return project.logical.annotations;
@@ -2914,7 +3097,7 @@ function wireAnnotationMenus(svg) {
         }],
         ["Supprimer", () => {
           const kept = list.filter((x) => x.id !== anId);
-          if (viewMode === "diagram") project.diagram.annotations = kept;
+          if (viewMode === "diagram") diagramBag().annotations = kept;
           else project.logical.annotations = kept;
           renderAnnotView();
         }, "danger"],
@@ -3634,13 +3817,15 @@ function _installProject(data, name) {
   project = data;
   if (!project.equipment_types) project.equipment_types = [];
   if (!project.logical) project.logical = { vlans: [], links: [], positions: {} };
-  if (!project.diagram) project.diagram = { annotations: [] };
+  if (!project.diagram) project.diagram = { annotations: [], pages: [], active_page: "" };
+  if (!project.diagram.pages) project.diagram.pages = [];
   if (!project.sites) project.sites = [];
   if (!project.flows) project.flows = [];
   workspaceName = name;
   if (name) localStorage.setItem("rfp-ws-name", name);
   else localStorage.removeItem("rfp-ws-name");
-  selectedItemId = null; focusRackId = null; logicalRack = null; _logicalFitted = false;
+  selectedItemId = null; selectedItemIds.clear();
+  focusRackId = null; logicalRack = null; _logicalFitted = false;
   _wsLastSaved = name ? JSON.stringify(project) : "";
   planNav = { siteId: null, buildingId: null, roomId: null };
   history.stack = []; history.index = -1;
@@ -3715,6 +3900,94 @@ async function openProjectsMenu(e) {
 }
 $("#btn-projects").addEventListener("click", openProjectsMenu);
 
+async function startNewProject(e) {
+  if (workspaceName) await saveToWorkspace();
+  else if (project.racks.some((r) => r.items.length))
+    await saveToWorkspace(slugName(currentProject().name));
+  _installProject(newProject(), null);
+  renderStatus("Nouveau projet — « Projets › Enregistrer » lui donne un nom dans l'espace de travail");
+}
+
+function diagramBag() {
+  if (!project.diagram) project.diagram = { annotations: [], pages: [], active_page: "" };
+  if (project.diagram.pages && project.diagram.pages.length) {
+    return project.diagram.pages.find((p) => p.id === project.diagram.active_page)
+      || project.diagram.pages[0];
+  }
+  return project.diagram;
+}
+
+async function startNewDiagramPage() {
+  if (!project.diagram) project.diagram = { annotations: [], pages: [], active_page: "" };
+  const name = await askText("Nouvelle page de diagramme",
+    "Une page blanche à côté de celles déjà dessinées — le projet ne change pas.",
+    "Page " + ((project.diagram.pages || []).length + 1));
+  if (!name) return;
+  if (!project.diagram.pages.length) {
+    project.diagram.pages.push({
+      id: "page-1", name: "Page 1",
+      annotations: project.diagram.annotations || [],
+    });
+  }
+  const id = "page-" + Date.now().toString(36);
+  project.diagram.pages.push({ id, name: name.trim(), annotations: [] });
+  project.diagram.active_page = id;
+  project.diagram.annotations = [];
+  setView("diagram");
+  renderStatus("Page « " + esc(name.trim()) + " » — dessinez avec Texte, Zone, Flèche…");
+}
+
+function openNouveauMenu(e) {
+  _logicalMenu(e, "Nouveau…", [
+    ["Nouveau projet", () => startNewProject()],
+    ["Nouvelle page de diagramme", () => startNewDiagramPage()],
+    ["Nouvelle baie 42U", () => addRack()],
+    ["Nouvelle ville / salle (plan)", () => { setView("plan"); planAddLevel(); }],
+  ]);
+}
+$("#btn-nouveau").addEventListener("click", openNouveauMenu);
+
+async function pairPanelDialog(item) {
+  const switches = [];
+  for (const rack of project.racks) {
+    for (const it of rack.items) {
+      const t = typesById[it.type_id];
+      if (t && t.category === "switch")
+        switches.push({ id: it.id, label: (it.meta.hostname || t.model) + " — " + rack.name });
+    }
+  }
+  if (!switches.length) {
+    renderStatus('<span class="stat-err">Aucun switch dans le projet pour apparier</span>');
+    return;
+  }
+  const pick = await askText("Apparier le panneau avec quel switch ?",
+    switches.map((s, i) => (i + 1) + ". " + s.label).join("\n")
+      + "\n\nEntrez le numéro (1, 2…) ou le hostname.",
+    "1");
+  if (!pick) return;
+  const byNum = switches[parseInt(pick, 10) - 1];
+  const byName = switches.find((s) => s.label.toLowerCase().includes(pick.trim().toLowerCase()));
+  const sw = byNum || byName;
+  if (!sw) {
+    renderStatus('<span class="stat-err">Switch introuvable</span>');
+    return;
+  }
+  const res = await fetch("/api/pair-panel?panel=" + encodeURIComponent(item.id)
+    + "&switch=" + encodeURIComponent(sw.id), {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(currentProject()),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    renderStatus('<span class="stat-err">' + esc(err.detail || "Appariement refusé") + "</span>");
+    return;
+  }
+  const body = await res.json();
+  project.logical = body.project.logical;
+  renderAll();
+  renderStatus(body.message + " — activez « Câbles » pour les voir");
+}
+
 /* =====================================================================
  * Vider / Remettre : un clic vide TOUT le projet à l'écran (baies vides,
  * plus de liens, VLANs, dessins, plans, flux) — rien n'est perdu : le
@@ -3728,9 +4001,11 @@ catch { projectStash = null; }
 function syncViderBtn() {
   const b = $("#btn-vider");
   b.classList.toggle("actif", !!projectStash);
+  const lab = $("#btn-vider-label");
+  if (lab) lab.textContent = projectStash ? "Remettre" : "Vider";
   b.title = projectStash
     ? "Remettre le projet : tout revient exactement comme avant"
-    : "Vider le projet : tout disparaît de l'écran, rien n'est perdu — recliquez pour tout remettre";
+    : "Gomme : vider le projet à l'écran (rien n'est perdu) — recliquez pour tout remettre. Ce n'est pas un outil de dessin.";
 }
 $("#btn-vider").addEventListener("click", async () => {
   if (!projectStash) {
@@ -3744,7 +4019,7 @@ $("#btn-vider").addEventListener("click", async () => {
     for (const s of project.sites || [])
       for (const b of s.buildings || [])
         for (const room of b.rooms || []) { room.racks = []; room.points = []; }
-    selectedItemId = null; closeInspector();
+    selectedItemId = null; selectedItemIds.clear(); closeInspector();
     renderAll();
     renderStatus("Projet vidé à l'écran — rien n'est perdu : recliquez le même bouton pour tout remettre");
   } else {
@@ -3760,7 +4035,7 @@ $("#btn-vider").addEventListener("click", async () => {
     refreshTypes();
     renderPalette($("#palette-filter").value);
     $("#project-name").value = project.name;
-    selectedItemId = null; closeInspector();
+    selectedItemId = null; selectedItemIds.clear(); closeInspector();
     renderAll();
     renderStatus("Projet remis tel qu'il était");
   }

@@ -903,8 +903,12 @@ body[data-view="plan"] #canvas { justify-content: center; }
 #item-menu .menu-item.menu-sep { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 8px; }
 
 /* ---- Vider / Remettre + minimap (bandeau, à gauche d'Annuler) ---- */
+#btn-vider { display: inline-flex; align-items: center; gap: 5px; }
+#btn-vider-label { font-size: 12px; }
 #btn-vider.actif { color: var(--accent); }
 #btn-vider.actif svg { filter: drop-shadow(0 0 3px var(--accent)); }
 #btn-minimap.actif { color: var(--accent); }
+#btn-nouveau { display: inline-flex; align-items: center; gap: 5px; }
+#sel-rect { pointer-events: none; }
 
 #btn-noms.actif { color: var(--accent); }

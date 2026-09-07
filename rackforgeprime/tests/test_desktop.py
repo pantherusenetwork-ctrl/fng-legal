@@ -31,6 +31,7 @@ def test_instance_unique_et_port_libre():
     # Rien n'écoute sur un port improbable : pas d'instance, port libre.
     assert run.running_instance("127.0.0.1", 8199) is None
     assert run.port_is_free("127.0.0.1", 8199)
+    assert run.find_running_rackforge(8199, lo=8198, hi=8199) == (None, None)
 
 
 class _Server:

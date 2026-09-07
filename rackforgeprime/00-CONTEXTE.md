@@ -771,3 +771,46 @@ passe-câbles pas à l'échelle.
 - Passe-câbles : image Panduit NM1 de face (ratio 10,93 pour 10,86 attendu) posée le
   04/09 — l'app relancée la sert ; l'ancienne perspective n'est plus visible.
 - Poubelle `POUBELLE-A-VALIDER-2026-09-05` : 10 exe périmés (un seul archivé gardé).
+
+## 🌉 Pont d'Hemingway — 07/09/2026 — v1.7.0 : juge + éditeur
+
+**Départ** : v1.6.0 (`4d88494`), 89 tests, DAT/README/CLAUDE encore en 1.5.2.
+Friction live notée : 2e instance qui bindait un port fantôme (10048) ; SVG
+photos OLYMPE ~11 Mo.
+
+**Fait (livrable déployable v1.7.0, 105 tests)** :
+
+- **A — Docs** : DAT / README / CLAUDE.md à 1.7.0, 105 tests recomptés, E3
+  (Noms off par défaut), backlog juge à jour, recette Visio, agent documenté.
+- **B — Agent « ajoute et corrige »** : `.claude/agents/ajoute-et-corrige.md`
+  (catalogue, images, métadonnées, packs, docs projet — spécialisé).
+- **C — Crayon + Nouveau** : le « crayon » du bandeau était `#btn-vider`
+  (Vider/Remettre), **pas** un mode dessin. Icône **gomme** + libellé
+  Vider/Remettre. Bouton **Nouveau** : projet / page de diagramme / baie /
+  ville-salle. Double-clic et clic droit sur le fond du canvas → le même menu.
+- **D1** layout logique compact (groupé par baie, wrap ~5 nœuds / rangée).
+- **D2** impression 1:10 / 1:20 écrite sur la page PDF (menu Exporter).
+- **D3** identifiants : retour à la ligne, plus de « … » (SVG + étiquettes).
+- **D4** multi-sélection (Maj/Ctrl+clic, Maj+rectangle) + Ctrl+C/V, Suppr, flèches.
+- **D5** VSDX `<Connect>` Begin/End → Pin des nœuds. XML validé.
+  **[à vérifier dans Visio desktop]** — recette DAT § 13.
+- **D6** câbles v2 à l'export SVG/PDF (`cables=true`, ancrage port) +
+  appariement panneau↔switch (clic droit sur un PP, `POST /api/pair-panel`).
+- **D7** plan d'étage déjà fondé (ville → bâtiment → salle) ; **Nouvelle
+  page** de diagramme (multi-pages, compat annotations seules). Aucune
+  donnée OLYMPE inventée.
+- **E** instance unique : scan 8137–8146, message, pas de 2e bind.
+  Export **SVG léger** (`leger=true` = dessin, sans photos).
+
+**Prochaine étape exacte** : Panther (1) rouvre salle OLYMPE, teste **Nouveau**
++ gomme + multi-sélection/Ctrl+C/V + Apparier sur un PP d'ATLAS + Câbles ;
+(2) exporte un PDF 1:10 et un .vsdx, ouvre le VSDX dans Visio (liens collés ?) ;
+(3) descend Plan → Ville [à vérifier] → OLYMPE et place les baies / charge
+l'image du plan. Puis recompiler l'exe (fermer l'app d'abord).
+
+Toujours en attente, **ne pas inventer** : 24/48 ports stack 2930 + PoE,
+VLANs d'OLYMPE, photo STORI, Belden v2, hostnames HERCULE, positions baies,
+test LANCER-PHONE.
+
+Reste produit : connecteurs éditables (waypoints), filtre VLAN des câbles,
+re-photos rackables en angle.

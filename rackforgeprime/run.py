@@ -111,6 +111,20 @@ def open_app_window(url: str) -> bool:
     return False
 
 
+def find_running_rackforge(preferred: int, host: str = "127.0.0.1",
+                           lo: int = 8137, hi: int = 8146
+                           ) -> tuple[int, str] | tuple[None, None]:
+    """Cherche une instance RackForgePrime déjà vivante (port préféré
+    puis 8137–8146). Évite le second bind (vu en live sur un port
+    fantôme type 10048) : on rouvre la fenêtre existante."""
+    ports = [preferred] + [p for p in range(lo, hi + 1) if p != preferred]
+    for port in ports:
+        ver = running_instance(host, port)
+        if ver:
+            return port, ver
+    return None, None
+
+
 def running_instance(host: str, port: int) -> str | None:
     """Version de RackForgePrime qui écoute déjà sur ce port, sinon None
     (port libre, ou occupé par autre chose)."""
@@ -182,17 +196,16 @@ def main() -> None:
 
     ws = ensure_workspace()
 
-    # INSTANCE UNIQUE : si RackForgePrime tourne déjà sur ce port, on ne
-    # lance pas un second serveur (qui échouerait en silence) — on rouvre
-    # simplement sa fenêtre. C'est le comportement d'une vraie application.
-    already = running_instance("127.0.0.1", args.port)
-    if already:
-        url = f"http://127.0.0.1:{args.port}"
+    # INSTANCE UNIQUE : une seule RackForgePrime à la fois. On sonde le
+    # port demandé ET la plage 8137–8146 : si une instance répond, on
+    # rouvre sa fenêtre — jamais de second bind (y compris un port
+    # fantôme type 10048).
+    found_port, already = find_running_rackforge(args.port)
+    if already and found_port is not None:
+        url = f"http://127.0.0.1:{found_port}"
         if args.host not in ("127.0.0.1", "localhost"):
-            # Édition Phone (--host 0.0.0.0) : impossible d'ouvrir le
-            # réseau tant que l'édition PC tient le port. On le DIT.
             msg = (f"RackForgePrime v{already} tourne déjà en édition PC "
-                   f"sur le port {args.port}.\n\nFerme sa fenêtre, puis "
+                   f"sur le port {found_port}.\n\nFerme sa fenêtre, puis "
                    f"relance LANCER-PHONE.bat : le serveur s'ouvrira alors "
                    f"au réseau (téléphone).")
             print(msg)
@@ -202,13 +215,23 @@ def main() -> None:
         if not args.no_browser and not open_app_window(url):
             webbrowser.open(url)
         return
-    # Port pris par autre chose : le suivant libre (jusqu'à +9), et on le dit.
+    # Port pris par AUTRE chose (pas RackForge) : suivant libre, borné
+    # à +9 — on n'écoute jamais un port aléatoire hors de cette plage.
     if not port_is_free(args.host, args.port):
+        chosen = None
         for cand in range(args.port + 1, args.port + 10):
-            if port_is_free(args.host, cand):
+            if port_is_free(args.host, cand) and not running_instance(
+                    "127.0.0.1", cand):
                 print(f"Port {args.port} occupé par un autre programme → {cand}")
-                args.port = cand
+                chosen = cand
                 break
+        if chosen is None:
+            msg = (f"Aucun port libre entre {args.port} et {args.port + 9}.\n"
+                   "Ferme l'autre programme, ou relance avec --port.")
+            print(msg)
+            _message_box("RackForgePrime — port occupé", msg)
+            return
+        args.port = chosen
 
     # Exe fenêtré (--noconsole) : sys.stdout/stderr valent None sous Windows
     # et le moindre print planterait l'app. On redirige tout vers un log
