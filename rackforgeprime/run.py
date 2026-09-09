@@ -1,21 +1,26 @@
 """Point d'entrée RackForgePrime.
 
-    python run.py              → http://127.0.0.1:8137 (navigateur auto-ouvert)
-    python run.py --port N     → port custom
-    python run.py --no-browser → sans ouverture du navigateur
+    python run.py                 → édition PC, http://127.0.0.1:8137
+    python run.py --edition web   → navigateur local, serveur partagé
+    python run.py --edition phone → LAN (0.0.0.0) + adresses affichées
+    python run.py --diagnostic    → vérifie le kit sans lancer le serveur
 
-Fonctionne aussi packagé en exécutable Windows (PyInstaller) : au premier
-lancement, l'exe crée son **espace de travail** à côté de lui :
+Packagé (PyInstaller onedir, recommandé pour USB) : l'exe crée son
+espace de travail **à côté de lui**, jamais dans %TEMP% ni dans le cwd.
 
-    RackForgePrime-Workspace/
-    ├── projets/      ← les JSON de projets (source de vérité)
-    ├── exports/      ← vos SVG / PDF / CSV livrés
-    ├── catalogue/    ← YAML NetBox et faceplates custom à importer
-    ├── datasheets/   ← PDF constructeurs à importer
-    └── LISEZMOI.txt
+    <kit>/
+    ├── RackForgePrime.exe
+    ├── _internal/                 ← DLLs (onedir : pas d'extraction TEMP)
+    ├── LANCER-PC.bat
+    ├── LANCER-WEB.bat
+    ├── LANCER-PHONE.bat
+    ├── LISEZMOI.txt
+    └── RackForgePrime-Workspace/  ← projets, catalogue, exports
 
-Local uniquement : le serveur n'écoute que sur 127.0.0.1.
+Local uniquement : aucune donnée ne sort du poste.
 """
+
+from __future__ import annotations
 
 import argparse
 import json
@@ -28,87 +33,33 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
-FROZEN = getattr(sys, "frozen", False)  # True dans l'exe PyInstaller
+FROZEN = getattr(sys, "frozen", False)
 
 # En développement, le package vit dans backend/ ; on l'ajoute au path.
 # Dans l'exe, PyInstaller a déjà embarqué les modules (via --paths backend).
 if not FROZEN:
     sys.path.insert(0, str(Path(__file__).resolve().parent / "backend"))
 
-LISEZMOI = """\
-RackForgePrime — espace de travail
-==================================
-
-projets/     Vos projets (.json). C'est la SOURCE DE VÉRITÉ : versionnez-les,
-             diffez-les, les dessins se régénèrent depuis ces fichiers.
-exports/     Rangez ici vos SVG / PDF / CSV exportés depuis l'application.
-catalogue/   Déposez ici vos YAML NetBox devicetype-library et vos images /
-             SVG de faceplates, puis importez-les depuis la palette.
-             Sous-dossier images-officielles/ : une image nommée
-             <id-du-type>.png (ex : fortinet-fortigate-100f.png) y est
-             chargée automatiquement comme faceplate du type du catalogue.
-datasheets/  Déposez ici les PDF constructeurs à importer.
-
-Lancement : RackForgePrime.exe (ou `python run.py`), l'interface s'ouvre sur
-http://127.0.0.1:8137 — tout est local, aucune donnée ne sort du poste.
-"""
-
-
-def ensure_workspace() -> Path:
-    """Crée (idempotent) l'espace de travail et pointe le stockage dessus.
-
-    À côté de l'exe quand on est packagé, à côté du code sinon.
-    """
-    base = (Path(sys.executable).resolve().parent if FROZEN
-            else Path(__file__).resolve().parent)
-    ws = base / "RackForgePrime-Workspace"
-    for sub in ("projets", "exports", "catalogue", "datasheets",
-                "catalogue/images-officielles", "catalogue/types-officiels"):
-        (ws / sub).mkdir(parents=True, exist_ok=True)
-    readme = ws / "LISEZMOI.txt"
-    if not readme.exists():
-        readme.write_text(LISEZMOI, encoding="utf-8")
-    # Le backend (storage.py) lit cette variable pour savoir où sauvegarder.
-    os.environ.setdefault("RACKFORGE_PROJECTS_DIR", str(ws / "projets"))
-    # catalog_images.py lit celle-ci pour trouver les images officielles.
-    os.environ.setdefault("RACKFORGE_CATALOG_DIR", str(ws / "catalogue"))
-    return ws
+from rackforge.kit import (  # noqa: E402
+    ADDRESS_FILE,
+    apply_kit_env,
+    append_boot_log,
+    diagnostic_report,
+    edition_defaults,
+    ensure_workspace,
+    first_browser,
+    open_ui,
+    public_urls,
+    resolve_kit_dir,
+    workspace_is_writable,
+    workspace_path,
+    write_address_file,
+)
 
 
 def open_app_window(url: str) -> bool:
-    """Ouvre l'UI dans une fenêtre applicative dédiée (mode ``--app`` de
-    Edge/Chrome : pas de barre d'adresse, pas d'onglets — le rendu d'une
-    vraie application de bureau, sans dépendance supplémentaire).
-
-    Retourne False si aucun navigateur Chromium n'est trouvé (l'appelant
-    retombe alors sur le navigateur par défaut).
-    """
-    import shutil
-    import subprocess
-
-    candidates: list[Path] = []
-    if os.name == "nt":
-        pf86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
-        pf = os.environ.get("ProgramFiles", r"C:\Program Files")
-        local = os.environ.get("LocalAppData", "")
-        candidates = [
-            Path(pf86) / "Microsoft" / "Edge" / "Application" / "msedge.exe",
-            Path(pf) / "Microsoft" / "Edge" / "Application" / "msedge.exe",
-            Path(pf) / "Google" / "Chrome" / "Application" / "chrome.exe",
-            Path(pf86) / "Google" / "Chrome" / "Application" / "chrome.exe",
-            Path(local) / "Google" / "Chrome" / "Application" / "chrome.exe",
-        ]
-    else:
-        for name in ("chromium", "google-chrome", "chromium-browser"):
-            found = shutil.which(name)
-            if found:
-                candidates.append(Path(found))
-    for exe in candidates:
-        if exe.exists():
-            subprocess.Popen([str(exe), f"--app={url}",
-                              "--window-size=1500,950"])
-            return True
-    return False
+    """Compat : fenêtre ``--app`` Chromium, sinon False (repli navigateur)."""
+    return open_ui(url, mode="app") == "app"
 
 
 def running_instance(host: str, port: int) -> str | None:
@@ -169,18 +120,105 @@ def watch_window(server, app_obj, grace: float = 90.0,
             server.should_exit = True
 
 
+def _redirect_stdio(ws: Path) -> None:
+    """Exe fenêtré (--noconsole) : stdout/stderr valent None sous Windows."""
+    if sys.stdout is None or sys.stderr is None:
+        log = open(ws / "rackforge.log", "a", encoding="utf-8", buffering=1)
+        sys.stdout = sys.stdout or log
+        sys.stderr = sys.stderr or log
+    else:
+        for stream in (sys.stdout, sys.stderr):
+            try:
+                stream.reconfigure(errors="replace")
+            except (AttributeError, ValueError):
+                pass
+
+
+def _print_diagnostic(report: dict) -> int:
+    print("RackForgePrime — diagnostic du kit portable")
+    print("==========================================")
+    for key in ("frozen", "kit_dir", "workspace", "workspace_exists",
+                "workspace_writable", "browser", "frontend",
+                "frontend_exists", "onedir", "edition"):
+        print(f"  {key:22} {report.get(key)}")
+    urls = report.get("urls") or []
+    if urls:
+        print("  urls")
+        for url in urls:
+            print(f"                         {url}")
+    ok = bool(report.get("workspace_writable"))
+    if report.get("frozen") and not report.get("frontend_exists"):
+        print("  ERREUR : frontend embarqué introuvable (rebuild onedir).")
+        ok = False
+    if not report.get("browser"):
+        print("  ATTENTION : aucun Edge/Chrome/Chromium trouvé.")
+        print("  L'édition PC ouvrira le navigateur par défaut ; à défaut,")
+        print(f"  ouvrez à la main l'URL écrite dans {ADDRESS_FILE}.")
+    print("  résultat               " + ("OK" if ok else "À CORRIGER"))
+    return 0 if ok else 2
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="RackForgePrime — serveur local")
     parser.add_argument("--port", type=int, default=8137)
-    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--host", default=None,
+                        help="défaut : 127.0.0.1 (pc/web) ou 0.0.0.0 (phone)")
+    parser.add_argument("--edition", choices=("pc", "web", "phone"), default="pc",
+                        help="pc = fenêtre ; web = navigateur ; phone = LAN")
     parser.add_argument("--no-browser", action="store_true",
-                        help="ne pas ouvrir de fenêtre au démarrage")
+                        help="ne pas ouvrir de fenêtre / navigateur")
     parser.add_argument("--keep-alive", action="store_true",
                         help="ne jamais s'arrêter quand la fenêtre se ferme "
                              "(serveur partagé : éditions Web / Phone)")
+    parser.add_argument("--diagnostic", action="store_true",
+                        help="vérifier le kit (chemins, écriture, navigateur) "
+                             "sans lancer le serveur")
     args = parser.parse_args()
 
-    ws = ensure_workspace()
+    defaults = edition_defaults(args.edition)
+    if args.host is None:
+        args.host = defaults["host"]
+    keep_alive = args.keep_alive or defaults["keep_alive"]
+    open_mode = "none" if args.no_browser else defaults["open_mode"]
+
+    kit = resolve_kit_dir()
+    append_boot_log(
+        f"démarrage edition={args.edition} host={args.host} "
+        f"port={args.port} frozen={FROZEN} kit={kit}",
+        kit,
+    )
+
+    ws_target = workspace_path(kit)
+    if not workspace_is_writable(ws_target):
+        # USB en lecture seule, dossier verrouillé, quota…
+        msg = (
+            "Impossible d'écrire l'espace de travail :\n"
+            f"  {ws_target}\n\n"
+            "Vérifiez que le kit n'est pas en lecture seule (clé USB\n"
+            "verrouillée, dossier OneDrive hors ligne, droits manquants)."
+        )
+        print(msg)
+        _message_box("RackForgePrime — espace de travail", msg)
+        append_boot_log(f"ERREUR workspace illisible: {ws_target}", kit)
+        sys.exit(3)
+
+    try:
+        ws = ensure_workspace(kit)
+    except OSError as exc:
+        msg = f"Création de l'espace de travail impossible :\n{ws_target}\n\n{exc}"
+        print(msg)
+        _message_box("RackForgePrime — espace de travail", msg)
+        append_boot_log(f"ERREUR ensure_workspace: {exc}", kit)
+        sys.exit(3)
+
+    os.environ["RACKFORGE_EDITION"] = args.edition
+    os.environ["RACKFORGE_BIND_HOST"] = args.host
+    os.environ["RACKFORGE_BIND_PORT"] = str(args.port)
+
+    if args.diagnostic:
+        apply_kit_env(kit, ws)
+        report = diagnostic_report(kit, ws)
+        sys.exit(_print_diagnostic(report))
 
     # INSTANCE UNIQUE : si RackForgePrime tourne déjà sur ce port, on ne
     # lance pas un second serveur (qui échouerait en silence) — on rouvre
@@ -189,67 +227,113 @@ def main() -> None:
     if already:
         url = f"http://127.0.0.1:{args.port}"
         if args.host not in ("127.0.0.1", "localhost"):
-            # Édition Phone (--host 0.0.0.0) : impossible d'ouvrir le
-            # réseau tant que l'édition PC tient le port. On le DIT.
-            msg = (f"RackForgePrime v{already} tourne déjà en édition PC "
-                   f"sur le port {args.port}.\n\nFerme sa fenêtre, puis "
-                   f"relance LANCER-PHONE.bat : le serveur s'ouvrira alors "
-                   f"au réseau (téléphone).")
+            msg = (
+                f"RackForgePrime v{already} tourne déjà en édition PC "
+                f"sur le port {args.port}.\n\nFermez sa fenêtre, puis "
+                f"relancez LANCER-PHONE.bat : le serveur s'ouvrira alors "
+                f"au réseau (téléphone)."
+            )
             print(msg)
             _message_box("RackForgePrime — édition Phone", msg)
             return
         print(f"RackForgePrime v{already} tourne déjà → {url} (fenêtre rouverte)")
-        if not args.no_browser and not open_app_window(url):
-            webbrowser.open(url)
+        if open_mode != "none":
+            opened = open_ui(url, mode=open_mode, kit=kit)
+            if opened == "none":
+                webbrowser.open(url)
         return
-    # Port pris par autre chose : le suivant libre (jusqu'à +9), et on le dit.
+
     if not port_is_free(args.host, args.port):
         for cand in range(args.port + 1, args.port + 10):
             if port_is_free(args.host, cand):
                 print(f"Port {args.port} occupé par un autre programme → {cand}")
                 args.port = cand
+                os.environ["RACKFORGE_BIND_PORT"] = str(args.port)
                 break
 
-    # Exe fenêtré (--noconsole) : sys.stdout/stderr valent None sous Windows
-    # et le moindre print planterait l'app. On redirige tout vers un log
-    # dans l'espace de travail — utile aussi pour diagnostiquer à distance.
-    if sys.stdout is None or sys.stderr is None:
-        log = open(ws / "rackforge.log", "a", encoding="utf-8", buffering=1)
-        sys.stdout = sys.stdout or log
-        sys.stderr = sys.stderr or log
-    else:
-        # Console cp1252 (cmd, PowerShell) : la flèche « → » du message de
-        # démarrage tuerait le process en UnicodeEncodeError.
-        for stream in (sys.stdout, sys.stderr):
-            try:
-                stream.reconfigure(errors="replace")
-            except (AttributeError, ValueError):
-                pass
+    _redirect_stdio(ws)
+
+    urls = public_urls(args.host, args.port)
+    os.environ["RACKFORGE_PUBLIC_URLS"] = "|".join(urls)
+    try:
+        addr_file = write_address_file(kit, args.edition, args.host, args.port, ws)
+    except OSError as exc:
+        addr_file = None
+        append_boot_log(f"adresse non écrite: {exc}", kit)
 
     # Import APRÈS ensure_workspace (l'env RACKFORGE_PROJECTS_DIR est posé).
     import uvicorn
-    from app import app  # noqa: WPS433 — objet importé pour le mode packagé
+    from app import VERSION, app  # noqa: WPS433 — objet importé pour le mode packagé
 
-    url = f"http://{args.host}:{args.port}"
-    print(f"RackForgePrime → {url}")
+    print(f"RackForgePrime v{VERSION}  édition {args.edition}")
+    print(f"Kit : {kit}")
     print(f"Espace de travail : {ws}")
-    if not args.no_browser:
-        # Le serveur met ~1 s à écouter ; fenêtre app dédiée, sinon navigateur.
+    for url in urls:
+        print(f"Ouvrir : {url}")
+    if addr_file:
+        print(f"Adresses : {addr_file}")
+    browser = first_browser(kit)
+    if browser:
+        print(f"Navigateur : {browser}")
+    elif open_mode != "none":
+        print("Aucun Edge/Chrome trouvé — repli sur le navigateur par défaut.")
+
+    if args.edition == "phone":
+        lan = [u for u in urls if "127.0.0.1" not in u]
+        phone_txt = (
+            "Édition Phone — ouvrez sur le téléphone (même Wi-Fi) :\n\n"
+            + ("\n".join(lan) if lan else
+               "Aucune IP LAN détectée. Vérifiez le Wi-Fi, ou lisez\n"
+               f"{ADDRESS_FILE} à la racine du kit.")
+            + "\n\nSur ce PC : "
+            + urls[0]
+            + "\nFermez la fenêtre du lanceur pour arrêter le serveur."
+        )
+        print(phone_txt)
+        _message_box("RackForgePrime — édition Phone", phone_txt)
+
+    if open_mode != "none":
+        url_local = urls[0]
+
         def _open() -> None:
-            if not open_app_window(url):
-                webbrowser.open(url)
+            opened = open_ui(url_local, mode=open_mode, kit=kit)
+            if opened == "none":
+                if not webbrowser.open(url_local):
+                    _message_box(
+                        "RackForgePrime — navigateur",
+                        "Impossible d'ouvrir un navigateur automatiquement.\n\n"
+                        f"Ouvrez à la main :\n{url_local}\n\n"
+                        "Prérequis : Microsoft Edge ou Google Chrome "
+                        "(édition PC en fenêtre). "
+                        "Sinon utilisez LANCER-WEB.bat avec Firefox.",
+                    )
+
         threading.Timer(1.2, _open).start()
+
     config = uvicorn.Config(app, host=args.host, port=args.port,
                             log_level="warning")
     server = uvicorn.Server(config)
     # Application de bureau : fermer la fenêtre = quitter. Un serveur
-    # partagé (--no-browser, --host réseau, --keep-alive) reste en vie.
-    desktop = (not args.no_browser and not args.keep_alive
+    # partagé (--no-browser, --host réseau, --keep-alive, web/phone)
+    # reste en vie.
+    desktop = (open_mode == "app" and not keep_alive
                and args.host in ("127.0.0.1", "localhost"))
     if desktop:
         threading.Thread(target=watch_window, args=(server, app),
                          daemon=True).start()
-    server.run()
+    try:
+        server.run()
+    except OSError as exc:
+        msg = (
+            f"Le serveur n'a pas pu démarrer ({args.host}:{args.port}).\n\n"
+            f"{exc}\n\n"
+            "Causes fréquentes hors du PC de build : antivirus qui bloque\n"
+            "l'exe, Visual C++ Redistributable manquant, ou port filtré."
+        )
+        print(msg)
+        _message_box("RackForgePrime — démarrage", msg)
+        append_boot_log(f"ERREUR serveur: {exc}", kit)
+        sys.exit(4)
 
 
 if __name__ == "__main__":

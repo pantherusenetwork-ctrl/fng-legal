@@ -6,32 +6,40 @@ VLAN/liens (par baie ou complète), plan d'étage (ville › bâtiment › salle
 étiquettes TIA-606 générés, matrice de flux, budget PoE, dossier DAT PDF, exports SVG / PNG /
 draw.io / Visio (.vsdx).
 
-**Version 1.5.2** — le DAT complet de l'application est dans
-[`docs/DAT-RACKFORGEPRIME.md`](docs/DAT-RACKFORGEPRIME.md) ; le journal de bord dans
+**Version 1.6.1** — kit portable (un dossier, 3 éditions). DAT :
+[`docs/DAT-RACKFORGEPRIME.md`](docs/DAT-RACKFORGEPRIME.md) ; journal :
 [`00-CONTEXTE.md`](00-CONTEXTE.md) (dernière section = état exact).
+Mode d'emploi USB / autre PC : [`portable/LISEZMOI.txt`](portable/LISEZMOI.txt).
 
 ## Lancer
 
 | Usage | Commande |
 |---|---|
-| Application (exe) | `RackForgePrime-PC\RackForgePrime.exe` — fenêtre dédiée, port 8137, fermer la fenêtre = quitter |
-| Navigateur / téléphone | `RackForgePrime-Web\LANCER-WEB.bat` · `RackForgePrime-Phone\LANCER-PHONE.bat` |
-| Développement | `set PYTHONIOENCODING=utf-8 && .venv\Scripts\python.exe run.py --port 8138 --no-browser` |
-| Tests | `.venv\Scripts\python.exe -m pytest tests -q` (88 verts au 04/09/2026) |
-| Compilation | recette PyInstaller au § 9 du DAT (chemins absolus, dossier de build court, version bumpée avant) |
+| Kit portable (USB / autre PC) | Un seul dossier : `LANCER-PC.bat` · `LANCER-WEB.bat` · `LANCER-PHONE.bat` (à côté de l'exe) |
+| Développement | `PYTHONIOENCODING=utf-8 python run.py --port 8138 --no-browser` |
+| Édition | `python run.py --edition pc\|web\|phone` |
+| Diagnostic kit | `python run.py --diagnostic` |
+| Tests | `python -m pytest tests -q` |
+| Smoke 3 éditions | `python scripts/smoke_editions.py` |
+| Compilation kit | `python scripts/construire_kit_portable.py --build` (Windows, onedir) |
+
+Ancien schéma `RackForgePrime-PC` + `RackForgePrime-Web` + `RackForgePrime-Phone`
+(les `.bat` faisaient `cd ..\RackForgePrime-PC`) : cassé dès qu'on copie un seul
+dossier. Remplacé par le kit unique.
 
 ## Arborescence
 
 ```
 rackforgeprime/
-├── run.py                  point d'entrée (workspace, instance unique, fenêtre, chien de garde)
-├── backend/app.py          FastAPI : API JSON + frontend statique
-├── backend/rackforge/      package pur Python : modèle, placement, moteurs SVG/PDF/draw.io/VSDX, flux, PoE, sauvegarde
-├── frontend/               index.html · css/app.css · js/app.js (vanilla, SVG natif) · assets/
-├── tests/                  pytest
-├── docs/                   DAT-RACKFORGEPRIME.md · SPEC.md · ARCHITECTURE.md · PLAN_DESIGN.md · RECHERCHE_VISUELLE.md
-├── assets/icon.ico
-└── RackForgePrime-Workspace/  (gitignoré) projets · catalogue (packs, images, bibliothèque, formes) · exports · sauvegardes
+├── run.py                  point d'entrée (kit, 3 éditions, fenêtre, chien de garde)
+├── backend/app.py          FastAPI : API JSON + frontend statique + /api/kit
+├── backend/rackforge/      package : modèle, SVG/PDF/draw.io/VSDX, kit portable
+├── frontend/               index.html · css/app.css · js/app.js · assets/
+├── portable/               LANCER-*.bat · _commun.cmd · LISEZMOI.txt
+├── scripts/                construire_kit_portable.py · smoke_editions.py
+├── tests/                  pytest (dont test_portable + smoke 3 éditions)
+├── docs/                   DAT-RACKFORGEPRIME.md · SPEC.md · ARCHITECTURE.md
+└── RackForgePrime-Workspace/  (gitignoré) projets · catalogue · exports · sauvegardes
 ```
 
 ## Règles gravées
@@ -40,3 +48,4 @@ rackforgeprime/
 - Aucun nom sur le dessin sauf hostname saisi ; un dessin = une vraie photo de façade de face.
 - Le backend valide tout (422 en français) ; le JSON est la source de vérité.
 - La version change à chaque exe déployé ; rien n'est supprimé (poubelle à valider).
+- Le kit se copie **en entier** (exe + `_internal\` + workspace + lanceurs). Jamais l'exe seul.

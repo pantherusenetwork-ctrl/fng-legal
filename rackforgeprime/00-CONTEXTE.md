@@ -771,3 +771,39 @@ passe-câbles pas à l'échelle.
 - Passe-câbles : image Panduit NM1 de face (ratio 10,93 pour 10,86 attendu) posée le
   04/09 — l'app relancée la sert ; l'ancienne perspective n'est plus visible.
 - Poubelle `POUBELLE-A-VALIDER-2026-09-05` : 10 exe périmés (un seul archivé gardé).
+
+## 🌉 Pont d'Hemingway — 09/09/2026 — v1.6.1 kit portable (USB / autre PC)
+
+**Demande Panther** : l'exe / le package ne s'ouvre pas hors du poste de build
+(autre PC, clé USB). Les 3 éditions (PC, Web, Phone) doivent marcher depuis un
+kit copiable, sans installer Python.
+
+**Diagnostic** (confirmé dans le code et le DAT, pas seulement l'hypothèse) :
+
+1. **3 dossiers frères** `RackForgePrime-PC` + `-Web` + `-Phone` : les `.bat`
+   faisaient `cd ..\RackForgePrime-PC`. Copier un seul dossier, ou changer
+   l'arborescence, cassait Web et Phone. Les lanceurs n'étaient **pas** dans
+   le dépôt.
+2. **Workspace à côté de l'exe** : correct si on copie le dossier PC entier ;
+   un exe seul recrée un workspace **vide** (plus de catalogue / photos).
+3. **Fenêtre PC = Chromium `--app`** (chemins Program Files seulement) : sans
+   Edge/Chrome au standard, ou profil Chrome déjà verrouillé, la fenêtre ne
+   s'ouvre pas. Exe `--noconsole` = silence.
+4. **PyInstaller onefile** : extraction `%TEMP%` à chaque lancement — antivirus,
+   TEMP plein, USB = échec avant même `run.py`. Recette DAT § 9 encore onefile.
+5. **Phone** affichait `http://0.0.0.0:8137` (inutilisable sur le téléphone).
+
+**Correctif** : un seul dossier kit (`portable/` + `scripts/construire_kit_portable.py`
+en **onedir**). Lanceurs ancrés sur `%~dp0`. `backend/rackforge/kit.py` : chemins
+sans cwd, env d'une autre install écrasé, navigateur kit/`navigateur\` puis
+Edge/Chrome + profil isolé, IPs LAN, `DERNIERE-ADRESSE.txt`,
+`rackforge-demarrage.log`. `--edition pc|web|phone`, `--diagnostic`, `/api/kit`.
+Smoke : `python scripts/smoke_editions.py` (3 éditions + kit déplacé).
+
+**Quoi copier** : tout le kit (exe + `_internal\` + workspace + `LANCER-*.bat`).
+Prérequis / dépannage : `portable/LISEZMOI.txt`. VERSION + badge **1.6.1**.
+
+**Prochaine étape exacte** : sur le PC Windows de Panther, `python scripts\construire_kit_portable.py --build`, y copier l'actuel `RackForgePrime-Workspace`, lancer les 3 `LANCER-*.bat`, puis recopier le dossier sur une clé USB et un autre PC. Archiver l'ancien exe 3-dossiers dans `SAUVEGARDES\`.
+
+**Questions en attente** : le rebuild exe se fait sur le poste Windows (cette
+session Linux assemble + smoke-simule, elle ne produit pas de `.exe`).

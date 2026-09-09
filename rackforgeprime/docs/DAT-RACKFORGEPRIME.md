@@ -1,4 +1,4 @@
-# DAT — RackForgePrime v1.5.2
+# DAT — RackForgePrime v1.6.1
 
 **Dossier d'Architecture Technique de l'application** — écrit le 04/09/2026, code expliqué
 étape par étape. Règle d'or reprise du dossier Ingénieur Réseau : *un autre ingénieur doit
@@ -14,16 +14,16 @@ pouvoir reconstruire, compiler, déployer et faire évoluer l'application sans t
 | Élément | Valeur |
 |---|---|
 | Nom | RackForgePrime (logo « slot forgé », icône `assets/icon.ico`) |
-| Version | **1.5.2** (`backend/app.py` `VERSION` + badge `#brand-version` de `frontend/index.html`, toujours bumpés ensemble) |
+| Version | **1.6.1** (`backend/app.py` `VERSION` + badge `#brand-version` de `frontend/index.html`, toujours bumpés ensemble) |
 | Nature | Application **de bureau 100 % locale** : serveur FastAPI + fenêtre Chromium `--app` (aucun cloud, aucun appel sortant) |
 | Métier | Schémas de baies réseau à l'échelle réelle EIA-310, vue logique VLAN/liens, plan d'étage, brassage, dossier DAT PDF, exports SVG/PNG/draw.io/VSDX |
 | Espace de travail projet | `C:\Users\koyon\Desktop\CITADEL\RACKFORGEPRIME\` (règle : tout au même endroit) |
 | Code | `fng-legal\rackforgeprime\` (dépôt git `fng-legal`, branche `claude/rackforgeprimes-foundations-y41pt4`) |
-| Exe déployé | `RackForgePrime-PC\RackForgePrime.exe` + `RackForgePrime-PC\RackForgePrime-Workspace\` (la seule copie de production) |
-| Éditions | `-PC` (fenêtre app), `-Web\LANCER-WEB.bat` (navigateur), `-Phone\LANCER-PHONE.bat` (`--host 0.0.0.0`) — même exe, même workspace |
+| Exe déployé | **Kit portable** : un seul dossier (`RackForgePrime.exe` + `_internal\` + `RackForgePrime-Workspace\` + `LANCER-*.bat`). Copiable USB / autre PC |
+| Éditions | `--edition pc` (fenêtre), `web` (navigateur), `phone` (`0.0.0.0` + IP LAN). Lanceurs dans `portable/` recopiés à côté de l'exe |
 | Port | 8137 (exe) ; dev `run.py --port 8138+` |
 | Python | 3.13 (`.venv`) ; FastAPI, Uvicorn, Pydantic v2, reportlab + svglib (PDF), Pillow, pyyaml, pypdf, PyInstaller |
-| Tests | `python -m pytest tests -q` → **88 verts** au 04/09/2026 (17 fichiers) |
+| Tests | `python -m pytest tests -q` + `python scripts/smoke_editions.py` (PC / Web / Phone + kit déplacé) |
 | Journal de bord | `00-CONTEXTE.md` (sections « Pont d'Hemingway », la dernière fait foi) |
 
 ---
@@ -55,7 +55,7 @@ dossier DAT — et une vraie application de bureau, solide et fluide.
 ```mermaid
 flowchart LR
   subgraph PC["Poste Windows"]
-    EXE["RackForgePrime.exe<br/>(PyInstaller onefile : run.py)"]
+    EXE["RackForgePrime.exe<br/>(PyInstaller onedir : run.py + _internal)"]
     WIN["Fenêtre Chromium --app<br/>frontend/index.html + app.js"]
     WS["RackForgePrime-Workspace/<br/>projets/ · catalogue/ · exports/ · sauvegardes/"]
   end
@@ -104,7 +104,7 @@ Un projet = un fichier `projets/<nom>.json`, `schema_version = 1`.
 
 | Étape | Module | Ce qu'il fait | Points d'attention |
 |---|---|---|---|
-| 1 | `run.py` | Point d'entrée : crée le workspace à côté de l'exe (`ensure_workspace`, variables `RACKFORGE_PROJECTS_DIR` / `RACKFORGE_CATALOG_DIR`), redirige stdout vers `rackforge.log` (exe fenêtré), **instance unique** (`running_instance` → rouvre la fenêtre), port libre suivant si occupé, ouvre la fenêtre Chromium `--app`, lance uvicorn, **chien de garde** `watch_window` (voir § 7) | `--no-browser`, `--host` réseau ou `--keep-alive` = serveur partagé jamais arrêté |
+| 1 | `run.py` + `kit.py` | Point d'entrée : kit = dossier de l'exe (`RACKFORGE_KIT_DIR`, jamais le cwd), workspace à côté, 3 éditions (`--edition pc\|web\|phone`), navigateur (kit `navigateur\` puis Edge/Chrome), adresses LAN + `DERNIERE-ADRESSE.txt`, `--diagnostic`, instance unique, chien de garde | `--no-browser` / `--keep-alive` ; Web/Phone = serveur partagé |
 | 2 | `backend/app.py` | FastAPI : routes (§ 6), `_parse_project` (422 français préfixé du champ fautif), `Theme`/`Rendu`/`Face` en `Literal` (valeur inconnue = 422), montage `/static` du frontend | version dans `VERSION` |
 | 3 | `catalog.py` | 13 types intégrés + `ROLE_COLORS` | — |
 | 4 | `catalog_packs.py` | Packs `catalogue/types-officiels/*.json` chargés **par ordre alphabétique, le dernier gagne** pour un même id ; cache par signature | nommer un pack correctif `pack-<constructeur>-vN.json` |
@@ -162,6 +162,7 @@ Règle de code : `prompt()` / `confirm()` natifs interdits (absents des webviews
 | POST | `/api/export/drawio` · `/api/export/vsdx` · `/api/export/etiquettes` | échanges, étiquettes |
 | POST | `/api/flows/propose` · `/api/flows.csv` · `/api/poe` | flux, PoE |
 | GET/PUT | `/api/projects` · `/api/projects/{name}` | projets du workspace |
+| GET | `/api/kit` | chemins du kit portable, workspace, URLs, navigateur |
 | GET/POST | `/api/backup/config` · `/api/backup` · `/api/backup/fichier` | sauvegardes |
 
 Toute erreur de donnée = **422** avec message français (champ fautif préfixé).
@@ -171,15 +172,19 @@ Toute erreur de donnée = **422** avec message français (champ fautif préfixé
 ## 7. Vie de l'application de bureau (`run.py`)
 
 ```
-lancement de l'exe
- ├─ ensure_workspace()  → RackForgePrime-Workspace/ à côté de l'exe (+ variables d'env)
+lancement (LANCER-*.bat ou exe --edition)
+ ├─ kit_dir() = dossier de l'exe / de run.py (jamais cwd ; USB / autre lettre OK)
+ ├─ ensure_workspace()  → <kit>/RackForgePrime-Workspace/ + env écrasé (pas de reste d'une autre install)
+ ├─ DERNIERE-ADRESSE.txt + rackforge-demarrage.log
  ├─ running_instance(8137) ?
  │    ├─ oui, édition PC   → rouvre la fenêtre sur l'instance existante, fin
- │    └─ oui, édition Phone (--host 0.0.0.0) → boîte de message « ferme l'édition PC », fin
+ │    └─ oui, édition Phone (--host 0.0.0.0) → boîte « fermez l'édition PC », fin
  ├─ port occupé par autre chose → port suivant libre (jusqu'à +9)
- ├─ fenêtre Chromium --app (Edge/Chrome), sinon navigateur par défaut
+ ├─ pc   : fenêtre Chromium --app (profil isolé <kit>/profil-fenetre)
+ ├─ web  : navigateur par défaut, serveur keep-alive
+ ├─ phone: 0.0.0.0 + boîte / ipconfig + URLs LAN
  └─ uvicorn.Server.run()
-      └─ watch_window (mode bureau seulement) :
+      └─ watch_window (édition PC seulement) :
            · chaque fenêtre a un id (ping 5 s) ; « bye » retire la fenêtre
            · plus AUCUNE fenêtre vivante + 4 s  → arrêt propre du serveur
            · 180 s sans aucun ping              → arrêt (fenêtre tuée / veille)
@@ -211,22 +216,43 @@ se fait dans les deux**, md5 identiques.
 
 ---
 
-## 9. Build et déploiement (recette éprouvée)
+## 9. Build et déploiement (kit portable, onedir)
+
+**À copier** : tout le dossier produit, jamais l'exe seul.
+
+```
+<kit>/
+  LANCER-PC.bat  LANCER-WEB.bat  LANCER-PHONE.bat  _commun.cmd  LISEZMOI.txt
+  RackForgePrime.exe
+  _internal\                    ← DLLs (onedir : pas d'extraction %TEMP%)
+  RackForgePrime-Workspace\     ← projets + catalogue + images
+```
+
+Commande unique :
 
 ```bat
 cd fng-legal\rackforgeprime
-.venv\Scripts\python.exe -m PyInstaller --noconfirm --onefile --clean --noconsole ^
-  --name RackForgePrime --icon <abs>\assets\icon.ico --paths <abs>\backend ^
-  --add-data "<abs>\frontend;frontend" --collect-all uvicorn ^
-  --workpath C:\Users\koyon\AppData\Local\Temp\rfp-build-<date>\build ^
-  --distpath  ...\dist --specpath ...\spec  <abs>\run.py
+:: bumper VERSION (app.py) + badge (index.html) AVANT
+.venv\Scripts\python.exe scripts\construire_kit_portable.py --build
+:: → dist\RackForgePrime-Portable\
+xcopy /E /I /Y <ancien-workspace> dist\RackForgePrime-Portable\RackForgePrime-Workspace
+.venv\Scripts\python.exe scripts\smoke_editions.py
 ```
 
-Règles : chemins **absolus** ; workpath/distpath dans un dossier **court** (un chemin > 260
-caractères casse `EndUpdateResourceW` à l'étape icône) ; ne pas toucher aux sources pendant la
-compilation ; bumper `VERSION` + badge AVANT ; fermer l'app (fichier verrouillé) ; archiver
-l'ancien exe `SAUVEGARDES\RackForgePrime-ancien-<date>-<lettre>.exe` (nom unique) ; copier ;
-relancer ; vérifier `GET /api/ping` (version) et `/static/js/app.js` (taille = source).
+Équivalent PyInstaller (chemins **absolus**, workpath **court** — un chemin > 260
+caractères casse `EndUpdateResourceW`) : `--onedir` (plus `--onefile`), `--noconsole`,
+`--add-data frontend;frontend`, `--collect-all uvicorn`. Détail dans
+`scripts/construire_kit_portable.py`.
+
+Pourquoi plus de onefile : l'extraction vers `%TEMP%` est la cause n°1 de « ça ne
+s'ouvre pas » sur un autre PC / une clé USB (antivirus, TEMP plein, SmartScreen).
+
+Prérequis sur le PC cible : Windows 10/11 64 bits ; Edge ou Chrome pour la fenêtre PC ;
+`vc_redist.x64` seulement si `VCRUNTIME140.dll` manque (le onedir l'embarque en principe).
+Voir `portable/LISEZMOI.txt`.
+
+Après build : fermer l'app (fichier verrouillé) ; archiver l'ancien exe dans
+`SAUVEGARDES\` ; vérifier `GET /api/ping` (version) et `/api/kit`.
 
 ---
 
@@ -240,6 +266,7 @@ relancer ; vérifier `GET /api/ping` (version) et `/static/js/app.js` (taille = 
 | `test_plan_flux_poe.py`, `test_api_plan_flux_vsdx.py`, `test_vsdx.py` | plan, flux, PoE, VSDX (structure OPC), dossier enrichi |
 | `test_dessin_compact.py` | placeholder à largeur réelle |
 | `test_desktop.py`, `test_desktop_clients.py` | ping/bye, instance unique, chien de garde, fenêtres multiples |
+| `test_portable.py`, `test_smoke_editions.py` | chemins USB, 3 éditions, lanceurs `%~dp0`, smoke PC/Web/Phone + kit déplacé |
 | `test_dossier_pdf.py`, `test_drawio.py`, `test_importers.py`, `test_catalog_*` | dossier, draw.io, imports, catalogue |
 
 Campagnes d'agents (lecture seule) : 31/08 (194 + 237 tests), 01/09 (203 tests, jury 9/10),
@@ -271,6 +298,8 @@ meilleur pour le métier, moins bien en éditeur généraliste).
 | 1.3.1 / 1.3.2 | 04/09 | Import JSON détaché (fin de l'écrasement), pas de PUT si inchangé, Phone prévenue, fenêtres multiples, lettres AA/AB |
 | 1.4.0 | 04/09 | Enregistrer sous (dossier, nom, 7 formats), Ouvrir, Ctrl+S / Ctrl+Maj+S / Ctrl+O |
 | 1.5.0 → 1.5.2 | 04/09 | Vider / Remettre, minimap araignée 220 × 140, dessin des compacts à largeur réelle, pack MikroTik 65 modèles |
+| 1.5.3 → 1.6.0 | 05/09 | Fantôme de dépose adaptatif, vue physique sans texte par défaut (bouton Noms), RAD ETX dessiné |
+| 1.6.1 | 09/09 | **Kit portable** : un dossier (exe + workspace + 3 lanceurs), plus de `cd ..\RackForgePrime-PC` ; onedir ; smoke 3 éditions |
 
 ---
 

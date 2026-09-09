@@ -1,0 +1,144 @@
+RackForgePrime — kit portable (PC / Web / Phone)
+================================================
+
+Un seul dossier à copier. Pas d'installateur, pas de Python sur l'autre PC.
+
+
+Quoi copier
+-----------
+
+Copiez TOUT le dossier du kit (le dossier qui contient ces fichiers) :
+
+  RackForgePrime-Portable\          ← ce dossier, tel quel
+  ├── LANCER-PC.bat                 fenêtre applicative (Edge / Chrome)
+  ├── LANCER-WEB.bat                navigateur sur ce PC
+  ├── LANCER-PHONE.bat              téléphone / tablette (même Wi-Fi)
+  ├── _commun.cmd                   (ne pas lancer tout seul)
+  ├── LISEZMOI.txt                  cette page
+  ├── RackForgePrime.exe
+  ├── _internal\                    DLLs — OBLIGATOIRE (kit onedir)
+  └── RackForgePrime-Workspace\     vos projets + catalogue + images
+
+Destinations possibles : autre PC Windows, clé USB, disque externe.
+Vous pouvez renommer le dossier. Changez de lettre de lecteur sans souci
+(E:\ → F:\). Ne séparez JAMAIS l'exe, _internal\ et le workspace.
+
+Ancien schéma (cassé hors du PC de build) :
+
+  RackForgePrime-PC\     +  RackForgePrime-Web\     +  RackForgePrime-Phone\
+
+LANCER-WEB.bat / LANCER-PHONE.bat faisaient « cd ..\RackForgePrime-PC ».
+Copier un seul de ces trois dossiers, ou changer l'arborescence, cassait
+Web et Phone. Ce kit les remplace : les 3 lanceurs vivent À CÔTÉ de l'exe.
+
+
+Les 3 éditions
+--------------
+
+  PC     Double-clic LANCER-PC.bat  (ou RackForgePrime.exe)
+         Fenêtre sans barre d'adresse. Fermer la fenêtre = quitter.
+
+  Web    Double-clic LANCER-WEB.bat
+         Ouvre http://127.0.0.1:8137 dans le navigateur.
+         Fermez la fenêtre noire du lanceur pour arrêter le serveur.
+
+  Phone  Double-clic LANCER-PHONE.bat
+         Une boîte affiche l'URL LAN (ex. http://192.168.1.12:8137).
+         Sur le téléphone, même Wi-Fi : ouvrez cette URL.
+         Le fichier DERNIERE-ADRESSE.txt (créé au lancement) la recopie.
+         Firewall Windows : autorisez RackForgePrime la première fois.
+
+
+Prérequis sur l'autre PC
+------------------------
+
+  • Windows 10 ou 11 (64 bits).
+  • Pas besoin de Python.
+  • Édition PC (fenêtre) : Microsoft Edge (déjà là sur Windows 10/11)
+    ou Google Chrome. Sans les deux, l'app ouvre le navigateur par défaut
+    (Firefox convient pour Web, pas pour la fenêtre --app).
+  • Visual C++ Redistributable 2015-2022 (x64) — seulement si l'exe
+    refuse de démarrer avec une erreur « VCRUNTIME140.dll manquant ».
+    Téléchargement Microsoft : « vc_redist.x64.exe ».
+    Le kit onedir embarque en principe ces DLL dans _internal\ : ce
+    prérequis est un repli, pas la normale.
+  • Antivirus : au premier lancement depuis une clé USB, Windows peut
+    afficher SmartScreen (« ordinateur protégé »). Choisir
+    « Informations complémentaires » → « Exécuter quand même ».
+    Clic droit sur l'exe → Propriétés → Débloquer, si la case existe.
+
+
+Dépannage — ça ne s'ouvre pas
+-----------------------------
+
+1. Rien du tout, pas de fenêtre, pas d'erreur
+   Lisez (dans le kit) :
+     rackforge-demarrage.log          journal tout au début
+     RackForgePrime-Workspace\rackforge.log
+   Causes fréquentes : antivirus qui met l'exe en quarantaine ;
+   _internal\ oublié lors de la copie ; USB en lecture seule
+   (commutateur physique de la clé).
+
+2. « VCRUNTIME140.dll est introuvable »
+   Installer vc_redist.x64.exe, ou recopier le dossier _internal\
+   complet depuis le kit d'origine.
+
+3. La fenêtre PC ne s'ouvre pas, mais le serveur tourne
+   Ouvrez DERNIERE-ADRESSE.txt et collez l'URL dans Edge.
+   Ou utilisez LANCER-WEB.bat.
+   Option : copiez un Edge / Chrome portable dans
+     <kit>\navigateur\msedge.exe  (ou chrome.exe)
+
+4. Web / Phone : « RackForgePrime.exe introuvable »
+   Vous avez copié uniquement le dossier des lanceurs. Reprenez le
+   kit complet (exe + _internal + workspace + lanceurs).
+
+5. Phone : le téléphone n'affiche rien
+   • PC et téléphone sur le MÊME Wi-Fi (pas le Wi-Fi invité isolé).
+   • Fermez d'abord l'édition PC (elle tient le port 8137).
+   • Autorisez le pare-feu (réseaux privés).
+   • L'URL est http://<IP-du-PC>:8137 — pas 127.0.0.1 (ça, c'est le PC).
+
+6. L'app s'ouvre mais le catalogue est vide / sans photos
+   Le workspace n'a pas été copié. Les images vivent dans
+     RackForgePrime-Workspace\catalogue\
+   Copiez ce dossier avec l'exe. Un exe tout seul recrée un workspace
+   VIDE (normal, mais sans vos projets ni le catalogue).
+
+7. Très lent au premier lancement, ou ça plante sur USB
+   Vous avez un vieux kit « onefile » (un seul .exe, pas de _internal\).
+   PyInstaller extrait alors tout dans %TEMP% : antivirus, TEMP plein
+   ou USB = échec silencieux. Recompilez en onedir (recette ci-dessous).
+
+
+Recette de rebuild (quand le code a changé)
+-------------------------------------------
+
+Sur le PC de build, dans fng-legal\rackforgeprime :
+
+  1. Bumper VERSION (backend\app.py) ET le badge
+     (frontend\index.html #brand-version) ENSEMBLE.
+  2. Fermer l'app (fichier exe verrouillé sinon).
+  3. python scripts\construire_kit_portable.py --build
+     → dist\RackForgePrime-Portable\
+  4. Y copier votre workspace existant (écrase le stub vide) :
+     xcopy /E /I /Y <ancien>\RackForgePrime-Workspace \
+          dist\RackForgePrime-Portable\RackForgePrime-Workspace
+  5. Vérifier : python scripts\smoke_editions.py
+     puis, sur Windows, les 3 LANCER-*.bat.
+  6. Archiver l'ancien exe dans SAUVEGARDES\ (rien n'est supprimé).
+
+Détail PyInstaller (onedir, chemins absolus, dossier de build COURT) :
+voir docs\DAT-RACKFORGEPRIME.md § 9 et scripts\construire_kit_portable.py.
+
+
+Fichiers créés au lancement
+---------------------------
+
+  DERNIERE-ADRESSE.txt          URL de la session (PC / LAN)
+  rackforge-demarrage.log       démarrage, même si le serveur échoue
+  RackForgePrime-Workspace\rackforge.log
+  profil-fenetre\               profil Chromium isolé (édition PC)
+
+
+Tout reste local : aucune donnée ne sort du poste.
