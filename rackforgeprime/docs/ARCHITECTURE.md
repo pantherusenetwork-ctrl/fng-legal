@@ -11,7 +11,7 @@
 | Export SVG | générateur Python maison (`svg_export.py`) | groupes nommés, rééditable draw.io/Inkscape |
 | Export PDF | **svglib + reportlab** | conversion SVG→PDF 100 % locale, aucun binaire système |
 | Tests | **pytest** | moteur de placement et exports testés |
-| Packaging (plus tard) | PyInstaller | exécutable Windows une fois stable |
+| Packaging | PyInstaller **onedir** | kit portable (exe + `_internal` + workspace + 3 lanceurs) |
 
 Principe clé : **une seule source de rendu**. Le backend génère le SVG de la
 baie ; le frontend rend la même géométrie (mêmes constantes d'échelle) ; le PDF

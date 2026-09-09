@@ -8,6 +8,7 @@ de validation : un projet qui viole le snap U ou chevauche deux
 
 from __future__ import annotations
 
+import os
 import sys
 import time
 from pathlib import Path
@@ -47,7 +48,7 @@ else:
 
 # Version de l'application — à mettre à jour en même temps que le badge
 # affiché dans l'UI (frontend/index.html, #brand-version).
-VERSION = "1.6.0"
+VERSION = "1.6.1"
 
 app = FastAPI(title="RackForgePrime", version=VERSION, docs_url="/api/docs")
 
@@ -133,7 +134,27 @@ def ping(c: str = "") -> dict:
     # une fenêtre connue vivante (ou si les clients ne s'identifient pas).
     if not c or app.state.clients:
         app.state.bye_at = 0.0
-    return {"ok": True, "version": VERSION, "app": "RackForgePrime"}
+    return {"ok": True, "version": VERSION, "app": "RackForgePrime",
+            "edition": os.environ.get("RACKFORGE_EDITION", "pc")}
+
+
+@app.get("/api/kit")
+def kit_status() -> dict:
+    """Chemins et adresses du kit portable — pour smoke et dépannage."""
+    from rackforge.kit import diagnostic_report, public_urls
+    report = diagnostic_report()
+    report["version"] = VERSION
+    host = os.environ.get("RACKFORGE_BIND_HOST", "127.0.0.1")
+    port_raw = os.environ.get("RACKFORGE_BIND_PORT", "")
+    try:
+        port = int(port_raw) if port_raw else 8137
+    except ValueError:
+        port = 8137
+    report["host"] = host
+    report["port"] = port
+    if not report.get("urls"):
+        report["urls"] = public_urls(host, port)
+    return report
 
 
 @app.post("/api/bye")

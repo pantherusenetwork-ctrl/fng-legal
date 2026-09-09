@@ -9,15 +9,17 @@ réseau (élévation 42U à l'échelle réelle EIA-310, vue logique, brassage, e
    « Prochaine étape exacte ». Ne jamais repartir de zéro.
 2. Vérifier `git status` et `git log -3` : la branche de travail est
    `claude/rackforgeprimes-foundations-y41pt4` (dépôt = dossier parent `fng-legal`).
-3. Lancer les tests : `python -m pytest tests -q` (84 tests attendus verts au 04/09/2026). ⛔ RÈGLE PANTHER : la version (app.py VERSION + badge index.html) CHANGE À CHAQUE exe déployé.
+3. Lancer les tests : `python -m pytest tests -q` et `python scripts/smoke_editions.py`. ⛔ RÈGLE PANTHER : la version (app.py VERSION + badge index.html) CHANGE À CHAQUE exe déployé.
 
 ## Repères
 - Code : ce dossier (`backend/`, `frontend/`, `tests/`, `docs/`).
 - Serveur de dev : `run.py --port 8138 --no-browser` (run.py écoute 8137 par
   défaut = le port de l'exe), avec `PYTHONIOENCODING=utf-8`. Vérifier `netstat -ano | findstr 813` :
   plusieurs sessions Claude peuvent tourner en même temps (8138, 8139, 8141 vus le 03/09).
-- Exe déployé : `..\..\RackForgePrime-PC\RackForgePrime.exe` (port 8137),
-  workspace `..\..\RackForgePrime-PC\RackForgePrime-Workspace\`.
+- Kit portable : un dossier `RackForgePrime.exe` + `_internal\` +
+  `RackForgePrime-Workspace\` + `LANCER-PC.bat` / `LANCER-WEB.bat` /
+  `LANCER-PHONE.bat`. Recette : `scripts/construire_kit_portable.py --build`
+  (onedir, plus de onefile). Mode d'emploi : `portable/LISEZMOI.txt`.
   Avant de recompiler : fermer l'app (fichier verrouillé sinon).
   Archiver l'ancien exe dans `..\..\SAUVEGARDES\` (suffixe -ancien-AAAA-MM-JJ-x.exe).
 - Projet démo `reseau-maison.json` et `salle-olympe` existent en DEUX copies
