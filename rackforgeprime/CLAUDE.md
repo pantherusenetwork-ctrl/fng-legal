@@ -22,9 +22,10 @@ réseau (élévation 42U à l'échelle réelle EIA-310, vue logique, brassage, e
 - Serveur de dev : `run.py --port 8138 --no-browser` (run.py écoute 8137 par
   défaut = le port de l'exe), avec `PYTHONIOENCODING=utf-8`. Vérifier
   `netstat -ano | findstr 813` : plusieurs sessions peuvent cohabiter
-  (8138, 8139, 8141 vus le 03/09). `find_running_rackforge` sonde 8137–8146 :
-  une instance déjà vivante → on rouvre sa fenêtre, on ne rebind pas
-  (plus de port fantôme type 10048).
+  (8138, 8139, 8141 vus le 03/09) si chacune a son `--port`. 
+  `find_running_rackforge` sonde 8137–8146 **seulement** si le port
+  demandé est dans cette plage (exe / double-clic) : une instance déjà
+  vivante → on rouvre sa fenêtre. Un `--port 18137` (smoke) ignore 8138.
 - Kit portable : un dossier `RackForgePrime.exe` + `_internal\` +
   `RackForgePrime-Workspace\` + `LANCER-PC.bat` / `LANCER-WEB.bat` /
   `LANCER-PHONE.bat`. Recette : `scripts/construire_kit_portable.py --build`
