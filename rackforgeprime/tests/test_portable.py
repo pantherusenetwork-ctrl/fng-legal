@@ -187,7 +187,11 @@ def test_phone_message_box_n_est_pas_avant_le_bind():
 
 
 def test_phone_ecoute_pendant_une_boite_bloquante(tmp_path, monkeypatch):
-    """Même si MessageBox dort 8 s, /api/ping répond en moins de 4 s."""
+    """Même si MessageBox dort 8 s, /api/ping répond avant cette durée.
+
+    Seuil 7,5 s : un bind Windows CI lent (~5 s vu le 10/09) passe ;
+    une MessageBox encore sur le thread principal (~8 s + bind) échoue.
+    """
     kit = tmp_path / "kit"
     kit.mkdir()
     monkeypatch.setenv("RACKFORGE_KIT_DIR", str(kit))
@@ -218,19 +222,21 @@ def test_phone_ecoute_pendant_une_boite_bloquante(tmp_path, monkeypatch):
     ping = None
     last = None
     try:
-        for _ in range(40):
+        for _ in range(75):
             try:
                 with urllib.request.urlopen(
                         f"http://127.0.0.1:{port}/api/ping", timeout=0.4) as resp:
                     ping = json.loads(resp.read().decode("utf-8"))
                 break
             except (urllib.error.URLError, TimeoutError, ConnectionError,
-                    json.JSONDecodeError) as exc:
+                    json.JSONDecodeError, OSError) as exc:
                 last = exc
                 time.sleep(0.1)
         elapsed = time.time() - t0
         assert ping is not None, f"serveur muet ({last})"
-        assert elapsed < 4.0, f"écoute trop tardive ({elapsed:.2f}s) — MessageBox encore bloquante ?"
+        assert elapsed < 7.5, (
+            f"écoute trop tardive ({elapsed:.2f}s) — MessageBox encore bloquante ?"
+        )
         assert ping.get("app") == "RackForgePrime"
         assert ping.get("edition") == "phone"
         addr = kit / "DERNIERE-ADRESSE.txt"
