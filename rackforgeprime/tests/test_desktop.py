@@ -34,6 +34,18 @@ def test_instance_unique_et_port_libre():
     assert run.find_running_rackforge(8199, lo=8198, hi=8199) == (None, None)
 
 
+def test_find_running_hors_plage_ignore_le_bureau(monkeypatch):
+    """Smoke / --port 18137 : ne pas « rouvrir » une instance sur 8138."""
+    def fake(_host: str, port: int) -> str | None:
+        return "1.7.1" if port == 8138 else None
+
+    monkeypatch.setattr(run, "running_instance", fake)
+    assert run.find_running_rackforge(18137) == (None, None)
+    assert run.find_running_rackforge(18937) == (None, None)
+    # Dans la plage bureau, on trouve toujours 8138.
+    assert run.find_running_rackforge(8137) == (8138, "1.7.1")
+
+
 def test_annonce_phone_attend_le_bind(monkeypatch):
     """La boîte Phone n'est appelée qu'une fois le serveur marqué started."""
     calls: list[tuple[str, str]] = []

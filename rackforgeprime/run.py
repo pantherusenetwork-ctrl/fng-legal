@@ -66,10 +66,18 @@ def open_app_window(url: str) -> bool:
 def find_running_rackforge(preferred: int, host: str = "127.0.0.1",
                            lo: int = 8137, hi: int = 8146
                            ) -> tuple[int, str] | tuple[None, None]:
-    """Cherche une instance RackForgePrime déjà vivante (port préféré
-    puis 8137–8146). Évite le second bind (vu en live sur un port
-    fantôme type 10048) : on rouvre la fenêtre existante."""
-    ports = [preferred] + [p for p in range(lo, hi + 1) if p != preferred]
+    """Cherche une instance RackForgePrime déjà vivante.
+
+    Dans la plage bureau (8137–8146) : on sonde toute la plage et on
+    rouvre la fenêtre (évite un 2e bind / port fantôme type 10048).
+    Hors de cette plage (``--port 18137``, smoke, tests) : uniquement
+    le port demandé — une instance de dev sur 8138 n'empêche pas le
+    smoke Phone.
+    """
+    if lo <= preferred <= hi:
+        ports = [preferred] + [p for p in range(lo, hi + 1) if p != preferred]
+    else:
+        ports = [preferred]
     for port in ports:
         ver = running_instance(host, port)
         if ver:
