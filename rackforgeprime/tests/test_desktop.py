@@ -34,12 +34,14 @@ def test_instance_unique_et_port_libre():
     assert run.find_running_rackforge(8199, lo=8198, hi=8199) == (None, None)
 
 
-def test_annonce_phone_attend_le_bind():
+def test_annonce_phone_attend_le_bind(monkeypatch):
     """La boîte Phone n'est appelée qu'une fois le serveur marqué started."""
     calls: list[tuple[str, str]] = []
 
     def fake_box(title: str, text: str) -> None:
         calls.append((title, text))
+
+    monkeypatch.setattr(run, "_message_box", fake_box)
 
     class _Srv:
         started = False
