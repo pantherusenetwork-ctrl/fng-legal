@@ -772,6 +772,37 @@ passe-câbles pas à l'échelle.
   04/09 — l'app relancée la sert ; l'ancienne perspective n'est plus visible.
 - Poubelle `POUBELLE-A-VALIDER-2026-09-05` : 10 exe périmés (un seul archivé gardé).
 
+## 🌉 Pont d'Hemingway — 07/09/2026 — v1.7.0 : juge + éditeur
+
+**Départ** : v1.6.0 (`4d88494`), 89 tests, DAT/README/CLAUDE encore en 1.5.2.
+Friction live notée : 2e instance qui bindait un port fantôme (10048) ; SVG
+photos OLYMPE ~11 Mo.
+
+**Fait (livrable déployable v1.7.0, 105 tests)** — branche
+`cursor/editeur-layout-vsdx-bcd3`, **pas** ancêtre du kit 1.6.1 :
+
+- **A — Docs** : DAT / README / CLAUDE.md à 1.7.0, 105 tests recomptés, E3
+  (Noms off par défaut), backlog juge à jour, recette Visio, agent documenté.
+- **B — Agent « ajoute et corrige »** : `.claude/agents/ajoute-et-corrige.md`
+  (catalogue, images, métadonnées, packs, docs projet — spécialisé).
+- **C — Crayon + Nouveau** : le « crayon » du bandeau était `#btn-vider`
+  (Vider/Remettre), **pas** un mode dessin. Icône **gomme** + libellé
+  Vider/Remettre. Bouton **Nouveau** : projet / page de diagramme / baie /
+  ville-salle. Double-clic et clic droit sur le fond du canvas → le même menu.
+- **D1** layout logique compact (groupé par baie, wrap ~5 nœuds / rangée).
+- **D2** impression 1:10 / 1:20 écrite sur la page PDF (menu Exporter).
+- **D3** identifiants : retour à la ligne, plus de « … » (SVG + étiquettes).
+- **D4** multi-sélection (Maj/Ctrl+clic, Maj+rectangle) + Ctrl+C/V, Suppr, flèches.
+- **D5** VSDX `<Connect>` Begin/End → Pin des nœuds. XML validé.
+  **[à vérifier dans Visio desktop]** — recette DAT § 13.
+- **D6** câbles v2 à l'export SVG/PDF (`cables=true`, ancrage port) +
+  appariement panneau↔switch (clic droit sur un PP, `POST /api/pair-panel`).
+- **D7** plan d'étage déjà fondé (ville → bâtiment → salle) ; **Nouvelle
+  page** de diagramme (multi-pages, compat annotations seules). Aucune
+  donnée OLYMPE inventée.
+- **E** instance unique : scan 8137–8146, message, pas de 2e bind.
+  Export **SVG léger** (`leger=true` = dessin, sans photos).
+
 ## 🌉 Pont d'Hemingway — 09/09/2026 — v1.6.1 kit portable (USB / autre PC)
 
 **Demande Panther** : l'exe / le package ne s'ouvre pas hors du poste de build
@@ -803,7 +834,36 @@ Smoke : `python scripts/smoke_editions.py` (3 éditions + kit déplacé).
 **Quoi copier** : tout le kit (exe + `_internal\` + workspace + `LANCER-*.bat`).
 Prérequis / dépannage : `portable/LISEZMOI.txt`. VERSION + badge **1.6.1**.
 
-**Prochaine étape exacte** : sur le PC Windows de Panther, `python scripts\construire_kit_portable.py --build`, y copier l'actuel `RackForgePrime-Workspace`, lancer les 3 `LANCER-*.bat`, puis recopier le dossier sur une clé USB et un autre PC. Archiver l'ancien exe 3-dossiers dans `SAUVEGARDES\`.
+## 🌉 Pont d'Hemingway — 10/09/2026 — v1.7.1 (avant marketing / vente)
 
-**Questions en attente** : le rebuild exe se fait sur le poste Windows (cette
-session Linux assemble + smoke-simule, elle ne produit pas de `.exe`).
+**Choix de version** : **1.7.1** = features éditeur 1.7.0 + kit portable 1.6.1
++ guide utilisateur + correctif Phone. Pas 1.7.0 : cette étiquette était déjà
+sur la branche features (sans kit onedir). Le tronc portable + les deux
+correctifs méritent un bump.
+
+**Fait** :
+
+1. **GUIDE-UTILISATEUR.md** (FR) : ouverture PC / Web / Phone, projets,
+   vues Physique / Logique / Plan, exports SVG/PDF/VSDX, workspace,
+   dépannage (port 8137, Edge/Chrome, SmartScreen). Copié dans `portable/`
+   et assemblé dans le kit.
+2. **Phone non bloquant** : `DERNIERE-ADRESSE.txt` écrit avant l'écoute ;
+   MessageBox Windows **après** bind, thread daemon. Le serveur n'attend
+   plus le clic OK. Smoke Phone vert même si la boîte reste ouverte.
+3. **Merge** `cursor/editeur-layout-vsdx-bcd3` (v1.7.0) sur le kit 1.6.1 :
+   multi-sélection + Ctrl+C/V, VSDX `<Connect>`, layout logique compact,
+   impression 1:10/1:20, SVG léger, appariement panneau↔switch. Conflits
+   `run.py` / VERSION / docs résolus en gardant le kit onedir.
+
+**Prochaine étape exacte** : sur le PC Windows,
+`python scripts\construire_kit_portable.py --build`, y copier l'actuel
+`RackForgePrime-Workspace`, lancer les 3 `LANCER-*.bat` (Phone : l'URL LAN
+doit répondre **avant** de cliquer OK), recopier le dossier sur USB / autre
+PC. Archiver l'ancien exe dans `SAUVEGARDES\`.
+
+Toujours en attente, **ne pas inventer** : 24/48 ports stack 2930 + PoE,
+VLANs d'OLYMPE, photo STORI, Belden v2, hostnames HERCULE, positions baies,
+ouverture Visio desktop.
+
+Reste produit : connecteurs éditables (waypoints), filtre VLAN des câbles,
+re-photos rackables en angle.

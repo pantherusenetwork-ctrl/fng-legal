@@ -15,6 +15,7 @@ espace de travail **à côté de lui**, jamais dans %TEMP% ni dans le cwd.
     ├── LANCER-WEB.bat
     ├── LANCER-PHONE.bat
     ├── LISEZMOI.txt
+    ├── GUIDE-UTILISATEUR.md
     └── RackForgePrime-Workspace/  ← projets, catalogue, exports
 
 Local uniquement : aucune donnée ne sort du poste.
@@ -62,6 +63,28 @@ def open_app_window(url: str) -> bool:
     return open_ui(url, mode="app") == "app"
 
 
+def find_running_rackforge(preferred: int, host: str = "127.0.0.1",
+                           lo: int = 8137, hi: int = 8146
+                           ) -> tuple[int, str] | tuple[None, None]:
+    """Cherche une instance RackForgePrime déjà vivante.
+
+    Dans la plage bureau (8137–8146) : on sonde toute la plage et on
+    rouvre la fenêtre (évite un 2e bind / port fantôme type 10048).
+    Hors de cette plage (``--port 18137``, smoke, tests) : uniquement
+    le port demandé — une instance de dev sur 8138 n'empêche pas le
+    smoke Phone.
+    """
+    if lo <= preferred <= hi:
+        ports = [preferred] + [p for p in range(lo, hi + 1) if p != preferred]
+    else:
+        ports = [preferred]
+    for port in ports:
+        ver = running_instance(host, port)
+        if ver:
+            return port, ver
+    return None, None
+
+
 def running_instance(host: str, port: int) -> str | None:
     """Version de RackForgePrime qui écoute déjà sur ce port, sinon None
     (port libre, ou occupé par autre chose)."""
@@ -76,7 +99,9 @@ def running_instance(host: str, port: int) -> str | None:
 
 def _message_box(title: str, text: str) -> None:
     """Boîte de message Windows (l'exe est fenêtré : pas de console où
-    lire un print). Silencieux ailleurs."""
+    lire un print). ``MessageBoxW`` est **bloquant** : ne jamais
+    l'appeler sur le thread qui doit encore binder le serveur.
+    Silencieux hors Windows."""
     if os.name != "nt":
         return
     try:
@@ -84,6 +109,26 @@ def _message_box(title: str, text: str) -> None:
         ctypes.windll.user32.MessageBoxW(None, text, title, 0x40)
     except Exception:  # noqa: BLE001
         pass
+
+
+def _message_box_async(title: str, text: str) -> None:
+    """MessageBox dans un thread daemon : n'empêche pas l'écoute."""
+    threading.Thread(
+        target=_message_box, args=(title, text),
+        name="rfp-message-box", daemon=True,
+    ).start()
+
+
+def _announce_when_listening(server, title: str, text: str,
+                             timeout: float = 12.0) -> None:
+    """Attend le bind uvicorn puis affiche l'URL (thread séparé)."""
+    deadline = time.time() + timeout
+    while time.time() < deadline and not getattr(server, "started", False):
+        if getattr(server, "should_exit", False):
+            return
+        time.sleep(0.05)
+    if not getattr(server, "should_exit", False):
+        _message_box(title, text)
 
 
 def port_is_free(host: str, port: int) -> bool:
@@ -220,16 +265,17 @@ def main() -> None:
         report = diagnostic_report(kit, ws)
         sys.exit(_print_diagnostic(report))
 
-    # INSTANCE UNIQUE : si RackForgePrime tourne déjà sur ce port, on ne
-    # lance pas un second serveur (qui échouerait en silence) — on rouvre
-    # simplement sa fenêtre. C'est le comportement d'une vraie application.
-    already = running_instance("127.0.0.1", args.port)
-    if already:
-        url = f"http://127.0.0.1:{args.port}"
+    # INSTANCE UNIQUE : une seule RackForgePrime à la fois. On sonde le
+    # port demandé ET la plage 8137–8146 : si une instance répond, on
+    # rouvre sa fenêtre — jamais de second bind (y compris un port
+    # fantôme type 10048).
+    found_port, already = find_running_rackforge(args.port)
+    if already and found_port is not None:
+        url = f"http://127.0.0.1:{found_port}"
         if args.host not in ("127.0.0.1", "localhost"):
             msg = (
                 f"RackForgePrime v{already} tourne déjà en édition PC "
-                f"sur le port {args.port}.\n\nFermez sa fenêtre, puis "
+                f"sur le port {found_port}.\n\nFermez sa fenêtre, puis "
                 f"relancez LANCER-PHONE.bat : le serveur s'ouvrira alors "
                 f"au réseau (téléphone)."
             )
@@ -243,13 +289,24 @@ def main() -> None:
                 webbrowser.open(url)
         return
 
+    # Port pris par AUTRE chose (pas RackForge) : suivant libre, borné
+    # à +9 — on n'écoute jamais un port aléatoire hors de cette plage.
     if not port_is_free(args.host, args.port):
+        chosen = None
         for cand in range(args.port + 1, args.port + 10):
-            if port_is_free(args.host, cand):
+            if port_is_free(args.host, cand) and not running_instance(
+                    "127.0.0.1", cand):
                 print(f"Port {args.port} occupé par un autre programme → {cand}")
-                args.port = cand
-                os.environ["RACKFORGE_BIND_PORT"] = str(args.port)
+                chosen = cand
                 break
+        if chosen is None:
+            msg = (f"Aucun port libre entre {args.port} et {args.port + 9}.\n"
+                   "Fermez l'autre programme, ou relancez avec --port.")
+            print(msg)
+            _message_box("RackForgePrime — port occupé", msg)
+            return
+        args.port = chosen
+        os.environ["RACKFORGE_BIND_PORT"] = str(args.port)
 
     _redirect_stdio(ws)
 
@@ -278,6 +335,7 @@ def main() -> None:
     elif open_mode != "none":
         print("Aucun Edge/Chrome trouvé — repli sur le navigateur par défaut.")
 
+    phone_txt = None
     if args.edition == "phone":
         lan = [u for u in urls if "127.0.0.1" not in u]
         phone_txt = (
@@ -290,7 +348,8 @@ def main() -> None:
             + "\nFermez la fenêtre du lanceur pour arrêter le serveur."
         )
         print(phone_txt)
-        _message_box("RackForgePrime — édition Phone", phone_txt)
+        # MessageBoxW est bloquant : l'afficher ICI empêcherait le
+        # serveur d'écouter (smoke Phone mort si on ouvre l'URL trop tôt).
 
     if open_mode != "none":
         url_local = urls[0]
@@ -321,6 +380,12 @@ def main() -> None:
     if desktop:
         threading.Thread(target=watch_window, args=(server, app),
                          daemon=True).start()
+    if phone_txt:
+        threading.Thread(
+            target=_announce_when_listening,
+            args=(server, "RackForgePrime — édition Phone", phone_txt),
+            name="rfp-phone-url", daemon=True,
+        ).start()
     try:
         server.run()
     except OSError as exc:

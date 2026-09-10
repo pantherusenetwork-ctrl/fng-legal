@@ -28,7 +28,8 @@ Recette manuelle équivalente (chemins ABSOLUS, workpath COURT) :
     --specpath <court>\\rfp-build\\spec  <abs>\\run.py
 
 Puis copier dist\\RackForgePrime\\* dans RackForgePrime-Portable\\,
-et y ajouter portable\\LANCER-*.bat, _commun.cmd, LISEZMOI.txt.
+et y ajouter portable\\LANCER-*.bat, _commun.cmd, LISEZMOI.txt,
+GUIDE-UTILISATEUR.md.
 Bumper VERSION (app.py) + badge (index.html) AVANT de compiler.
 """
 
@@ -50,6 +51,7 @@ LAUNCHERS = (
     "LANCER-PHONE.bat",
     "_commun.cmd",
     "LISEZMOI.txt",
+    "GUIDE-UTILISATEUR.md",
 )
 
 
@@ -64,6 +66,11 @@ def assemble(dest: Path, workspace: Path | None = None) -> Path:
     dest.mkdir(parents=True, exist_ok=True)
     for name in LAUNCHERS:
         src = PORTABLE_SRC / name
+        if name == "GUIDE-UTILISATEUR.md":
+            # Source de vérité à la racine du projet ; portable/ en est une copie.
+            root_guide = ROOT / "GUIDE-UTILISATEUR.md"
+            if root_guide.is_file():
+                src = root_guide
         if not src.is_file():
             raise FileNotFoundError(f"Lanceur manquant : {src}")
         _copy_file(src, dest / name)

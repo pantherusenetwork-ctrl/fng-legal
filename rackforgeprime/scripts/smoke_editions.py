@@ -60,8 +60,10 @@ def _make_kit(base: Path) -> Path:
     # Même contrat que le kit réel : lanceurs + workspace à côté.
     portable = ROOT / "portable"
     for name in ("LANCER-PC.bat", "LANCER-WEB.bat", "LANCER-PHONE.bat",
-                 "_commun.cmd", "LISEZMOI.txt"):
-        shutil.copy2(portable / name, kit / name)
+                 "_commun.cmd", "LISEZMOI.txt", "GUIDE-UTILISATEUR.md"):
+        src = portable / name
+        if src.is_file():
+            shutil.copy2(src, kit / name)
     (kit / "RackForgePrime-Workspace" / "projets").mkdir(parents=True)
     return kit
 

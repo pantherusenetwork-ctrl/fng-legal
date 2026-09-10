@@ -1,4 +1,4 @@
-# DAT — RackForgePrime v1.6.1
+# DAT — RackForgePrime v1.7.1
 
 **Dossier d'Architecture Technique de l'application** — écrit le 04/09/2026, code expliqué
 étape par étape. Règle d'or reprise du dossier Ingénieur Réseau : *un autre ingénieur doit
@@ -14,7 +14,7 @@ pouvoir reconstruire, compiler, déployer et faire évoluer l'application sans t
 | Élément | Valeur |
 |---|---|
 | Nom | RackForgePrime (logo « slot forgé », icône `assets/icon.ico`) |
-| Version | **1.6.1** (`backend/app.py` `VERSION` + badge `#brand-version` de `frontend/index.html`, toujours bumpés ensemble) |
+| Version | **1.7.1** (`backend/app.py` `VERSION` + badge `#brand-version` de `frontend/index.html`, toujours bumpés ensemble) |
 | Nature | Application **de bureau 100 % locale** : serveur FastAPI + fenêtre Chromium `--app` (aucun cloud, aucun appel sortant) |
 | Métier | Schémas de baies réseau à l'échelle réelle EIA-310, vue logique VLAN/liens, plan d'étage, brassage, dossier DAT PDF, exports SVG/PNG/draw.io/VSDX |
 | Espace de travail projet | `C:\Users\koyon\Desktop\CITADEL\RACKFORGEPRIME\` (règle : tout au même endroit) |
@@ -25,6 +25,7 @@ pouvoir reconstruire, compiler, déployer et faire évoluer l'application sans t
 | Python | 3.13 (`.venv`) ; FastAPI, Uvicorn, Pydantic v2, reportlab + svglib (PDF), Pillow, pyyaml, pypdf, PyInstaller |
 | Tests | `python -m pytest tests -q` + `python scripts/smoke_editions.py` (PC / Web / Phone + kit déplacé) |
 | Journal de bord | `00-CONTEXTE.md` (sections « Pont d'Hemingway », la dernière fait foi) |
+| Guide utilisateur | `GUIDE-UTILISATEUR.md` (copie `portable/GUIDE-UTILISATEUR.md`, assemblé dans le kit) |
 
 ---
 
@@ -41,7 +42,7 @@ dossier DAT — et une vraie application de bureau, solide et fluide.
 |---|---|---|
 | E1 | **Échelle réelle EIA-310 au mm** : façade 19" = 482,6 mm, 1U = 44,45 mm, `RACK_W = 440 px` → `U_PX = 40.5` ; images toujours `preserveAspectRatio="xMidYMid meet"` (jamais d'étirement) ; boîtier compact = `width_mm` réel | `svg_export.py` + `app.js` (constantes miroir) |
 | E2 | **Une seule source de rendu** : l'écran est le SVG d'export, le PDF est la conversion du SVG | `svg_export.py`, `svg_logical.py`, `svg_plan.py`, `pdf_export.py` |
-| E3 | **Aucun nom écrit sur le dessin** sauf hostname saisi par l'utilisateur ; le reste vit au survol (`<title>`) | `render_rack()`, `drawFaceplate()` |
+| E3 | **Aucun nom écrit sur le dessin** sauf hostname saisi **et** toggle « Noms » actif (masqué par défaut en vue physique depuis v1.6.0) ; le reste vit au survol (`<title>`), fiche et tableaux | `render_rack()`, `drawFaceplate()`, `rfp-noms` |
 | E4 | **Un dessin = une image** : tout type posé reçoit une vraie photo de façade DE FACE ; un modèle « [à vérifier] » ne reçoit jamais la photo d'un voisin deviné | pipeline images, `bibliotheque\` |
 | E5 | **Options, choix, liberté** : jamais de blocage sec, clic droit partout, confirmation + Ctrl+Z plutôt qu'interdiction | menus contextuels de `app.js` |
 | E6 | **Version bumpée à chaque exe déployé** | `app.py`, `index.html`, `SAUVEGARDES\` |
@@ -104,17 +105,18 @@ Un projet = un fichier `projets/<nom>.json`, `schema_version = 1`.
 
 | Étape | Module | Ce qu'il fait | Points d'attention |
 |---|---|---|---|
-| 1 | `run.py` + `kit.py` | Point d'entrée : kit = dossier de l'exe (`RACKFORGE_KIT_DIR`, jamais le cwd), workspace à côté, 3 éditions (`--edition pc\|web\|phone`), navigateur (kit `navigateur\` puis Edge/Chrome), adresses LAN + `DERNIERE-ADRESSE.txt`, `--diagnostic`, instance unique, chien de garde | `--no-browser` / `--keep-alive` ; Web/Phone = serveur partagé |
+| 1 | `run.py` + `kit.py` | Point d'entrée : kit = dossier de l'exe (`RACKFORGE_KIT_DIR`, jamais le cwd), workspace à côté, 3 éditions (`--edition pc\|web\|phone`), navigateur (kit `navigateur\` puis Edge/Chrome), adresses LAN + `DERNIERE-ADRESSE.txt` **avant** l'écoute, MessageBox Phone **après** bind (thread), `--diagnostic`, instance unique (`find_running_rackforge` sonde 8137–8146), chien de garde | `--no-browser` / `--keep-alive` ; Web/Phone = serveur partagé |
 | 2 | `backend/app.py` | FastAPI : routes (§ 6), `_parse_project` (422 français préfixé du champ fautif), `Theme`/`Rendu`/`Face` en `Literal` (valeur inconnue = 422), montage `/static` du frontend | version dans `VERSION` |
 | 3 | `catalog.py` | 13 types intégrés + `ROLE_COLORS` | — |
 | 4 | `catalog_packs.py` | Packs `catalogue/types-officiels/*.json` chargés **par ordre alphabétique, le dernier gagne** pour un même id ; cache par signature | nommer un pack correctif `pack-<constructeur>-vN.json` |
 | 5 | `catalog_images.py` | `images-officielles/<id>.png|jpg|svg` → data URI (MIME sniffé sur les octets), chargement différé côté API (`/api/catalog/image/{id}`) | le workspace est gitignoré : images sur disque seulement |
 | 6 | `svg_export.py` | Élévation : `render_rack()` (cadre, rails gradués, équipements), `_item_box()` (empreinte au mm, miroir en vue arrière), `_faceplate_placeholder()` (dessin PATCHBOX : ports en banques, décor, pastille U — à la largeur réelle des compacts depuis v1.5.1), `_rear_faceplate()` (dos neutre, aucun port inventé), `render_project_svg(face=)` | constantes E1 |
-| 7 | `svg_logical.py` | Schéma logique : `_collect_nodes()` (obturateurs exclus ; `rack_id` = vue d'une baie + voisins fantômes), `layout_nodes()` (couches firewall → routeur → cœur → brassage → serveurs → énergie, positions manuelles prioritaires), liens à coudes (`_elbow`), étiquettes, pastilles VLAN, nuage WAN si un port documente « WAN », légende, calques (`LOGICAL_LAYERS`) | 4 palettes `LPALETTES` |
+| 7 | `svg_logical.py` | Schéma logique : `_collect_nodes()` (obturateurs exclus ; `rack_id` = vue d'une baie + voisins fantômes), `layout_nodes()` **compact** (couches DAT, groupé par baie, wrap à `MAX_ROW_PX` ≈ 5 nœuds — plus de bande 4 500 px), liens à coudes, identifiants en retour à la ligne (`textutil.wrap_label`, jamais « … »), calques | 4 palettes `LPALETTES` |
+| 7b | `textutil.py` · `pairing.py` · `cables.py` | Wrap d'identifiants ; appariement panneau↔switch (`POST /api/pair-panel`) ; cordons SVG ancrés au port (`cables=true` à l'export) | aucun VLAN inventé |
 | 8 | `svg_plan.py` | Plan d'étage d'une salle : image de fond à l'opacité choisie, grille 1 m sinon, baies à l'emprise réelle 600 × 1 000 mm (`mm_per_px`), face avant en trait épais, liens inter-baies agrégés avec compteur, points (borne Wi-Fi + cercle de couverture, prise, caméra, note) | `find_room()` → fil d'Ariane |
 | 9 | `pdf_export.py` | svglib + reportlab : élévation **une baie par page A4 portrait**, logique en **tranches verticales** lisibles (jamais réduite pour la largeur), plan, dossier DAT (`render_project_dossier_pdf` : cadre + cartouche auto (projet, section, date, source, version, page), pages Suivi des versions → élévations → logique → plans → brassage → matrice de flux → budget PoE → nomenclature + bilan onduleur), étiquettes TIA-606 (`render_labels_pdf`) | seuil de lisibilité mesuré : min 4,36 pt sur salle-olympe |
 | 10 | `drawio_export.py` | `.drawio` non compressé, 2 pages (élévation en cellules déplaçables, logique avec `edge` source/target) | pas de photos (boîtes) |
-| 11 | `vsdx_export.py` | Paquet OPC Visio 2012 écrit à la main (content types, rels, document + « No Style », pages Élévation et Logique, formes nommées, pouces, Y inversé) | validé structurellement, **[à vérifier] ouverture dans un vrai Visio**, 0 `<Connect>` |
+| 11 | `vsdx_export.py` | Paquet OPC Visio 2012 (pages Élévation + Logique, formes nommées, pouces, Y inversé) + **`<Connect>` Begin/End** vers le Pin des nœuds | validé XML/schema (tests) ; **[à vérifier] ouverture dans Visio desktop** — voir recette § 13 |
 | 12 | `flows.py` | Matrice de flux : `propose_flows()` (paires VLAN↔VLAN via pare-feu/routeur, Internet↔VLAN si WAN — **action toujours vide**), `flow_matrix()` (cellule = action la plus restrictive), CSV | — |
 | 13 | `energy.py` | Budget PoE par équipement : budget saisi (`ItemMeta.poe_budget_w`) sinon type sinon « à renseigner » (jamais deviné), tiré = Σ `poe_w`, alerte ≥ 80 % | `is_poe_type()` = miroir de `isPoE()` JS |
 | 14 | `backup.py` | Sauvegarde ZIP/JSON (projet / tous / workspace) vers dossier de l'app, dossier libre (NAS…), ou téléchargement ; dépôt d'un export déjà généré | chemin NAS dans `sauvegardes\.dernier-dossier.txt`, jamais en dur |
@@ -132,13 +134,13 @@ Un projet = un fichier `projets/<nom>.json`, `schema_version = 1`.
 | 2 | Moteur de placement miroir | `canPlace`, `tryShare` (cohabitation), `rackStats`, `uToY`/`yToU` — le backend reste l'autorité |
 | 3 | Rendu physique | `renderRackSVG` (baie interactive), `drawFaceplate` (photo `meet` ou placeholder à largeur réelle), `drawRearFaceplate`, `itemBox`, slots libres cliquables, motif des U libres suivant le fond |
 | 4 | Fiche équipement | `openDeviceSheet` : façade en grand, tuiles (ports, brassés, conso, **PoE tiré/budget**), grille de ports (clic = éditeur, clic droit = état), câblage port-à-port, trace de câble |
-| 5 | Menus & gestes | clic droit baie/équipement/slot/nœud/lien/point/plan, `addRack(after)` (dit toujours où va la baie, lettres A…Z, AA…), recherche Ctrl+K, Suppr, Ctrl+Z/Y (`history.stack`) |
+| 5 | Menus & gestes | clic droit baie/équipement/slot/nœud/lien/point/plan/**fond** (Nouveau…), `addRack(after)`, Ctrl+K, **multi-sélection** (Maj/Ctrl+clic, Maj+glisser), Ctrl+C/V, Suppr, flèches, Ctrl+Z/Y |
 | 6 | Vues | `setView` physical / logical / diagram / plan ; classes CSS `physical-only`, `logical-only`, `plan-only` |
 | 7 | Logique | `renderLogical` (SVG backend + interactivité : drag des nœuds, liens, annotations, calques, **périmètre par baie** `logicalRack` = baie active `focusRackId`, ajustement automatique à la 1re ouverture) |
 | 8 | Plan | `renderPlan` (cartes ville › bâtiment › salle, puis SVG backend + drag des baies/points, clic droit « poser ici », image de plan réduite à 1 600 px, opacité, réglages) |
 | 9 | Exports | `exportQuery()` (vue, thème, rendu, face, calques, baie, salle), `saveBlob` (« Enregistrer sous » natif `showSaveFilePicker`, repli téléchargement), PNG rasterisé 2×, dialogue Sauvegarder / **Enregistrer sous** (7 formats × 3 destinations) |
-| 10 | Projets | menu **Projets** : liste du workspace, bascule fluide (`switchProject` : PUT du courant si changé, GET de l'autre), `_installProject`, enregistrement auto 1,5 s après chaque geste (`scheduleWorkspaceSave`, `_wsLastSaved` = pas de PUT si inchangé), Ouvrir (Ctrl+O), Enregistrer (Ctrl+S), Enregistrer sous (Ctrl+Maj+S), Détacher |
-| 11 | Vider / Remettre | `projectStash` : projet mis de côté (mémoire + localStorage), écran vidé, enregistrement suspendu, remise exacte |
+| 10 | Projets | menu **Projets** + bouton **Nouveau** (projet / page diagramme / baie / salle) ; double-clic et clic droit sur le fond ; enregistrement auto 1,5 s, Ouvrir (Ctrl+O), Enregistrer (Ctrl+S), Enregistrer sous (Ctrl+Maj+S) |
+| 11 | Vider / Remettre | `#btn-vider` = **gomme** (pas un crayon de dessin) : projet mis de côté, écran vidé, enregistrement suspendu |
 | 12 | Minimap | `updateMinimap` (canvas 220 × 140, blocs + noms de baies, viewport accentué), bouton **araignée** (affichage forcé), clic/glisser pour naviguer |
 | 13 | Flux & PoE | dialogue Flux (lignes éditables, vue matrice, « Proposer », CSV), champ `poe_w` + classes af/at/bt |
 | 14 | Vie de la fenêtre | `heartbeat` : `/api/ping?c=<id fenêtre>` toutes les 5 s, `sendBeacon('/api/bye', id)` au `pagehide` |
@@ -157,8 +159,9 @@ Règle de code : `prompt()` / `confirm()` natifs interdits (absents des webviews
 | GET | `/api/formes` · `/api/formes/svg/{name}` | icônes du Diagramme |
 | POST | `/api/validate` · `/api/patch-table` · `/api/patch-table.csv` | validation + stats ; brassage |
 | POST | `/api/import/devicetype-yaml` · `/api/import/datasheet` | imports |
-| POST | `/api/export/svg` `view=physical|logical|diagram|plan` `theme rendu face layers rack room` | SVG |
-| POST | `/api/export/pdf` idem + `view=dossier` | PDF |
+| POST | `/api/export/svg` `view=physical|logical|diagram|plan` `theme rendu face layers rack room noms cables leger` | SVG (`cables` = cordons ; `leger` = dessin sans photos) |
+| POST | `/api/export/pdf` idem + `view=dossier` `echelle=10\|20` | PDF (échelle EIA-310 écrite sur la page physique) |
+| POST | `/api/pair-panel?panel=&switch=` | Appariement en masse panneau → switch (cordons, aucun VLAN inventé) |
 | POST | `/api/export/drawio` · `/api/export/vsdx` · `/api/export/etiquettes` | échanges, étiquettes |
 | POST | `/api/flows/propose` · `/api/flows.csv` · `/api/poe` | flux, PoE |
 | GET/PUT | `/api/projects` · `/api/projects/{name}` | projets du workspace |
@@ -222,7 +225,8 @@ se fait dans les deux**, md5 identiques.
 
 ```
 <kit>/
-  LANCER-PC.bat  LANCER-WEB.bat  LANCER-PHONE.bat  _commun.cmd  LISEZMOI.txt
+  LANCER-PC.bat  LANCER-WEB.bat  LANCER-PHONE.bat  _commun.cmd
+  LISEZMOI.txt  GUIDE-UTILISATEUR.md
   RackForgePrime.exe
   _internal\                    ← DLLs (onedir : pas d'extraction %TEMP%)
   RackForgePrime-Workspace\     ← projets + catalogue + images
@@ -249,7 +253,7 @@ s'ouvre pas » sur un autre PC / une clé USB (antivirus, TEMP plein, SmartScree
 
 Prérequis sur le PC cible : Windows 10/11 64 bits ; Edge ou Chrome pour la fenêtre PC ;
 `vc_redist.x64` seulement si `VCRUNTIME140.dll` manque (le onedir l'embarque en principe).
-Voir `portable/LISEZMOI.txt`.
+Voir `portable/LISEZMOI.txt` et `GUIDE-UTILISATEUR.md`.
 
 Après build : fermer l'app (fichier verrouillé) ; archiver l'ancien exe dans
 `SAUVEGARDES\` ; vérifier `GET /api/ping` (version) et `/api/kit`.
@@ -265,8 +269,9 @@ Après build : fermer l'app (fichier verrouillé) ; archiver l'ancien exe dans
 | `test_face_arriere.py` | miroir, dos neutre, U inchangés |
 | `test_plan_flux_poe.py`, `test_api_plan_flux_vsdx.py`, `test_vsdx.py` | plan, flux, PoE, VSDX (structure OPC), dossier enrichi |
 | `test_dessin_compact.py` | placeholder à largeur réelle |
-| `test_desktop.py`, `test_desktop_clients.py` | ping/bye, instance unique, chien de garde, fenêtres multiples |
+| `test_desktop.py`, `test_desktop_clients.py` | ping/bye, instance unique (scan 8137–8146), chien de garde, fenêtres multiples |
 | `test_portable.py`, `test_smoke_editions.py` | chemins USB, 3 éditions, lanceurs `%~dp0`, smoke PC/Web/Phone + kit déplacé |
+| `test_v17_layout_print_vsdx.py` | layout compact, wrap, 1:10, VSDX `<Connect>`, appariement, câbles, export léger |
 | `test_dossier_pdf.py`, `test_drawio.py`, `test_importers.py`, `test_catalog_*` | dossier, draw.io, imports, catalogue |
 
 Campagnes d'agents (lecture seule) : 31/08 (194 + 237 tests), 01/09 (203 tests, jury 9/10),
@@ -281,9 +286,10 @@ meilleur pour le métier, moins bien en éditeur généraliste).
   **Enregistrer sous** = dossier + nom + format au choix ; **Sauvegarder** = copie datée
   (PC / NAS `\\192.168.1.138\ULTRA\BACKUP\RACKFORGEPRIME` / téléchargement).
 - **Rien n'est supprimé** : résidus en `RAZOR LOCK\POUBELLE-A-VALIDER-<date>\` avec `00-LISTE.md`.
-- Risques connus : projets à images inline (1,7 Mo, en cours de migration vers un pack
-  `pack-olympe-v1.json`) ; localStorage limité (~5 Mo) ; un seul port ; deux copies du
-  workspace à garder synchrones ; VSDX jamais ouvert dans Visio.
+- Risques connus : SVG photos lourds (~11 Mo salle OLYMPE à l'écran si images
+  catalogue) — export **SVG léger** (`leger=true`, dessin) ; localStorage ~5 Mo ;
+  deux copies du workspace à garder synchrones ; VSDX jamais ouvert dans Visio
+  sur ce poste ; double instance (port fantôme 10048) **corrigé** : scan 8137–8146.
 
 ---
 
@@ -297,22 +303,40 @@ meilleur pour le métier, moins bien en éditeur généraliste).
 | 1.3.0 | 03/09 | Logique par baie, menu Projets + enregistrement auto, ajout de baie explicite, appli de bureau solide, **cache catalogue** |
 | 1.3.1 / 1.3.2 | 04/09 | Import JSON détaché (fin de l'écrasement), pas de PUT si inchangé, Phone prévenue, fenêtres multiples, lettres AA/AB |
 | 1.4.0 | 04/09 | Enregistrer sous (dossier, nom, 7 formats), Ouvrir, Ctrl+S / Ctrl+Maj+S / Ctrl+O |
-| 1.5.0 → 1.5.2 | 04/09 | Vider / Remettre, minimap araignée 220 × 140, dessin des compacts à largeur réelle, pack MikroTik 65 modèles |
-| 1.5.3 → 1.6.0 | 05/09 | Fantôme de dépose adaptatif, vue physique sans texte par défaut (bouton Noms), RAD ETX dessiné |
+| 1.5.0 → 1.5.4 | 04–05/09 | Vider / Remettre, minimap araignée, MikroTik, OLYMPE allégé, dimensions réelles, photos de face |
+| 1.6.0 | 05/09 | Vue physique **sans noms** par défaut (bouton Noms), RAD ETX dessiné |
 | 1.6.1 | 09/09 | **Kit portable** : un dossier (exe + workspace + 3 lanceurs), plus de `cd ..\RackForgePrime-PC` ; onedir ; smoke 3 éditions |
+| 1.7.0 | 07/09 | Layout logique compact (par baie + wrap), impression 1:10/1:20 écrite, wrap identifiants (plus de « … »), multi-sélection + Ctrl+C/V, VSDX `<Connect>`, câbles v2 à l'export + appariement panneau↔switch, bouton Nouveau / pages diagramme, gomme clarifiée, instance unique renforcée, export SVG léger, agent « ajoute-et-corrige » |
+| 1.7.1 | 10/09 | **1.7.0 + kit portable 1.6.1** : guide utilisateur FR, Phone non bloquant (MessageBox après bind), features éditeur dans le tronc onedir |
 
 ---
 
 ## 13. Backlog et [à vérifier]
 
-Par impact (juge du 04/09) : auto-layout logique compact ; impression à l'échelle (1:10,
-1:20 écrit sur la page) ; plus de « … » sur un identifiant dans le PDF ; multi-sélection +
-Ctrl+C/V ; VSDX avec connecteurs + ouverture réelle dans Visio ; câbles v2 (export, ancrage
-au port) ; appariement panneau ↔ switch ; re-photos des rackables en angle.
+**Fait en v1.7.0** (juge du 04/09) : layout logique compact ; impression 1:10/1:20 écrite ;
+wrap des identifiants (plus de « … ») ; multi-sélection + Ctrl+C/V / Suppr / flèches ;
+VSDX `<Connect>` (XML validé) ; câbles v2 à l'export + appariement panneau↔switch ;
+plan d'étage (fondation déjà en 1.2, pages diagramme + bouton Nouveau).
 
-En attente de Panther : 24/48 ports du stack 2930 + budgets PoE, VLANs d'OLYMPE, positions
-réelles des baies et image du plan, photo STORI, Belden v2, test LANCER-PHONE, hostnames
-réels de HERCULE (ex A6KVC).
+**Reste** : connecteurs éditables (waypoints) ; re-photos des rackables en angle ;
+filtre VLAN des câbles ; sauvegarde auto périodique.
+
+**Ouvrir un .vsdx dans Visio desktop [à vérifier par Panther]** :
+1. Exporter → Visio (.vsdx) depuis salle-olympe (ou le démo).
+2. Ouvrir dans Visio (2013+). Deux pages : Élévation, Logique.
+3. Page Logique : un lien doit rester collé aux nœuds si on les déplace
+   (`<Connect>` BeginX/EndX → PinX). Si Visio « répare » le fichier, noter
+   le message — on ajustera le paquet.
+4. Ne pas attendre de photos dans le VSDX (rectangles nommés, comme draw.io).
+
+En attente de Panther (ne pas inventer) : 24/48 ports du stack 2930 + budgets PoE,
+VLANs d'OLYMPE (sans eux : 0 flux proposable), positions réelles des baies + image
+du plan, photo STORI, Belden v2, hostnames réels de HERCULE,
+ouverture Visio, crayon/gomme + Nouveau sur le vrai workspace. Review USB
+après rebuild Windows (`python scripts/construire_kit_portable.py --build`).
+
+Agent spécialisé : `.claude/agents/ajoute-et-corrige.md` (catalogue, images,
+métadonnées, packs, docs projet — pas l'éditeur).
 
 📖 *Sources : le dépôt lui-même (`backend/`, `frontend/`, `tests/`, `00-CONTEXTE.md`), les
 rapports d'agents du 04/09/2026 (`C:\Users\koyon\AppData\Local\Temp\claude\rfp-*`), EIA-310

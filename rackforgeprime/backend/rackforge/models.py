@@ -185,10 +185,23 @@ class Logical(BaseModel):
     annotations: list[Annotation] = []
 
 
+class DiagramPage(BaseModel):
+    """Une page de dessin libre (multi-pages, esprit Visio)."""
+    id: str
+    name: str = "Page 1"
+    annotations: list[Annotation] = []
+
+
 class Diagram(BaseModel):
     """Page de diagramme libre (esprit Visio/draw.io) : uniquement du
-    dessin — texte, zones, flèches, lignes, ellipses."""
+    dessin — texte, zones, flèches, lignes, ellipses.
+
+    ``pages`` : multi-pages (v1.7+). ``annotations`` reste la page
+    implicite si ``pages`` est vide (projets antérieurs).
+    """
     annotations: list[Annotation] = []
+    pages: list[DiagramPage] = []
+    active_page: str = ""
 
 
 class Revision(BaseModel):

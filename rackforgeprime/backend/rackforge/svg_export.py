@@ -17,6 +17,7 @@ from xml.sax.saxutils import escape
 
 from .models import (EquipmentType, Project, Rack, RackItem, rack_stats,
                      type_index)
+from .textutil import svg_text_lines, wrap_label
 
 # --- Constantes d'échelle (le frontend utilise les mêmes valeurs) -----------
 # ÉCHELLE RÉELLE, GRAVÉE AU MM (EIA-310) : la façade 19" fait 482,6 mm,
@@ -202,15 +203,20 @@ _LABEL_W = 138
 
 def _name_plate(label: str, x: float, y: float, ih: float,
                 color: str, p: dict) -> list[str]:
-    # Polices À L'ÉCHELLE du dessin (U_PX=40.5) : lisibles à l'écran ET
-    # une fois la page PDF réduite — jamais les tailles de l'ancien U 22.
-    txt = label if len(label) <= 15 else label[:14] + "…"
+    # Identifiant entier : retour à la ligne dans le cartouche (1U =
+    # 2 lignes, 2U+ = 3). Jamais de « … » sur un hostname.
+    max_lines = 3 if ih >= 70 else 2
+    lines = wrap_label(label, 16, max_lines)
+    if not lines:
+        return []
+    size = 12 if len(lines) > 1 else 15
+    line_h = 13 if len(lines) > 1 else 16
+    y0 = y + ih / 2 - (len(lines) - 1) * line_h / 2 + 4
     return [
         f'<rect x="{x + 4}" y="{y + 2}" width="{_LABEL_W - 6}" '
         f'height="{ih - 4}" rx="3" fill="{p["band"]}"/>',
-        f'<text x="{x + 12}" y="{y + ih / 2 + 5:.1f}" '
-        f'font-family="{FONT}" font-size="15" font-weight="bold" '
-        f'fill="#f1f5f9">{escape(txt)}</text>',
+        svg_text_lines(lines, x + 12, y0, line_h, font=FONT, size=size,
+                       fill="#f1f5f9", weight="bold"),
     ]
 
 
@@ -477,11 +483,13 @@ def render_rack(rack: Rack, types: dict[str, EquipmentType],
 
 def render_project_svg(project: Project, theme: str = "sombre",
                        rendu: str = "photos", face: str = "front",
-                       noms: bool = True) -> str:
+                       noms: bool = True, cables: bool = False) -> str:
     """SVG complet : toutes les baies du projet côte à côte.
 
     ``face="rear"`` rend la vue arrière — dérivée du même JSON, jamais
     un second dessin à maintenir.
+    ``cables=True`` : cordons de brassage (export câbles v2, ancrage port).
+    ``rendu="dessin"`` : export léger (pas de photos embarquées).
     """
     p = palette(theme)
     types = type_index(project)
@@ -510,5 +518,8 @@ def render_project_svg(project: Project, theme: str = "sombre",
                                  theme=theme, rendu=rendu, face=face,
                                  noms=noms))
         x += w + GAP_X
+    if cables:
+        from .cables import render_cables_svg
+        parts.extend(render_cables_svg(project, face=face))
     parts.append('</svg>')
     return "\n".join(parts)

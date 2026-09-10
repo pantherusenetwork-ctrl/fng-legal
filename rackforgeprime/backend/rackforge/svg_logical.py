@@ -18,14 +18,19 @@ from __future__ import annotations
 from xml.sax.saxutils import escape
 
 from .models import EquipmentType, LogicalLink, Project, type_index
+from .textutil import svg_text_lines, wrap_label
 
 # --- Géométrie --------------------------------------------------------------
 NODE_W = 214
 NODE_H = 64
 LAYER_GAP = 120      # espace vertical entre couches (zones comprises)
-NODE_GAP = 40        # espace horizontal entre nœuds d'une couche
+NODE_GAP = 28        # espace horizontal entre nœuds d'une couche
+ROW_GAP = 88         # rangées wrappées d'une même couche (brassage…)
 MARGIN = 40
 LEGEND_H = 70
+# Largeur max d'une rangée auto-layout : au-delà on passe à la ligne
+# (le juge v1.3.0 : 61 nœuds en 4 521 px = inutilisable). 5 cartes.
+MAX_ROW_PX = 5 * (NODE_W + NODE_GAP) - NODE_GAP
 
 # Zones par couche — la lecture DAT (conteneurs Lucid : bordure + titre).
 ZONE_LABELS = {
@@ -166,14 +171,46 @@ def _collect_nodes(project: Project, types: dict[str, EquipmentType],
                 "category": t.category,
                 "color": t.color,
                 "ghost": ghost,
+                "rack_id": rack.id,
             })
     return nodes
+
+
+def _rows_for_layer(nodes: list[dict], project: Project) -> list[list[dict]]:
+    """Groupe par baie (ordre du projet), puis wrap à ``MAX_ROW_PX``.
+
+    Les panneaux d'une même baie restent voisins ; une couche trop
+    large (brassage OLYMPE) devient plusieurs rangées plutôt qu'une
+    bande de 4 000 px.
+    """
+    order = {r.id: i for i, r in enumerate(project.racks)}
+    groups: dict[str, list[dict]] = {}
+    for n in nodes:
+        groups.setdefault(n.get("rack_id") or "", []).append(n)
+    ordered = sorted(groups.items(), key=lambda kv: order.get(kv[0], 999))
+    rows: list[list[dict]] = []
+    current: list[dict] = []
+    current_w = 0.0
+    step = NODE_W + NODE_GAP
+    for _rid, group in ordered:
+        for n in group:
+            add = NODE_W if not current else step
+            if current and current_w + add > MAX_ROW_PX:
+                rows.append(current)
+                current = [n]
+                current_w = float(NODE_W)
+            else:
+                current.append(n)
+                current_w += add
+    if current:
+        rows.append(current)
+    return rows
 
 
 def layout_nodes(project: Project, types: dict[str, EquipmentType],
                  rack_id: str | None = None) -> dict[str, tuple[float, float]]:
     """Positions des nœuds : celles posées à la main, sinon auto-layout
-    en couches (le frontend applique exactement le même algorithme)."""
+    compact (couches DAT, groupé par baie, wrap des rangées larges)."""
     nodes = _collect_nodes(project, types, rack_id)
     layers: dict[int, list[dict]] = {}
     for n in nodes:
@@ -181,30 +218,23 @@ def layout_nodes(project: Project, types: dict[str, EquipmentType],
 
     pos: dict[str, tuple[float, float]] = {}
     manual = project.logical.positions
-    # Couches centrées sur la plus large (lecture en colonne, pas en
-    # escalier) + léger décalage alterné anti-traversée de nœuds.
-    row_w = {rank: len(row) * (NODE_W + NODE_GAP) - NODE_GAP
-             for rank, row in layers.items()}
-    max_w = max(row_w.values(), default=NODE_W)
-    # Un WAN documenté (usage contenant « WAN ») réserve de la place en
-    # tête pour le nuage Internet.
     top_extra = 62 if _wan_item(project) else 0
-    # Rangées compactées : une couche absente (pas de firewall…) ne
-    # laisse jamais de bande vide de 120 px dans le dessin.
-    row_of = {rank: i for i, rank in enumerate(sorted(layers))}
+    y = MARGIN + 26 + top_extra
     for rank in sorted(layers):
-        row = layers[rank]
-        stagger = (rank % 2) * (NODE_W / 2 + 30)
-        x0 = MARGIN + 26 + (max_w - row_w[rank]) / 2 + stagger
-        for i, n in enumerate(row):
-            if n["id"] in manual:
-                p = manual[n["id"]]
-                pos[n["id"]] = (p.x, p.y)
-            else:
-                pos[n["id"]] = (
-                    x0 + i * (NODE_W + NODE_GAP),
-                    MARGIN + 26 + top_extra + row_of[rank] * LAYER_GAP,
-                )
+        rows = _rows_for_layer(layers[rank], project)
+        widest = max((len(r) * (NODE_W + NODE_GAP) - NODE_GAP for r in rows),
+                     default=NODE_W)
+        for row in rows:
+            row_w = len(row) * (NODE_W + NODE_GAP) - NODE_GAP
+            x0 = MARGIN + 26 + max(0.0, (widest - row_w) / 2)
+            for i, n in enumerate(row):
+                if n["id"] in manual:
+                    p = manual[n["id"]]
+                    pos[n["id"]] = (p.x, p.y)
+                else:
+                    pos[n["id"]] = (x0 + i * (NODE_W + NODE_GAP), y)
+            y += ROW_GAP
+        y += LAYER_GAP - ROW_GAP
     return pos
 
 
@@ -439,13 +469,26 @@ def _render_annotations(annotations) -> tuple[list[str], list[str]]:
     return under, over
 
 
+def diagram_annotations(project: Project):
+    """Annotations de la page active (multi-pages) ou de l'ancienne
+    page unique (``diagram.annotations``)."""
+    d = project.diagram
+    if d.pages:
+        page = next((p for p in d.pages if p.id == d.active_page), d.pages[0])
+        return page.annotations, page.name
+    return d.annotations, ""
+
+
 def render_diagram_svg(project: Project, theme: str = "sombre") -> str:
     """Page de diagramme libre (esprit Visio) : uniquement le dessin de
     l'utilisateur — même moteur, mêmes exports que le reste."""
     _set_theme(theme)
-    annots = project.diagram.annotations
+    annots, page_name = diagram_annotations(project)
     max_x = max([a.x + 60 for a in annots] + [a.x2 + 60 for a in annots] + [900])
     max_y = max([a.y + 60 for a in annots] + [a.y2 + 60 for a in annots] + [560])
+    title = escape(project.name) + " — diagramme"
+    if page_name:
+        title += " — " + escape(page_name)
     s: list[str] = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{max_x:.0f}" '
         f'height="{max_y:.0f}" viewBox="0 0 {max_x:.0f} {max_y:.0f}" '
@@ -453,7 +496,7 @@ def render_diagram_svg(project: Project, theme: str = "sombre") -> str:
         f'<rect x="0" y="0" width="{max_x:.0f}" height="{max_y:.0f}" '
         f'fill="{C_BG}"/>',
         f'<text x="{MARGIN}" y="28" font-size="18" font-weight="bold" '
-        f'fill="{C_TEXT}">{escape(project.name)} — diagramme</text>',
+        f'fill="{C_TEXT}">{title}</text>',
     ]
     if not annots:
         s.append(f'<text x="{max_x / 2:.0f}" y="{max_y / 2:.0f}" '
@@ -622,17 +665,18 @@ def render_logical_svg(project: Project, theme: str = "sombre",
         s.append(f'<rect x="{x:.0f}" y="{y:.0f}" width="4" height="{NODE_H}" '
                  f'rx="2" fill="{n["color"]}"/>')
         s.extend(_node_glyph(n["category"], x + 8, y, n["color"]))
-        # Libellé jamais tronqué en plein mot : ellipse au-delà de 26 car.
-        lbl = n["label"] if len(n["label"]) <= 26 else n["label"][:25] + "…"
-        s.append(f'<text x="{x + 38:.0f}" y="{y + 22:.0f}" font-size="14" '
-                 f'fill="{C_TEXT}">{escape(lbl)}</text>')
-        # Deux lignes de détail bornées à la carte (26 car. mono max).
-        for k, line in enumerate((n["sub"], n["sub2"])):
-            if not line:
-                continue
-            line = line if len(line) <= 26 else line[:25] + "…"
-            s.append(f'<text x="{x + 38:.0f}" y="{y + 37 + k * 14:.0f}" '
-                     f'font-size="11" font-family="{FONT_MONO}" '
+        # Identifiant entier : retour à la ligne, jamais de « … ».
+        lbl_lines = wrap_label(n["label"], 22, 2)
+        s.append(svg_text_lines(lbl_lines, x + 38, y + 18, 13,
+                                font=FONT, size=12 if len(lbl_lines) > 1 else 14,
+                                fill=C_TEXT, weight="bold"))
+        details = []
+        for line in (n["sub"], n["sub2"]):
+            details.extend(wrap_label(line, 24, 2))
+        details = details[:2]
+        for k, line in enumerate(details):
+            s.append(f'<text x="{x + 38:.0f}" y="{y + 42 + k * 12:.0f}" '
+                     f'font-size="10" font-family="{FONT_MONO}" '
                      f'fill="{C_TEXT_DIM}">{escape(line)}</text>')
         s.append('</g>')
 

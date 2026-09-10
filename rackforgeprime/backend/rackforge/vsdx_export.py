@@ -76,6 +76,8 @@ class _Page:
         self.w_in = _px(width_px) + 2 * _MARGIN_IN
         self.h_in = _px(height_px) + 2 * _MARGIN_IN
         self.shapes: list[str] = []
+        self.connects: list[str] = []
+        self.named: dict[str, int] = {}
         self._next_id = 1
 
     def _id(self) -> int:
@@ -125,8 +127,16 @@ class _Page:
         s.append(_rect_geometry(wi, hi, no_fill))
         if text:
             s.append(f'<Text><cp IX="0"/><pp IX="0"/>{escape(text)}</Text>')
+        # Point de connexion central : les <Connect> s'y accrochent.
+        s.append('<Section N="Connection" IX="0"><Row IX="0">'
+                 '<Cell N="X" V="0" F="Width*0.5"/>'
+                 '<Cell N="Y" V="0" F="Height*0.5"/>'
+                 '<Cell N="DirX" V="0"/><Cell N="DirY" V="0"/>'
+                 '<Cell N="Type" V="0"/><Cell N="AutoGen" V="0"/>'
+                 '</Row></Section>')
         s.append('</Shape>')
         self.shapes.append("".join(s))
+        self.named[name] = sid
         return sid
 
     def line(self, name: str, x1: float, y1: float, x2: float, y2: float,
@@ -166,13 +176,35 @@ class _Page:
             s.append(f'<Text>{escape(text)}</Text>')
         s.append('</Shape>')
         self.shapes.append("".join(s))
+        self.named[name] = sid
+        return sid
+
+    def connector(self, name: str, from_name: str, to_name: str,
+                  x1: float, y1: float, x2: float, y2: float,
+                  color: str = "#333333", line_w_pt: float = 0.75,
+                  pattern: int = 1, text: str = "") -> int:
+        """Lien 1D + ``<Connect>`` Begin/End vers les formes nommées."""
+        sid = self.line(name, x1, y1, x2, y2, color=color,
+                        line_w_pt=line_w_pt, pattern=pattern, text=text)
+        src, dst = self.named.get(from_name), self.named.get(to_name)
+        if src is not None and dst is not None:
+            # FromPart 9 = Begin, 12 = End ; ToPart 3 = Pin (centre).
+            self.connects.append(
+                f'<Connect FromSheet="{sid}" FromCell="BeginX" FromPart="9" '
+                f'ToSheet="{src}" ToCell="PinX" ToPart="3"/>')
+            self.connects.append(
+                f'<Connect FromSheet="{sid}" FromCell="EndX" FromPart="12" '
+                f'ToSheet="{dst}" ToCell="PinX" ToPart="3"/>')
         return sid
 
     def xml(self) -> str:
+        connects = ""
+        if self.connects:
+            connects = f'<Connects>{"".join(self.connects)}</Connects>'
         return (f'<?xml version="1.0" encoding="utf-8"?>'
                 f'<PageContents xmlns="{_NS_MAIN}" xmlns:r="{_NS_R}" '
                 f'xml:space="preserve"><Shapes>{"".join(self.shapes)}'
-                f'</Shapes></PageContents>')
+                f'</Shapes>{connects}</PageContents>')
 
 
 def _fmt(v: float) -> str:
@@ -259,20 +291,7 @@ def _logical_page(project: Project, types: dict[str, EquipmentType]) -> _Page:
                   text=ZONE_LABELS.get(rank, "AUTRES"), no_fill=True,
                   stroke="#9aa2ad", dashed=True, font_pt=7, color="#6b7480",
                   halign=0, valign=0)
-    # Liens (avant les nœuds : ils restent dessous).
-    for link in project.logical.links:
-        a, b = link.from_.equipment_id, link.to.equipment_id
-        if a not in pos or b not in pos:
-            continue
-        color, pattern, width = _EDGE_STYLE.get(link.kind, _EDGE_STYLE["other"])
-        ports = " · ".join(p for p in (link.from_.port, link.to.port) if p)
-        text = link.label or link.kind
-        if ports:
-            text += f" ({ports})"
-        page.line(f"edge-{link.id}",
-                  pos[a][0] + NODE_W / 2, pos[a][1] + NODE_H / 2,
-                  pos[b][0] + NODE_W / 2, pos[b][1] + NODE_H / 2,
-                  color=color, line_w_pt=width, pattern=pattern, text=text)
+    # Nœuds d'abord (leurs IDs servent aux <Connect>), puis connecteurs.
     for nid, (x, y) in pos.items():
         rack, item = items[nid]
         t = types.get(item.type_id)
@@ -283,6 +302,19 @@ def _logical_page(project: Project, types: dict[str, EquipmentType]) -> _Page:
         page.rect(f"lnode-{nid}", x, y, NODE_W, NODE_H, text=f"{label}\n{sub}",
                   fill=_tint(t.color if t else "#888888"),
                   stroke=(t.color if t else "#888888"), font_pt=9)
+    for link in project.logical.links:
+        a, b = link.from_.equipment_id, link.to.equipment_id
+        if a not in pos or b not in pos:
+            continue
+        color, pattern, width = _EDGE_STYLE.get(link.kind, _EDGE_STYLE["other"])
+        ports = " · ".join(p for p in (link.from_.port, link.to.port) if p)
+        text = link.label or link.kind
+        if ports:
+            text += f" ({ports})"
+        page.connector(f"edge-{link.id}", f"lnode-{a}", f"lnode-{b}",
+                       pos[a][0] + NODE_W / 2, pos[a][1] + NODE_H / 2,
+                       pos[b][0] + NODE_W / 2, pos[b][1] + NODE_H / 2,
+                       color=color, line_w_pt=width, pattern=pattern, text=text)
     return page
 
 

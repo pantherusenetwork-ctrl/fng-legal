@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import os
+import socket
+import subprocess
 import sys
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 import pytest
@@ -24,7 +30,7 @@ def test_version_alignee_sur_le_badge():
     html = (Path(__file__).resolve().parent.parent / "frontend" / "index.html"
             ).read_text(encoding="utf-8")
     assert f">{VERSION}<" in html or f">v{VERSION}<" in html
-    assert VERSION == "1.6.1"
+    assert VERSION == "1.7.1"
 
 
 def test_workspace_ignore_le_cwd(tmp_path, monkeypatch):
@@ -128,8 +134,26 @@ def test_assemblage_du_kit(tmp_path):
     assert (dest / "LANCER-PHONE.bat").is_file()
     assert (dest / "_commun.cmd").is_file()
     assert (dest / "LISEZMOI.txt").is_file()
+    assert (dest / "GUIDE-UTILISATEUR.md").is_file()
     assert (dest / "RackForgePrime-Workspace" / "projets").is_dir()
     assert (dest / "KIT-PORTABLE.txt").is_file()
+    guide = (dest / "GUIDE-UTILISATEUR.md").read_text(encoding="utf-8")
+    assert "Physique" in guide and "Phone" in guide and "8137" in guide
+
+
+def test_guide_utilisateur_aligne():
+    root = Path(__file__).resolve().parent.parent / "GUIDE-UTILISATEUR.md"
+    portable = PORTABLE / "GUIDE-UTILISATEUR.md"
+    assert root.is_file() and portable.is_file()
+    assert root.read_text(encoding="utf-8") == portable.read_text(encoding="utf-8")
+    txt = root.read_text(encoding="utf-8")
+    assert "LANCER-PC.bat" in txt
+    assert "LANCER-WEB.bat" in txt
+    assert "LANCER-PHONE.bat" in txt
+    assert "Physique" in txt and "Logique" in txt and "Plan" in txt
+    assert "VSDX" in txt or ".vsdx" in txt
+    assert "SmartScreen" in txt
+    assert "8137" in txt
 
 
 def test_lisezmoi_dit_quoi_copier():
@@ -140,6 +164,92 @@ def test_lisezmoi_dit_quoi_copier():
     assert "_internal" in txt
     assert "VCRUNTIME140" in txt or "Visual C++" in txt
     assert "Edge" in txt
+    assert "GUIDE-UTILISATEUR.md" in txt
+
+
+def test_readme_et_claude_citent_le_guide():
+    root = Path(__file__).resolve().parent.parent
+    readme = (root / "README.md").read_text(encoding="utf-8")
+    claude = (root / "CLAUDE.md").read_text(encoding="utf-8")
+    assert "GUIDE-UTILISATEUR.md" in readme
+    assert "GUIDE-UTILISATEUR.md" in claude
+
+
+def test_phone_message_box_n_est_pas_avant_le_bind():
+    """Régression audit 10/09 : MessageBoxW avant server.run() tue Phone."""
+    src = (Path(__file__).resolve().parent.parent / "run.py").read_text(
+        encoding="utf-8")
+    start = src.index("phone_txt = None")
+    end = src.index("server.run()")
+    chunk = src[start:end]
+    assert '_message_box("RackForgePrime — édition Phone"' not in chunk
+    assert "_announce_when_listening" in chunk
+
+
+def test_phone_ecoute_pendant_une_boite_bloquante(tmp_path, monkeypatch):
+    """Même si MessageBox dort 8 s, /api/ping répond avant cette durée.
+
+    Seuil 7,5 s : un bind Windows CI lent (~5 s vu le 10/09) passe ;
+    une MessageBox encore sur le thread principal (~8 s + bind) échoue.
+    """
+    kit = tmp_path / "kit"
+    kit.mkdir()
+    monkeypatch.setenv("RACKFORGE_KIT_DIR", str(kit))
+    monkeypatch.delenv("RACKFORGE_WORKSPACE", raising=False)
+    monkeypatch.delenv("RACKFORGE_PROJECTS_DIR", raising=False)
+    port = None
+    for cand in range(18937, 18970):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            if sock.connect_ex(("127.0.0.1", cand)) != 0:
+                port = cand
+                break
+    assert port is not None
+    helper = Path(__file__).resolve().parent / "phone_box_lente.py"
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["RACKFORGE_KIT_DIR"] = str(kit)
+    env["RACKFORGE_WORKSPACE"] = str(kit / "RackForgePrime-Workspace")
+    cwd = tmp_path / "ailleurs"
+    cwd.mkdir()
+    proc = subprocess.Popen(
+        [sys.executable, str(helper), "--edition", "phone",
+         "--port", str(port), "--no-browser"],
+        cwd=str(cwd), env=env,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+    )
+    t0 = time.time()
+    ping = None
+    last = None
+    try:
+        for _ in range(75):
+            try:
+                with urllib.request.urlopen(
+                        f"http://127.0.0.1:{port}/api/ping", timeout=0.4) as resp:
+                    ping = json.loads(resp.read().decode("utf-8"))
+                break
+            except (urllib.error.URLError, TimeoutError, ConnectionError,
+                    json.JSONDecodeError, OSError) as exc:
+                last = exc
+                time.sleep(0.1)
+        elapsed = time.time() - t0
+        assert ping is not None, f"serveur muet ({last})"
+        assert elapsed < 7.5, (
+            f"écoute trop tardive ({elapsed:.2f}s) — MessageBox encore bloquante ?"
+        )
+        assert ping.get("app") == "RackForgePrime"
+        assert ping.get("edition") == "phone"
+        addr = kit / "DERNIERE-ADRESSE.txt"
+        assert addr.is_file(), "DERNIERE-ADRESSE.txt doit exister pendant la boîte"
+        assert f"127.0.0.1:{port}" in addr.read_text(encoding="utf-8")
+    finally:
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.communicate(timeout=8)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.communicate(timeout=4)
 
 
 def test_api_kit_et_ping_edition(monkeypatch):

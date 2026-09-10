@@ -19,7 +19,8 @@ from svglib.svglib import svg2rlg
 from .energy import poe_rows
 from .flows import flows_rows
 from .models import Project, patch_table, type_index
-from .svg_export import render_project_svg
+from .svg_export import MM_19_POUCES, RACK_W, render_project_svg
+from .textutil import wrap_label
 from .svg_logical import render_diagram_svg, render_logical_svg
 from .svg_plan import render_plan_svg
 
@@ -66,6 +67,52 @@ def _pdf_palette(theme: str) -> dict:
     return _PDF_PALETTES.get(theme, _PDF_PALETTES["sombre"])
 
 
+def _eia_pt_per_px(n: float) -> float:
+    """Facteur SVG-px → point PDF pour une échelle 1:n (EIA-310)."""
+    return (MM_19_POUCES / RACK_W) / n * (72.0 / 25.4)
+
+
+def _scale_label(pt_per_px: float) -> str:
+    n = (MM_19_POUCES / RACK_W) * (72.0 / 25.4) / pt_per_px
+    n_r = round(n)
+    if abs(n - n_r) < 0.15:
+        return f"1:{n_r}"
+    return f"1:{n:.1f}".replace(".", ",")
+
+
+def choose_print_scale(draw_w: float, draw_h: float,
+                       page_w: float, page_h: float, margin: float,
+                       wanted: int | None = None
+                       ) -> tuple[float, str]:
+    """Choisit l'échelle d'impression 1:10 / 1:20 (écrite sur la page).
+
+    Si la baie ne tient pas à l'échelle demandée, on prend la plus
+    grande qui rentre et on l'écrit honnêtement (jamais un 1:10 faux).
+    """
+    usable_w = page_w - 2 * margin
+    usable_h = page_h - 2 * margin - 18
+    def fits(n: float) -> bool:
+        s = _eia_pt_per_px(n)
+        return draw_w * s <= usable_w + 0.6 and draw_h * s <= usable_h + 0.6
+    candidates = []
+    if wanted in (10, 20):
+        candidates.append(wanted)
+    candidates.extend(n for n in (10, 20) if n not in candidates)
+    for n in candidates:
+        if fits(n):
+            return _eia_pt_per_px(n), f"1:{n}"
+    s = min(usable_w / draw_w, usable_h / draw_h)
+    return s, _scale_label(s)
+
+
+def _write_scale(c, page_w: float, margin: float, pal: dict, label: str
+                 ) -> None:
+    c.setFillColorRGB(*pal["dim"])
+    c.setFont("Helvetica", 8)
+    c.drawCentredString(page_w / 2, margin - 2,
+                        f"Échelle {label}  —  EIA-310  (1U = 44,45 mm)")
+
+
 def render_project_pdf(project: Project, view: str = "physical",
                        layers=None,
                        theme: str = "sombre",
@@ -73,39 +120,51 @@ def render_project_pdf(project: Project, view: str = "physical",
                        face: str = "front",
                        room: str | None = None,
                        rack: str | None = None,
-                       noms: bool = True) -> bytes:
+                       noms: bool = True,
+                       echelle: int | None = None,
+                       cables: bool = False) -> bytes:
     """Projet -> PDF (bytes). Le SVG est la source, le PDF une vue.
 
     ``view`` : « physical » (élévation de baies) ou « logical » (VLANs/liens).
     ``theme`` : « sombre » (écran) ou « clair » (impression).
+    ``echelle`` : 10 ou 20 (impression à l'échelle, écrite sur la page) ;
+    None = la plus grande de 1:10 / 1:20 qui tient, sinon ajustée.
     """
     buf = io.BytesIO()
     if view == "physical":
         # UNE BAIE PAR PAGE A4 PORTRAIT (pratique DAT, style Patchdocs) :
         # à l'échelle réelle une baie 42U est très haute — sur une page
         # commune les textes tomberaient sous 4 pt. Page par page, chaque
-        # baie profite de toute la hauteur.
+        # baie profite de toute la hauteur. Échelle 1:10 / 1:20 écrite.
         c = pdf_canvas.Canvas(buf, pagesize=A4)
         c.setTitle(project.name)
         c.setAuthor("RackForgePrime")
         page_w, page_h = A4
-        margin = 24
-        for rack in project.racks:
-            sub = project.model_copy(update={"racks": [rack]})
+        margin = 28
+        pal = _pdf_palette(theme)
+        scales_written: list[str] = []
+        for rk in project.racks:
+            sub = project.model_copy(update={"racks": [rk]})
             svg = render_project_svg(sub, theme=theme, rendu=rendu,
-                                     face=face, noms=noms)
+                                     face=face, noms=noms, cables=cables)
             drawing = svg2rlg(io.StringIO(svg))
             if drawing is None:
                 raise RuntimeError(
                     "Conversion SVG -> PDF impossible (SVG invalide)")
-            scale = min((page_w - 2 * margin) / drawing.width,
-                        (page_h - 2 * margin) / drawing.height, 1.75)
+            scale, slabel = choose_print_scale(
+                drawing.width, drawing.height, page_w, page_h, margin,
+                wanted=echelle)
             drawing.scale(scale, scale)
-            c.setFillColorRGB(*_pdf_palette(theme)["bg"])
+            c.setFillColorRGB(*pal["bg"])
             c.rect(0, 0, page_w, page_h, stroke=0, fill=1)
             renderPDF.draw(drawing, c, (page_w - drawing.width * scale) / 2,
                            page_h - margin - drawing.height * scale)
+            _write_scale(c, page_w, margin, pal, slabel)
+            scales_written.append(slabel)
             c.showPage()
+        if scales_written:
+            c.setSubject("Échelle " + ", ".join(dict.fromkeys(scales_written))
+                         + " — EIA-310")
         c.save()
         return buf.getvalue()
 
@@ -400,27 +459,24 @@ def render_labels_pdf(project: Project) -> bytes:
             c.rect(cx + 2, cy + 2, lw - 4, lh - 4)
             c.setDash()
             c.setFillColorRGB(*pal["text"])
-            c.setFont("Courier-Bold", 10)
-            c.drawString(cx + 8, cy + lh - 16,
-                         _label_id(r["rack"], r["u"], r["port"])[:30])
+            c.setFont("Courier-Bold", 9)
+            ident_lines = wrap_label(_label_id(r["rack"], r["u"], r["port"]), 28, 2)
+            for i, line in enumerate(ident_lines):
+                c.drawString(cx + 8, cy + lh - 14 - i * 10, line)
             c.setFillColorRGB(*pal["accent"])
-            c.setFont("Helvetica-Bold", 8)
-            c.drawString(cx + 8, cy + lh - 28, str(r["equipment"])[:34])
+            c.setFont("Helvetica-Bold", 7.5)
+            eq_off = 14 + len(ident_lines) * 10
+            for i, line in enumerate(wrap_label(str(r["equipment"]), 32, 2)):
+                c.drawString(cx + 8, cy + lh - eq_off - i * 9, line)
             c.setFillColorRGB(*pal["dim"])
-            c.setFont("Helvetica", 7.5)
+            c.setFont("Helvetica", 7)
             details = " · ".join(x for x in (
                 f"prise {r['outlet']}" if r["outlet"] else "",
                 f"VLAN {r['vlan']}" if r["vlan"] else "",
                 str(r["usage"] or "")) if x)
-            # Deux lignes plutôt qu'un texte coupé : une étiquette
-            # imprimée doit se lire en entier.
-            if len(details) <= 44:
-                c.drawString(cx + 8, cy + lh - 39, details)
-            else:
-                coupe = details.rfind(" ", 0, 44)
-                coupe = coupe if coupe > 20 else 44
-                c.drawString(cx + 8, cy + lh - 39, details[:coupe])
-                c.drawString(cx + 8, cy + lh - 48, details[coupe:].strip()[:44])
+            det_off = eq_off + 18
+            for i, line in enumerate(wrap_label(details, 36, 2)):
+                c.drawString(cx + 8, cy + lh - det_off - i * 8, line)
         c.showPage()
     c.save()
     return buf.getvalue()
