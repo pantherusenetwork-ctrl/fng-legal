@@ -14,7 +14,8 @@ Copiez TOUT le dossier du kit (le dossier qui contient ces fichiers) :
   ├── LANCER-WEB.bat                navigateur sur ce PC
   ├── LANCER-PHONE.bat              téléphone / tablette (même Wi-Fi)
   ├── _commun.cmd                   (ne pas lancer tout seul)
-  ├── LISEZMOI.txt                  cette page
+  ├── LISEZMOI.txt                  cette page (kit USB / autre PC)
+  ├── GUIDE-UTILISATEUR.md          mode d'emploi : vues, exports, sauvegarde
   ├── RackForgePrime.exe
   ├── _internal\                    DLLs — OBLIGATOIRE (kit onedir)
   └── RackForgePrime-Workspace\     vos projets + catalogue + images
@@ -46,6 +47,7 @@ Les 3 éditions
          Une boîte affiche l'URL LAN (ex. http://192.168.1.12:8137).
          Sur le téléphone, même Wi-Fi : ouvrez cette URL.
          Le fichier DERNIERE-ADRESSE.txt (créé au lancement) la recopie.
+         Le serveur écoute tout de suite : inutile d'attendre le clic OK.
          Firewall Windows : autorisez RackForgePrime la première fois.
 
 

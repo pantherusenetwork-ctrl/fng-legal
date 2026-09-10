@@ -31,6 +31,31 @@ def test_instance_unique_et_port_libre():
     # Rien n'écoute sur un port improbable : pas d'instance, port libre.
     assert run.running_instance("127.0.0.1", 8199) is None
     assert run.port_is_free("127.0.0.1", 8199)
+    assert run.find_running_rackforge(8199, lo=8198, hi=8199) == (None, None)
+
+
+def test_annonce_phone_attend_le_bind():
+    """La boîte Phone n'est appelée qu'une fois le serveur marqué started."""
+    calls: list[tuple[str, str]] = []
+
+    def fake_box(title: str, text: str) -> None:
+        calls.append((title, text))
+
+    class _Srv:
+        started = False
+        should_exit = False
+
+    srv = _Srv()
+    import threading
+    th = threading.Thread(
+        target=run._announce_when_listening,
+        args=(srv, "t", "url"), kwargs={"timeout": 2.0}, daemon=True)
+    th.start()
+    time.sleep(0.15)
+    assert calls == []
+    srv.started = True
+    th.join(timeout=2.0)
+    assert calls == [("t", "url")]
 
 
 class _Server:

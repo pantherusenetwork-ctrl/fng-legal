@@ -37,6 +37,7 @@ from rackforge.pdf_export import (render_labels_pdf,
                                   render_project_dossier_pdf,
                                   render_project_pdf)
 from rackforge.svg_export import render_project_svg
+from rackforge.pairing import pair_panel_switch
 from rackforge.svg_logical import (LOGICAL_LAYERS, render_diagram_svg,
                                    render_logical_svg)
 
@@ -48,7 +49,7 @@ else:
 
 # Version de l'application — à mettre à jour en même temps que le badge
 # affiché dans l'UI (frontend/index.html, #brand-version).
-VERSION = "1.6.1"
+VERSION = "1.7.1"
 
 app = FastAPI(title="RackForgePrime", version=VERSION, docs_url="/api/docs")
 
@@ -269,15 +270,19 @@ def export_svg(payload: dict,
                theme: Theme = "sombre", rendu: Rendu = "photos",
                layers: str | None = None, face: Face = "front",
                room: str | None = None, rack: str | None = None,
-               noms: bool = True) -> Response:
+               noms: bool = True, cables: bool = False,
+               leger: bool = False) -> Response:
     """``view=physical`` : élévation ; ``logical`` : VLANs/liens
     (``rack=<id>`` : vue logique de cette seule baie) ;
     ``diagram`` : page de dessin libre ; ``plan`` : plan d'étage d'une
     salle (``room`` = id de la salle, vide = la première).
     ``theme`` : sombre/clair/kaki/nuit. ``rendu`` : photos ou dessin.
     ``layers`` : calques logiques à dessiner (csv), vide = tous.
-    ``face`` : front (défaut) ou rear — la vue arrière de l'élévation."""
+    ``face`` : front (défaut) ou rear — la vue arrière de l'élévation.
+    ``cables`` : cordons sur l'élévation. ``leger`` : dessin sans photos."""
     project = _parse_project(payload)
+    if leger:
+        rendu = "dessin"
     if view == "logical":
         svg = render_logical_svg(project, theme=theme,
                                  layers=_parse_layers(layers),
@@ -288,7 +293,7 @@ def export_svg(payload: dict,
         svg = render_plan_svg(project, _check_room(project, room), theme=theme)
     else:
         svg = render_project_svg(project, theme=theme, rendu=rendu,
-                                 face=face, noms=noms)
+                                 face=face, noms=noms, cables=cables)
     suffix = {"logical": "-logique", "diagram": "-diagramme",
               "plan": "-plan"}.get(view, "")
     if view == "physical" and face == "rear":
@@ -309,12 +314,20 @@ def export_pdf(payload: dict,
                theme: Theme = "sombre", rendu: Rendu = "photos",
                layers: str | None = None, face: Face = "front",
                room: str | None = None, rack: str | None = None,
-               noms: bool = True) -> Response:
+               noms: bool = True, cables: bool = False,
+               leger: bool = False, echelle: int | None = None) -> Response:
     """``view`` : physical, logical, diagram, plan, ou ``dossier``
     (livrable DAT complet : élévation + logique + plans + brassage +
     flux + PoE + nomenclature, cartouche).
-    ``theme`` : sombre/clair/kaki/nuit. ``rendu`` : photos ou dessin."""
+    ``theme`` : sombre/clair/kaki/nuit. ``rendu`` : photos ou dessin.
+    ``echelle`` : 10 ou 20 (écrit sur la page physique). ``leger`` :
+    dessin sans photos (PDF plus léger)."""
     project = _parse_project(payload)
+    if leger:
+        rendu = "dessin"
+    if echelle is not None and echelle not in (10, 20):
+        raise HTTPException(status_code=422,
+                            detail="échelle : 10 ou 20 (1:10 / 1:20)")
     if view == "dossier":
         pdf = render_project_dossier_pdf(project, theme=theme, rendu=rendu,
                                          noms=noms)
@@ -323,7 +336,8 @@ def export_pdf(payload: dict,
         pdf = render_project_pdf(project, view=view, theme=theme, rendu=rendu,
                                  layers=_parse_layers(layers), face=face,
                                  room=_check_room(project, room),
-                                 rack=_check_rack(project, rack), noms=noms)
+                                 rack=_check_rack(project, rack), noms=noms,
+                                 echelle=echelle, cables=cables)
         suffix = {"logical": "-logique", "diagram": "-diagramme",
                   "plan": "-plan"}.get(view, "")
         if view == "physical" and face == "rear":
@@ -371,6 +385,19 @@ def flows_csv_export(payload: dict) -> Response:
         headers={"Content-Disposition":
                  f'attachment; filename="{project.id}-flux.csv"'},
     )
+
+
+@app.post("/api/pair-panel")
+def pair_panel(payload: dict, panel: str, switch: str,
+               media: str = "cuivre-cat6a") -> dict:
+    """Appariement en masse panneau ↔ switch : un cordon par port
+    cuivre, sans inventer de VLAN. Renvoie le projet mis à jour."""
+    project = _parse_project(payload)
+    try:
+        result = pair_panel_switch(project, panel, switch, media=media)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"project": project.model_dump(by_alias=True), **result}
 
 
 @app.post("/api/poe")
